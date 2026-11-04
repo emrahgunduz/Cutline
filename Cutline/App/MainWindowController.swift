@@ -48,9 +48,12 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         window?.contentView = vertical
         installTransportKeys()
         editor.warmCaches()
+        toolbar = WindowToolbar(editor: editor, windowController: self)
+        if let window { toolbar?.install(on: window) }
     }
 
     private var keyMonitor: Any?
+    private var toolbar: WindowToolbar?
 
     /// Space, arrows, Home and End drive playback anywhere in the window except text fields.
     private func installTransportKeys() {
