@@ -48,6 +48,17 @@ final class ProjectDocument: NSDocument {
     }
 
     override class var autosavesInPlace: Bool { true }
+
+    /// Cutline itself writes caches and layout.json into the package between saves, which
+    /// changes its modification date. Reporting the on-disk date keeps NSDocument from
+    /// treating those writes as an outside edit and refusing to autosave.
+    override var fileModificationDate: Date? {
+        get {
+            guard let fileURL else { return super.fileModificationDate }
+            return (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? super.fileModificationDate
+        }
+        set { super.fileModificationDate = newValue }
+    }
     override class func canConcurrentlyReadDocuments(ofType typeName: String) -> Bool { true }
 
     override func makeWindowControllers() {
