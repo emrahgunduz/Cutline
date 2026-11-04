@@ -1,35 +1,54 @@
 import AppKit
 import Combine
 
-/// The timeline: ruler, video tracks, the audio track and lyric tracks. Draws only what is
-/// visible and does its own hit-testing, so thousands of lyric words stay cheap.
+/// The timeline: ruler, audio, lyric tracks and video tracks. Draws only what is visible and
+/// does its own hit-testing, so thousands of lyric words stay cheap.
 final class TimelineView: NSView {
     let editor: EditorModel
     private var cancellables: Set<AnyCancellable> = []
-    var pixelsPerSecond: CGFloat = 40
-    var scrollTime: Double = 0
-    var scrollY: CGFloat = 0
+    private let filmstrip = Filmstrip()
+
+    var pixelsPerSecond: CGFloat = 40 { didSet { scrollChanged() } }
+    var scrollTime: Double = 0 { didSet { scrollChanged() } }
+    var scrollY: CGFloat = 0 { didSet { scrollChanged() } }
+    /// Called whenever zoom or scroll changes, so scrollers can follow.
+    var onScroll: (() -> Void)?
+    var onSnappingChange: ((Bool) -> Void)?
+
+    var snappingEnabled: Bool {
+        get { editor.document?.layout.snapping ?? true }
+        set { editor.document?.layout.snapping = newValue; editor.document?.persistLayout(); onSnappingChange?(newValue); needsDisplay = true }
+    }
 
     private enum Edge { case left, right, body }
     private enum Hit {
         case clip(UUID, Edge), line(UUID, Edge), word(UUID, Edge), audio
-        case ruler, header(TimelineRow), empty(TimelineRow)
+        case ruler, empty(TimelineRow)
+        case headerButton(TimelineRow, HeaderButton), headerResize(TimelineRow), headerBody(TimelineRow)
     }
-    private struct Drag {
-        var hit: Hit
-        var startPoint: CGPoint
-        var original: Project
-        var didEdit = false
+    enum HeaderButton { case add, remove }
+
+    private enum DragKind {
+        case edit(Hit, original: Project)
+        case scrub
+        case pan(startScroll: Double, startY: CGFloat)
+        case resize(TimelineRow, startHeight: CGFloat)
+        case reorder(TimelineRow)
     }
+    private struct Drag { var kind: DragKind; var startPoint: CGPoint; var didEdit = false }
     private var drag: Drag?
+    /// Time of the snap target the current drag is locked to (drawn as a guide line).
+    private var snapGuide: Double?
+    private var reorderTarget: TimelineRow?
 
     init(editor: EditorModel) {
         self.editor = editor
         super.init(frame: .zero)
         wantsLayer = true
-        registerForDraggedTypes([.string])
+        registerForDraggedTypes([.string, .fileURL])
         let redraw: () -> Void = { [weak self] in self?.needsDisplay = true }
-        editor.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
+        filmstrip.onUpdate = redraw
+        editor.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in self?.needsDisplay = true; self?.onScroll?() }.store(in: &cancellables)
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
@@ -40,120 +59,259 @@ final class TimelineView: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 
-    var layout: TimelineLayout {
-        TimelineLayout(pixelsPerSecond: pixelsPerSecond, scrollTime: scrollTime, scrollY: scrollY,
-                       videoTrackCount: editor.project.videoTracks.count,
-                       lyricTrackCount: editor.project.lyricTracks.count, viewWidth: bounds.width)
+    private func scrollChanged() {
+        needsDisplay = true
+        onScroll?()
     }
 
+    // MARK: Layout
+
     private var project: Project { editor.project }
+
+    func rowKey(_ row: TimelineRow) -> String {
+        switch row {
+        case .ruler: "ruler"
+        case .audio: "audio"
+        case .lyric(let t): project.lyricTracks.indices.contains(t) ? project.lyricTracks[t].id.uuidString : "lyric"
+        case .video(let t): project.videoTracks.indices.contains(t) ? project.videoTracks[t].id.uuidString : "video"
+        }
+    }
+
+    func rowHeight(_ row: TimelineRow) -> CGFloat {
+        if row == .ruler { return TimelineLayout.rulerHeight }
+        let stored = editor.document?.layout.trackHeights?[rowKey(row)].map { CGFloat($0) }
+        return min(max(stored ?? TimelineLayout.defaultHeight(row), TimelineLayout.minRowHeight), TimelineLayout.maxRowHeight)
+    }
+
+    func setRowHeight(_ row: TimelineRow, _ h: CGFloat) {
+        guard let doc = editor.document else { return }
+        var heights = doc.layout.trackHeights ?? [:]
+        heights[rowKey(row)] = Double(min(max(h, TimelineLayout.minRowHeight), TimelineLayout.maxRowHeight))
+        doc.layout.trackHeights = heights
+        needsDisplay = true
+        onScroll?()
+    }
+
+    var layout: TimelineLayout {
+        var l = TimelineLayout(pixelsPerSecond: pixelsPerSecond, scrollTime: scrollTime, scrollY: scrollY,
+                               videoTrackCount: project.videoTracks.count,
+                               lyricTrackCount: project.lyricTracks.count, viewWidth: bounds.width)
+        l.height = { [unowned self] in self.rowHeight($0) }
+        return l
+    }
+
+    /// Scrollable extent in seconds (a little past the project end).
+    var contentDuration: Double { max(project.duration, layout.visibleDuration) + layout.visibleDuration * 0.25 }
+    var maxScrollY: CGFloat { max(0, layout.contentHeight - bounds.height) }
 
     // MARK: Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let l = layout
-        NSColor.textBackgroundColor.withAlphaComponent(0.04).setFill()
+        NSColor(calibratedWhite: 0.11, alpha: 1).setFill()
         bounds.fill()
-        ctx.saveGState()
-        ctx.clip(to: CGRect(x: 0, y: TimelineLayout.rulerHeight, width: bounds.width, height: bounds.height))
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: CGRect(x: 0, y: TimelineLayout.rulerHeight, width: bounds.width, height: bounds.height)).addClip()
         for (row, y, h) in l.rows.dropFirst() {
             let rect = CGRect(x: 0, y: y, width: bounds.width, height: h)
             guard rect.intersects(dirtyRect) else { continue }
             drawRowBackground(row, rect)
-            ctx.saveGState()
-            ctx.clip(to: CGRect(x: TimelineLayout.headerWidth, y: y, width: bounds.width, height: h))
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: CGRect(x: TimelineLayout.headerWidth, y: y, width: bounds.width, height: h - 1)).addClip()
             switch row {
             case .video(let t): drawVideoTrack(t, rect, l)
             case .audio: drawAudio(rect, l)
             case .lyric(let t): drawLyricTrack(t, rect, l)
             case .ruler: break
             }
-            ctx.restoreGState()
+            NSGraphicsContext.restoreGraphicsState()
             drawHeader(row, rect)
         }
         drawProjectEnd(l)
-        ctx.restoreGState()
+        if let target = reorderTarget, let f = l.frame(of: target) {
+            NSColor.controlAccentColor.setFill()
+            CGRect(x: 0, y: f.minY - 1, width: bounds.width, height: 3).fill()
+        }
+        NSGraphicsContext.restoreGraphicsState()
         drawRuler(l)
+        if let g = snapGuide {
+            let x = l.x(for: g)
+            NSColor.systemYellow.setFill()
+            CGRect(x: x - 0.5, y: 0, width: 1.5, height: bounds.height).fill()
+        }
         drawPlayhead(l)
     }
 
     private func drawRowBackground(_ row: TimelineRow, _ rect: CGRect) {
-        let isAlt: Bool
+        let shade: CGFloat
         switch row {
-        case .video(let t): isAlt = t % 2 == 0
-        case .lyric(let t): isAlt = t % 2 == 1
-        default: isAlt = false
+        case .audio: shade = 0.14
+        case .lyric(let t): shade = t % 2 == 0 ? 0.15 : 0.13
+        case .video(let t): shade = t % 2 == 0 ? 0.13 : 0.15
+        case .ruler: shade = 0.1
         }
-        (isAlt ? NSColor.black.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.05)).setFill()
+        NSColor(calibratedWhite: shade, alpha: 1).setFill()
         rect.fill()
-        NSColor.separatorColor.setFill()
+        NSColor(calibratedWhite: 0.05, alpha: 1).setFill()
         CGRect(x: 0, y: rect.maxY - 1, width: rect.width, height: 1).fill()
+    }
+
+    private func title(_ row: TimelineRow) -> String {
+        switch row {
+        case .video(let t): "Video \(t + 1)"
+        case .audio: "Audio"
+        case .lyric(let t): "Lyrics \(t + 1)"
+        case .ruler: ""
+        }
+    }
+
+    private func headerButtonRects(_ rect: CGRect) -> (add: CGRect, remove: CGRect) {
+        let y = rect.minY + 3
+        let remove = CGRect(x: TimelineLayout.headerWidth - 22, y: y, width: 16, height: 16)
+        let add = CGRect(x: TimelineLayout.headerWidth - 42, y: y, width: 16, height: 16)
+        return (add, remove)
+    }
+
+    private func canRemove(_ row: TimelineRow) -> Bool {
+        switch row {
+        case .video: project.videoTracks.count > 1
+        case .lyric: project.lyricTracks.count > 1
+        case .audio: project.audio != nil
+        case .ruler: false
+        }
     }
 
     private func drawHeader(_ row: TimelineRow, _ rect: CGRect) {
         let header = CGRect(x: 0, y: rect.minY, width: TimelineLayout.headerWidth, height: rect.height - 1)
-        NSColor.controlBackgroundColor.setFill()
+        NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
         header.fill()
-        let title: String
-        switch row {
-        case .video(let t): title = "Video \(t + 1)"
-        case .audio: title = "Audio"
-        case .lyric(let t): title = "Lyrics \(t + 1)"
-        case .ruler: title = ""
+        let color: NSColor = switch row {
+        case .audio: NSColor(calibratedRed: 0.30, green: 0.75, blue: 0.50, alpha: 1)
+        case .lyric: NSColor(calibratedRed: 0.70, green: 0.50, blue: 0.90, alpha: 1)
+        default: NSColor(calibratedRed: 0.40, green: 0.60, blue: 0.95, alpha: 1)
         }
-        (title as NSString).draw(at: CGPoint(x: 8, y: rect.minY + 6),
-                                 withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium),
-                                                  .foregroundColor: NSColor.secondaryLabelColor])
+        color.setFill()
+        CGRect(x: 0, y: header.minY, width: 3, height: header.height).fill()
+        if case .audio = row {} else {
+            symbol("line.3.horizontal", at: CGRect(x: 8, y: rect.minY + 4, width: 12, height: 12), tint: .tertiaryLabelColor)
+        }
+        (title(row) as NSString).draw(at: CGPoint(x: 24, y: rect.minY + 3),
+                                      withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.labelColor])
+        let b = headerButtonRects(rect)
+        if row != .audio { symbol("plus.circle", at: b.add, tint: .secondaryLabelColor) }
+        if canRemove(row) { symbol("minus.circle", at: b.remove, tint: .secondaryLabelColor) }
+        if case .video(let t) = row, rect.height > 38 {
+            let count = project.videoTracks[t].clips.count
+            ("\(count) clip\(count == 1 ? "" : "s")" as NSString).draw(at: CGPoint(x: 24, y: rect.minY + 19),
+                                                                       withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.tertiaryLabelColor])
+        }
+        // Resize grip along the bottom edge.
+        NSColor(calibratedWhite: 0.28, alpha: 1).setFill()
+        CGRect(x: TimelineLayout.headerWidth / 2 - 10, y: rect.maxY - 4, width: 20, height: 2).fill()
+    }
+
+    private func symbol(_ name: String, at rect: CGRect, tint: NSColor) {
+        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: rect.height - 3, weight: .regular)) else { return }
+        let tinted = NSImage(size: img.size, flipped: false) { r in
+            img.draw(in: r)
+            tint.set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: rect)
     }
 
     private func clipColor(_ selected: Bool) -> NSColor {
-        selected ? NSColor.controlAccentColor : NSColor(calibratedRed: 0.24, green: 0.36, blue: 0.55, alpha: 1)
+        selected ? NSColor.controlAccentColor : NSColor(calibratedRed: 0.22, green: 0.33, blue: 0.52, alpha: 1)
     }
 
     private func drawVideoTrack(_ t: Int, _ rect: CGRect, _ l: TimelineLayout) {
         let visible = l.visibleTimeRange
         for clip in project.videoTracks[t].clips where clip.end >= visible.lowerBound && clip.start <= visible.upperBound {
-            let r = CGRect(x: l.x(for: clip.start), y: rect.minY + 3, width: CGFloat(clip.duration) * l.pixelsPerSecond, height: rect.height - 7)
+            let r = CGRect(x: l.x(for: clip.start), y: rect.minY + 2, width: CGFloat(clip.duration) * l.pixelsPerSecond, height: rect.height - 5)
             let selected = editor.selection == .clip(clip.id)
             let path = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
-            clipColor(selected).withAlphaComponent(0.85).setFill()
+            clipColor(selected).setFill()
             path.fill()
-            if let img = editor.thumbnails.images[clip.assetID] {
+            guard let asset = project.asset(clip.assetID) else { continue }
+            let labelH: CGFloat = 14
+            if r.height > labelH + 8 {
                 NSGraphicsContext.saveGraphicsState()
-                path.addClip()
-                let aspect = img.size.width / max(1, img.size.height)
-                let tileH = r.height - 14
-                let tileW = max(20, tileH * aspect)
-                var x = r.minX
-                while x < r.maxX && x < bounds.width {
-                    if x + tileW > 0 { img.draw(in: CGRect(x: x, y: r.minY + 14, width: tileW, height: tileH)) }
-                    x += tileW
-                }
+                NSBezierPath(rect: r.insetBy(dx: 1, dy: 1)).addClip()
+                drawFilmstrip(clip: clip, asset: asset, in: CGRect(x: r.minX, y: r.minY + labelH, width: r.width, height: r.height - labelH), l)
                 NSGraphicsContext.restoreGraphicsState()
             }
-            let name = project.asset(clip.assetID)?.name ?? "?"
-            (name as NSString).draw(in: CGRect(x: r.minX + 4, y: r.minY + 1, width: max(0, r.width - 8), height: 13),
-                                    withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
-            if selected {
-                NSColor.white.setStroke()
-                path.lineWidth = 2
-                path.stroke()
+            var labelX = r.minX + 5
+            if let proxy = asset.proxy, r.width > 60 {
+                // Orange "PROXY 1/4" badge: preview is playing the low-res copy of this clip.
+                let text = "PROXY \(proxy.scale.label)" as NSString
+                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.black]
+                let size = text.size(withAttributes: attrs)
+                let badge = CGRect(x: labelX, y: r.minY + 2, width: size.width + 8, height: 11)
+                NSColor.systemOrange.setFill()
+                NSBezierPath(roundedRect: badge, xRadius: 5.5, yRadius: 5.5).fill()
+                text.draw(at: CGPoint(x: badge.minX + 4, y: badge.minY - 0.5), withAttributes: attrs)
+                labelX = badge.maxX + 5
             }
+            (asset.name as NSString).draw(in: CGRect(x: labelX, y: r.minY + 1, width: max(0, r.maxX - labelX - 5), height: 13),
+                                          withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor.white])
+            if asset.proxy != nil {
+                NSColor.systemOrange.setFill()
+                CGRect(x: r.minX, y: r.maxY - 3, width: r.width, height: 3).fill()
+            }
+            NSColor.white.withAlphaComponent(selected ? 1 : 0.25).setStroke()
+            path.lineWidth = selected ? 2 : 1
+            path.stroke()
+            // Edge handles hint that the ends can be dragged.
+            if r.width > 24 {
+                NSColor.white.withAlphaComponent(selected ? 0.9 : 0.35).setFill()
+                NSBezierPath(roundedRect: CGRect(x: r.minX + 2, y: r.midY - 8, width: 3, height: 16), xRadius: 1.5, yRadius: 1.5).fill()
+                NSBezierPath(roundedRect: CGRect(x: r.maxX - 5, y: r.midY - 8, width: 3, height: 16), xRadius: 1.5, yRadius: 1.5).fill()
+            }
+        }
+    }
+
+    /// Tiles across the clip, each showing the source frame at its own time.
+    private func drawFilmstrip(clip: Clip, asset: Asset, in r: CGRect, _ l: TimelineLayout) {
+        if asset.kind == .image {
+            guard let img = editor.thumbnails.images[asset.id] else { return }
+            let w = max(16, r.height * img.size.width / max(1, img.size.height))
+            var x = r.minX
+            while x < r.maxX { if x + w > TimelineLayout.headerWidth && x < bounds.width { img.draw(in: CGRect(x: x, y: r.minY, width: w, height: r.height)) }; x += w }
+            return
+        }
+        let aspect = asset.pixelSize.map { CGFloat($0.width) / CGFloat(max(1, $0.height)) } ?? 16 / 9
+        let tileW = max(24, r.height * aspect)
+        let tileSeconds = Double(tileW / l.pixelsPerSecond)
+        let step = Filmstrip.gridStep(tileSeconds: tileSeconds, fps: project.fps)
+        let url = editor.mediaURL(for: asset, useProxies: true)
+        var x = r.minX
+        while x < r.maxX {
+            if x + tileW > TimelineLayout.headerWidth && x < bounds.width {
+                let localT = Double((x - r.minX) / l.pixelsPerSecond)
+                let src = clip.sourceIn + localT
+                if let img = filmstrip.image(url: url, sourceTime: src, step: step) ?? (localT == 0 ? editor.thumbnails.images[asset.id] : nil) {
+                    img.draw(in: CGRect(x: x, y: r.minY, width: tileW, height: r.height))
+                }
+            }
+            x += tileW
         }
     }
 
     private func drawAudio(_ rect: CGRect, _ l: TimelineLayout) {
         guard let audio = project.audio else {
-            ("Drop the song here" as NSString).draw(at: CGPoint(x: TimelineLayout.headerWidth + 10, y: rect.midY - 7),
+            ("Drop the song here" as NSString).draw(at: CGPoint(x: TimelineLayout.headerWidth + 10, y: rect.minY + 4),
                                                     withAttributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.tertiaryLabelColor])
             return
         }
-        let r = CGRect(x: l.x(for: audio.start), y: rect.minY + 3, width: CGFloat(audio.duration) * l.pixelsPerSecond, height: rect.height - 7)
+        let r = CGRect(x: l.x(for: audio.start), y: rect.minY + 2, width: CGFloat(audio.duration) * l.pixelsPerSecond, height: rect.height - 5)
         let selected = editor.selection == .audio
-        NSColor(calibratedRed: 0.18, green: 0.42, blue: 0.30, alpha: selected ? 1 : 0.8).setFill()
-        NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3).fill()
-        guard let wf = editor.waveforms.waveforms[audio.assetID],
+        NSColor(calibratedRed: 0.15, green: 0.38, blue: 0.27, alpha: 1).setFill()
+        let path = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
+        path.fill()
+        if selected { NSColor.controlAccentColor.setStroke(); path.lineWidth = 2; path.stroke() }
+        guard r.height > 16, let wf = editor.waveforms.waveforms[audio.assetID],
               let level = wf.level(secondsPerPixel: 1 / Double(l.pixelsPerSecond)) else { return }
         let secondsPerBucket = Double(level.samplesPerBucket) / wf.sampleRate
         let mid = r.midY, half = r.height / 2 - 2
@@ -172,25 +330,30 @@ final class TimelineView: NSView {
             }
             x += 1
         }
-        NSColor.white.withAlphaComponent(0.45).setStroke(); peak.lineWidth = 1; peak.stroke()
-        NSColor.white.withAlphaComponent(0.85).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
+        NSColor.white.withAlphaComponent(0.40).setStroke(); peak.lineWidth = 1; peak.stroke()
+        NSColor(calibratedRed: 0.55, green: 1, blue: 0.75, alpha: 0.9).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
     }
 
     private func drawLyricTrack(_ t: Int, _ rect: CGRect, _ l: TimelineLayout) {
         let visible = l.visibleTimeRange
+        let showWords = rect.height >= 36
         for line in project.lyricTracks[t].lines where line.end >= visible.lowerBound && line.start <= visible.upperBound {
             let lr = CGRect(x: l.x(for: line.start), y: rect.minY + 2, width: CGFloat(line.end - line.start) * l.pixelsPerSecond, height: rect.height - 5)
             let lineSelected = editor.selection == .lyricLine(line.id)
-            NSColor(calibratedRed: 0.45, green: 0.30, blue: 0.55, alpha: lineSelected ? 0.9 : 0.45).setFill()
-            NSBezierPath(roundedRect: lr, xRadius: 3, yRadius: 3).fill()
-            for w in line.words {
-                let wr = CGRect(x: l.x(for: w.start), y: lr.minY + 12, width: max(2, CGFloat(w.end - w.start) * l.pixelsPerSecond), height: lr.height - 14)
-                let selected = editor.selection == .lyricWord(w.id)
-                let lowConfidence = !w.confirmed && w.confidence < 0.6
-                (selected ? NSColor.controlAccentColor : lowConfidence ? NSColor.systemOrange : NSColor(calibratedRed: 0.62, green: 0.45, blue: 0.75, alpha: 1)).setFill()
-                NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
-                if wr.width > 14 {
-                    (w.text as NSString).draw(in: wr.insetBy(dx: 2, dy: 1), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
+            NSColor(calibratedRed: 0.36, green: 0.24, blue: 0.46, alpha: 1).setFill()
+            let lp = NSBezierPath(roundedRect: lr, xRadius: 3, yRadius: 3)
+            lp.fill()
+            if lineSelected { NSColor.controlAccentColor.setStroke(); lp.lineWidth = 2; lp.stroke() }
+            if showWords {
+                for w in line.words {
+                    let wr = CGRect(x: l.x(for: w.start), y: lr.minY + 13, width: max(2, CGFloat(w.end - w.start) * l.pixelsPerSecond), height: lr.height - 15)
+                    let selected = editor.selection == .lyricWord(w.id)
+                    let lowConfidence = !w.confirmed && w.confidence < 0.6
+                    (selected ? NSColor.controlAccentColor : lowConfidence ? NSColor.systemOrange.withAlphaComponent(0.85) : NSColor(calibratedRed: 0.62, green: 0.45, blue: 0.80, alpha: 1)).setFill()
+                    NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
+                    if wr.width > 14 {
+                        (w.text as NSString).draw(in: wr.insetBy(dx: 2, dy: 1), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
+                    }
                 }
             }
             if lr.width > 30 {
@@ -203,14 +366,14 @@ final class TimelineView: NSView {
     private func drawProjectEnd(_ l: TimelineLayout) {
         let x = l.x(for: project.duration)
         guard x > TimelineLayout.headerWidth, x < bounds.width else { return }
-        NSColor.white.withAlphaComponent(0.04).setFill()
+        NSColor.black.withAlphaComponent(0.35).setFill()
         CGRect(x: x, y: TimelineLayout.rulerHeight, width: bounds.width - x, height: bounds.height).fill()
     }
 
     private func drawRuler(_ l: TimelineLayout) {
         let r = CGRect(x: 0, y: 0, width: bounds.width, height: TimelineLayout.rulerHeight)
-        NSColor.windowBackgroundColor.setFill(); r.fill()
-        NSColor.separatorColor.setFill(); CGRect(x: 0, y: r.maxY - 1, width: r.width, height: 1).fill()
+        NSColor(calibratedWhite: 0.17, alpha: 1).setFill(); r.fill()
+        NSColor(calibratedWhite: 0.05, alpha: 1).setFill(); CGRect(x: 0, y: r.maxY - 1, width: r.width, height: 1).fill()
         let step = l.tickInterval(fps: project.fps)
         var t = (l.scrollTime / step).rounded(.down) * step
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]
@@ -223,6 +386,10 @@ final class TimelineView: NSView {
             }
             t += step
         }
+        NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
+        CGRect(x: 0, y: 0, width: TimelineLayout.headerWidth, height: r.height - 1).fill()
+        (Timecode.string(editor.playhead, fps: project.fps) as NSString).draw(at: CGPoint(x: 10, y: 6),
+            withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.systemRed])
     }
 
     private func drawPlayhead(_ l: TimelineLayout) {
@@ -241,26 +408,36 @@ final class TimelineView: NSView {
         let l = layout
         guard let row = l.row(atY: p.y) else { return .empty(.ruler) }
         if row == .ruler { return .ruler }
-        if p.x < TimelineLayout.headerWidth { return .header(row) }
+        if p.x < TimelineLayout.headerWidth {
+            guard let f = l.frame(of: row) else { return .headerBody(row) }
+            let b = headerButtonRects(f)
+            if row != .audio && b.add.insetBy(dx: -3, dy: -3).contains(p) { return .headerButton(row, .add) }
+            if canRemove(row) && b.remove.insetBy(dx: -3, dy: -3).contains(p) { return .headerButton(row, .remove) }
+            if p.y > f.maxY - 6 { return .headerResize(row) }
+            return .headerBody(row)
+        }
+        if let f = l.frame(of: row), p.y > f.maxY - 4 { return .headerResize(row) }
         let t = l.time(for: p.x)
         let grab = Double(TimelineLayout.edgeGrab / l.pixelsPerSecond)
         func edge(_ start: Double, _ end: Double) -> Edge {
-            if abs(t - start) <= grab { return .left }
-            if abs(t - end) <= grab { return .right }
+            let span = end - start
+            let g = min(grab, span / 3)
+            if t - start <= g { return .left }
+            if end - t <= g { return .right }
             return .body
         }
         switch row {
         case .video(let ti):
-            if let c = project.videoTracks[ti].clips.last(where: { t >= $0.start - grab && t <= $0.end + grab }) {
+            if let c = project.videoTracks[ti].clips.last(where: { t >= $0.start && t <= $0.end }) {
                 return .clip(c.id, edge(c.start, c.end))
             }
         case .audio:
             if let a = project.audio, t >= a.start, t <= a.end { return .audio }
         case .lyric(let ti):
             guard let frame = l.frame(of: row) else { break }
-            let inWordBand = p.y > frame.minY + 13
-            for line in project.lyricTracks[ti].lines where t >= line.start - grab && t <= line.end + grab {
-                if inWordBand, let w = line.words.first(where: { t >= $0.start - grab && t <= $0.end + grab }) {
+            let inWordBand = frame.height >= 36 && p.y > frame.minY + 14
+            for line in project.lyricTracks[ti].lines where t >= line.start && t <= line.end {
+                if inWordBand, let w = line.words.first(where: { t >= $0.start && t <= $0.end }) {
                     return .word(w.id, edge(w.start, w.end))
                 }
                 return .line(line.id, edge(line.start, line.end))
@@ -270,6 +447,35 @@ final class TimelineView: NSView {
         return .empty(row)
     }
 
+    // MARK: Cursors
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .arrow)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect, .cursorUpdate], owner: self))
+    }
+
+    override func mouseMoved(with event: NSEvent) { updateCursor(at: convert(event.locationInWindow, from: nil)) }
+    override func cursorUpdate(with event: NSEvent) { updateCursor(at: convert(event.locationInWindow, from: nil)) }
+
+    private func updateCursor(at p: CGPoint) {
+        switch hit(at: p) {
+        case .clip(_, .left), .clip(_, .right), .line(_, .left), .line(_, .right), .word(_, .left), .word(_, .right):
+            NSCursor.resizeLeftRight.set()
+        case .clip(_, .body), .line(_, .body), .word(_, .body):
+            NSCursor.openHand.set()
+        case .headerResize: NSCursor.resizeUpDown.set()
+        case .headerButton: NSCursor.pointingHand.set()
+        case .headerBody(let r) where r != .audio: NSCursor.openHand.set()
+        default: NSCursor.arrow.set()
+        }
+    }
+
     // MARK: Mouse
 
     override func mouseDown(with event: NSEvent) {
@@ -277,69 +483,115 @@ final class TimelineView: NSView {
         let p = convert(event.locationInWindow, from: nil)
         let h = hit(at: p)
         switch h {
-        case .clip(let id, _): editor.selection = .clip(id)
+        case .clip(let id, let e): editor.selection = .clip(id); if e == .body { NSCursor.closedHand.set() }
         case .line(let id, _): editor.selection = .lyricLine(id)
         case .word(let id, _): editor.selection = .lyricWord(id)
         case .audio: editor.selection = .audio
-        case .ruler: editor.setPlayhead(layout.time(for: p.x))
-        case .empty: editor.selection = .none; editor.setPlayhead(layout.time(for: p.x))
-        case .header(let row): showHeaderMenu(row, event: event); return
+        case .ruler:
+            editor.isPlaying = false
+            editor.setPlayhead(layout.time(for: p.x))
+            drag = Drag(kind: .scrub, startPoint: p); return
+        case .empty:
+            editor.selection = .none
+            editor.isPlaying = false
+            editor.setPlayhead(layout.time(for: p.x))
+            drag = Drag(kind: .scrub, startPoint: p); return
+        case .headerButton(let row, let b): headerAction(row, b); return
+        case .headerResize(let row): drag = Drag(kind: .resize(row, startHeight: rowHeight(row)), startPoint: p); return
+        case .headerBody(let row):
+            if event.clickCount == 2 { setRowHeight(row, rowHeight(row) > TimelineLayout.minRowHeight + 1 ? TimelineLayout.minRowHeight : TimelineLayout.defaultHeight(row)); return }
+            if row != .audio { drag = Drag(kind: .reorder(row), startPoint: p) }
+            return
         }
-        drag = Drag(hit: h, startPoint: p, original: editor.project)
+        drag = Drag(kind: .edit(h, original: editor.project), startPoint: p)
+    }
+
+    /// Snap `time` to nearby targets unless snapping is off or ⌘ is held.
+    private func snapped(_ time: Double, excluding ids: Set<UUID>, event: NSEvent?) -> Double {
+        guard snappingEnabled, !(event?.modifierFlags.contains(.command) ?? false) else { snapGuide = nil; return time }
+        let targets = Snapping.targets(in: drag.map { if case .edit(_, let o) = $0.kind { return o } else { return project } } ?? project,
+                                       playhead: editor.playhead, excluding: ids)
+        if let s = Snapping.snap(time, targets: targets, pixelsPerSecond: Double(pixelsPerSecond)) { snapGuide = s; return s }
+        snapGuide = nil
+        return time
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard var d = drag else { return }
         let p = convert(event.locationInWindow, from: nil)
         let l = layout
-        let dt = Double((p.x - d.startPoint.x) / l.pixelsPerSecond)
-        let pointerTime = l.time(for: p.x)
-        if case .ruler = d.hit { editor.setPlayhead(pointerTime); return }
-        if case .empty = d.hit { editor.setPlayhead(pointerTime); return }
-        guard abs(p.x - d.startPoint.x) > 2 || d.didEdit else { return }
-        var next = d.original
-        switch d.hit {
-        case .clip(let id, let edge):
-            guard let c = d.original.videoTracks.flatMap(\.clips).first(where: { $0.id == id }) else { return }
-            switch edge {
-            case .left: next.trimStart(id, to: c.start + dt)
-            case .right: next.trimEnd(id, to: c.end + dt)
-            case .body:
-                var track = d.original.clipLocation(id)!.track
-                if case .video(let t)? = l.row(atY: p.y) { track = t }
-                next.moveClip(id, toTrack: track, start: c.start + dt)
+        autoscroll(at: p)
+        switch d.kind {
+        case .scrub:
+            editor.setPlayhead(l.time(for: p.x)); return
+        case .pan: return
+        case .resize(let row, let h0):
+            setRowHeight(row, h0 + (p.y - d.startPoint.y)); return
+        case .reorder(let row):
+            reorderTarget = reorderDestination(for: row, at: p.y)
+            needsDisplay = true
+            return
+        case .edit(let hit, let original):
+            guard abs(p.x - d.startPoint.x) > 2 || d.didEdit else { return }
+            let dt = Double((p.x - d.startPoint.x) / l.pixelsPerSecond)
+            var next = original
+            switch hit {
+            case .clip(let id, let edge):
+                guard let c = original.videoTracks.flatMap(\.clips).first(where: { $0.id == id }) else { return }
+                switch edge {
+                case .left: next.trimStart(id, to: snapped(c.start + dt, excluding: [id], event: event))
+                case .right: next.trimEnd(id, to: snapped(c.end + dt, excluding: [id], event: event))
+                case .body:
+                    var track = original.clipLocation(id)!.track
+                    if case .video(let t)? = l.row(atY: p.y) { track = t }
+                    var start = c.start + dt
+                    let s1 = snapped(start, excluding: [id], event: event)
+                    if s1 != start { start = s1 } else {
+                        let endSnap = snapped(start + c.duration, excluding: [id], event: event)
+                        start = endSnap - c.duration
+                    }
+                    next.moveClip(id, toTrack: track, start: start)
+                }
+            case .line(let id, let edge):
+                guard let line = original.lyricTracks.flatMap(\.lines).first(where: { $0.id == id }) else { return }
+                let ids = Set([id] + line.words.map(\.id))
+                switch edge {
+                case .left: next.retimeLine(id, start: snapped(line.start + dt, excluding: ids, event: event))
+                case .right: next.retimeLine(id, end: snapped(line.end + dt, excluding: ids, event: event))
+                case .body:
+                    var track = original.lineLocation(id)!.track
+                    if case .lyric(let t)? = l.row(atY: p.y) { track = t }
+                    next.moveLine(id, toTrack: track, start: snapped(line.start + dt, excluding: ids, event: event))
+                }
+            case .word(let id, let edge):
+                guard let w = original.lyricTracks.flatMap(\.lines).flatMap(\.words).first(where: { $0.id == id }) else { return }
+                switch edge {
+                case .left: next.retimeWord(id, start: min(snapped(w.start + dt, excluding: [id], event: event), w.end - next.frameDuration))
+                case .right: next.retimeWord(id, end: max(snapped(w.end + dt, excluding: [id], event: event), w.start + next.frameDuration))
+                case .body: next.moveWord(id, start: snapped(w.start + dt, excluding: [id], event: event))
+                }
+            default: return
             }
-        case .line(let id, let edge):
-            guard let line = d.original.lyricTracks.flatMap(\.lines).first(where: { $0.id == id }) else { return }
-            switch edge {
-            case .left: next.retimeLine(id, start: line.start + dt)
-            case .right: next.retimeLine(id, end: line.end + dt)
-            case .body:
-                var track = d.original.lineLocation(id)!.track
-                if case .lyric(let t)? = l.row(atY: p.y) { track = t }
-                next.moveLine(id, toTrack: track, start: line.start + dt)
-            }
-        case .word(let id, let edge):
-            guard let w = d.original.lyricTracks.flatMap(\.lines).flatMap(\.words).first(where: { $0.id == id }) else { return }
-            switch edge {
-            case .left: next.retimeWord(id, start: min(w.start + dt, w.end - next.frameDuration))
-            case .right: next.retimeWord(id, end: max(w.end + dt, w.start + next.frameDuration))
-            case .body: next.moveWord(id, start: w.start + dt)
-            }
-        default: return
+            // Live preview of the drag; committed as one undo step on mouse up.
+            editor.replaceWithoutUndo(next)
+            d.didEdit = true
+            drag = d
         }
-        // Live preview of the drag; committed as one undo step on mouse up.
-        editor.replaceWithoutUndo(next)
-        d.didEdit = true
-        drag = d
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { drag = nil }
-        guard let d = drag, d.didEdit else { return }
-        let final = editor.project
-        editor.replaceWithoutUndo(d.original)
-        editor.edit(actionName(for: d.hit)) { $0 = final }
+        defer { drag = nil; snapGuide = nil; reorderTarget = nil; needsDisplay = true; updateCursor(at: convert(event.locationInWindow, from: nil)) }
+        guard let d = drag else { return }
+        switch d.kind {
+        case .resize: editor.document?.persistLayout()
+        case .reorder(let row):
+            if let target = reorderTarget { performReorder(row, to: target) }
+        case .edit(let hit, let original) where d.didEdit:
+            let final = editor.project
+            editor.replaceWithoutUndo(original)
+            editor.edit(actionName(for: hit)) { $0 = final }
+        default: break
+        }
     }
 
     private func actionName(for hit: Hit) -> String {
@@ -349,18 +601,112 @@ final class TimelineView: NSView {
         }
     }
 
+    // MARK: Track reordering
+
+    /// The row a dragged header would land in front of (same kind only).
+    private func reorderDestination(for row: TimelineRow, at y: CGFloat) -> TimelineRow? {
+        guard let over = layout.row(atY: y), over != row else { return nil }
+        switch (row, over) {
+        case (.video, .video), (.lyric, .lyric): return over
+        default: return nil
+        }
+    }
+
+    private func performReorder(_ row: TimelineRow, to target: TimelineRow) {
+        switch (row, target) {
+        case (.video(let from), .video(let to)): editor.edit("Move Track") { $0.moveVideoTrack(from: from, to: to) }
+        case (.lyric(let from), .lyric(let to)): editor.edit("Move Track") { $0.moveLyricTrack(from: from, to: to) }
+        default: break
+        }
+    }
+
+    // MARK: Track header actions
+
+    func headerAction(_ row: TimelineRow, _ b: HeaderButton) {
+        switch (row, b) {
+        case (.video(let t), .add): editor.edit("Add Video Track") { $0.insertVideoTrack(above: t) }
+        case (.lyric(let t), .add): editor.edit("Add Lyrics Track") { $0.insertLyricTrack(below: t) }
+        case (.video(let t), .remove): confirmRemoveTrack(row) { self.editor.edit("Remove Video Track") { $0.removeVideoTrack(at: t) } }
+        case (.lyric(let t), .remove): confirmRemoveTrack(row) { self.editor.edit("Remove Lyrics Track") { $0.removeLyricTrack(at: t) } }
+        case (.audio, .remove): editor.edit("Remove Audio") { $0.removeAudio() }
+        default: break
+        }
+    }
+
+    private func confirmRemoveTrack(_ row: TimelineRow, _ remove: @escaping () -> Void) {
+        let count: Int
+        switch row {
+        case .video(let t): count = project.videoTracks[t].clips.count
+        case .lyric(let t): count = project.lyricTracks[t].lines.count
+        default: count = 0
+        }
+        guard count > 0, let window else { remove(); return }
+        let alert = NSAlert()
+        alert.messageText = "Remove \(title(row))?"
+        alert.informativeText = "It contains \(count) item\(count == 1 ? "" : "s"). You can undo this."
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { remove() } }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        guard let row = layout.row(atY: p.y), row != .ruler else { return }
+        let menu = NSMenu()
+        func item(_ title: String, _ action: @escaping () -> Void) {
+            let i = NSMenuItem(title: title, action: #selector(MenuAction.run), keyEquivalent: "")
+            let target = MenuAction(action)
+            i.target = target
+            i.representedObject = target
+            menu.addItem(i)
+        }
+        switch row {
+        case .video(let t):
+            item("Add Video Track Above") { self.headerAction(row, .add) }
+            if project.videoTracks.count > 1 { item("Remove \(title(row))") { self.headerAction(row, .remove) } }
+            if t < project.videoTracks.count - 1 { item("Move Up") { self.editor.edit("Move Track") { $0.moveVideoTrack(from: t, to: t + 1) } } }
+            if t > 0 { item("Move Down") { self.editor.edit("Move Track") { $0.moveVideoTrack(from: t, to: t - 1) } } }
+        case .lyric(let t):
+            item("Add Lyrics Track Below") { self.headerAction(row, .add) }
+            if project.lyricTracks.count > 1 { item("Remove \(title(row))") { self.headerAction(row, .remove) } }
+            if t > 0 { item("Move Up") { self.editor.edit("Move Track") { $0.moveLyricTrack(from: t, to: t - 1) } } }
+            if t < project.lyricTracks.count - 1 { item("Move Down") { self.editor.edit("Move Track") { $0.moveLyricTrack(from: t, to: t + 1) } } }
+        case .audio:
+            if project.audio != nil { item("Remove Audio") { self.headerAction(row, .remove) } }
+        case .ruler: break
+        }
+        menu.addItem(.separator())
+        item("Collapse Track") { self.setRowHeight(row, TimelineLayout.minRowHeight); self.editor.document?.persistLayout() }
+        item("Default Height") { self.setRowHeight(row, TimelineLayout.defaultHeight(row)); self.editor.document?.persistLayout() }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    // MARK: Scrolling and zoom
+
+    override func otherMouseDown(with event: NSEvent) {
+        drag = Drag(kind: .pan(startScroll: scrollTime, startY: scrollY), startPoint: convert(event.locationInWindow, from: nil))
+        NSCursor.closedHand.set()
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        guard let d = drag, case .pan(let s0, let y0) = d.kind else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        scrollTime = min(max(0, s0 - Double((p.x - d.startPoint.x) / pixelsPerSecond)), contentDuration)
+        scrollY = min(max(0, y0 - (p.y - d.startPoint.y)), maxScrollY)
+    }
+
+    override func otherMouseUp(with event: NSEvent) { drag = nil; NSCursor.arrow.set() }
+
     override func scrollWheel(with event: NSEvent) {
         if event.modifierFlags.contains(.option) || event.modifierFlags.contains(.command) {
             zoom(by: 1 + event.scrollingDeltaY * 0.01, around: convert(event.locationInWindow, from: nil).x)
             return
         }
-        let dx = event.scrollingDeltaX != 0 ? event.scrollingDeltaX : (event.modifierFlags.contains(.shift) ? event.scrollingDeltaY : 0)
-        scrollTime = max(0, scrollTime - Double(dx / pixelsPerSecond))
-        if dx == 0 {
-            let maxY = max(0, layout.contentHeight - bounds.height)
-            scrollY = min(max(0, scrollY - event.scrollingDeltaY), maxY)
-        }
-        needsDisplay = true
+        var dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+        if event.modifierFlags.contains(.shift) && dx == 0 { dx = dy; dy = 0 }
+        if !event.hasPreciseScrollingDeltas { dx *= 8; dy *= 8 }
+        scrollTime = min(max(0, scrollTime - Double(dx / pixelsPerSecond)), contentDuration)
+        scrollY = min(max(0, scrollY - dy), maxScrollY)
     }
 
     override func magnify(with event: NSEvent) {
@@ -372,20 +718,30 @@ final class TimelineView: NSView {
         let range = TimelineLayout.zoomRange(duration: project.duration, fps: project.fps, width: bounds.width)
         pixelsPerSecond = min(max(pixelsPerSecond * factor, range.lowerBound), range.upperBound)
         scrollTime = max(0, anchor - Double((x - TimelineLayout.headerWidth) / pixelsPerSecond))
-        needsDisplay = true
+    }
+
+    func zoomAroundPlayhead(_ factor: CGFloat) {
+        let x = layout.x(for: editor.playhead)
+        zoom(by: factor, around: (TimelineLayout.headerWidth...bounds.width).contains(x) ? x : bounds.midX)
     }
 
     func zoomToFit() {
         pixelsPerSecond = TimelineLayout.zoomRange(duration: project.duration, fps: project.fps, width: bounds.width).lowerBound
         scrollTime = 0
-        needsDisplay = true
     }
 
+    /// Scroll while dragging near the left/right edges.
+    private func autoscroll(at p: CGPoint) {
+        let margin: CGFloat = 30
+        if p.x > bounds.width - margin { scrollTime += Double(8 / pixelsPerSecond) }
+        else if p.x < TimelineLayout.headerWidth + margin && p.x > TimelineLayout.headerWidth { scrollTime = max(0, scrollTime - Double(8 / pixelsPerSecond)) }
+    }
+
+    /// Keep the playhead visible: continuous scrolling while playing, recentering after jumps.
     private func followPlayhead(_ t: Double) {
-        guard editor.isPlaying else { needsDisplay = true; return }
-        let l = layout
-        if l.x(for: t) > bounds.width - 40 { scrollTime = t - Double((bounds.width - TimelineLayout.headerWidth) * 0.1 / pixelsPerSecond) }
-        needsDisplay = true
+        if case .scrub? = drag?.kind { needsDisplay = true; return }
+        let next = layout.scrollTimeFollowing(t, playing: editor.isPlaying)
+        if next != scrollTime { scrollTime = next } else { needsDisplay = true }
     }
 
     // MARK: Keyboard
@@ -400,9 +756,10 @@ final class TimelineView: NSView {
         case (119, _): editor.goToEnd()
         case (51, _), (117, _): editor.deleteSelection()
         case (_, "b") where cmd: editor.splitAtPlayhead()
-        case (_, "=") where cmd, (_, "+") where cmd: zoom(by: 1.5, around: layout.x(for: editor.playhead))
-        case (_, "-") where cmd: zoom(by: 1 / 1.5, around: layout.x(for: editor.playhead))
+        case (_, "=") where cmd, (_, "+") where cmd: zoomAroundPlayhead(1.5)
+        case (_, "-") where cmd: zoomAroundPlayhead(1 / 1.5)
         case (_, "0") where cmd: zoomToFit()
+        case (_, "n") where !cmd: snappingEnabled.toggle()
         default: super.keyDown(with: event)
         }
     }
@@ -415,64 +772,41 @@ final class TimelineView: NSView {
         }
     }
 
-    // MARK: Track headers
-
-    private func showHeaderMenu(_ row: TimelineRow, event: NSEvent) {
-        let menu = NSMenu()
-        func item(_ title: String, _ action: @escaping () -> Void) {
-            let i = NSMenuItem(title: title, action: #selector(MenuAction.run), keyEquivalent: "")
-            let target = MenuAction(action)
-            i.target = target
-            i.representedObject = target
-            menu.addItem(i)
-        }
-        item("Add Video Track") { [editor] in editor.edit("Add Video Track") { $0.addVideoTrack() } }
-        if case .video(let t) = row, project.videoTracks.count > 1 {
-            item("Remove Video \(t + 1)") { [editor] in editor.edit("Remove Video Track") { $0.removeVideoTrack(at: t) } }
-        }
-        menu.addItem(.separator())
-        item("Add Lyrics Track") { [editor] in editor.edit("Add Lyrics Track") { $0.addLyricTrack() } }
-        if case .lyric(let t) = row, project.lyricTracks.count > 1 {
-            item("Remove Lyrics \(t + 1)") { [editor] in editor.edit("Remove Lyrics Track") { $0.removeLyricTrack(at: t) } }
-        }
-        if case .audio = row, project.audio != nil {
-            menu.addItem(.separator())
-            item("Remove Audio") { [editor] in editor.edit("Remove Audio") { $0.removeAudio() } }
-        }
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
-    }
-
-    override func rightMouseDown(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        if let row = layout.row(atY: p.y), row != .ruler { showHeaderMenu(row, event: event) }
-    }
-
     // MARK: Drop assets from the panel
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let str = sender.draggingPasteboard.string(forType: .string), let id = UUID(uuidString: str),
-              let asset = project.asset(id) else { return false }
+        let ids = (sender.draggingPasteboard.string(forType: .string) ?? "")
+            .split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+        guard !ids.isEmpty else { return false }
         let p = convert(sender.draggingLocation, from: nil)
         let l = layout
-        let time = max(0, l.time(for: p.x))
+        var time = max(0, l.time(for: p.x))
         let row = l.row(atY: p.y)
-        switch (asset.kind, row) {
-        case (.video, .video(let t)?), (.image, .video(let t)?):
-            var newID: UUID?
-            editor.edit("Add Clip") { newID = $0.addClip(assetID: id, track: t, at: time) }
-            if let newID { editor.selection = .clip(newID) }
-        case (.video, _), (.image, _):
-            var newID: UUID?
-            editor.edit("Add Clip") { newID = $0.addClip(assetID: id, track: 0, at: time) }
-            if let newID { editor.selection = .clip(newID) }
-        case (.audio, _):
-            editor.edit(project.audio == nil ? "Add Audio" : "Replace Audio") { $0.setAudio(assetID: id) }
-            Task { await editor.waveforms.ensureWaveform(for: asset) }
-        case (.lyrics, _):
-            editor.lyricsDropped?(asset)
+        let assets = ids.compactMap { project.asset($0) }
+        let visuals = assets.filter { $0.kind == .video || $0.kind == .image }
+        if !visuals.isEmpty {
+            var track = 0
+            if case .video(let t)? = row { track = t }
+            var lastID: UUID?
+            editor.edit(visuals.count > 1 ? "Add Clips" : "Add Clip") { p in
+                for a in visuals {
+                    lastID = p.addClip(assetID: a.id, track: track, at: time)
+                    if let id = lastID, let c = p.videoTracks[track].clips.first(where: { $0.id == id }) { time = c.end }
+                }
+            }
+            if let lastID { editor.selection = .clip(lastID) }
+        }
+        if let audio = assets.first(where: { $0.kind == .audio }) {
+            editor.edit(project.audio == nil ? "Add Audio" : "Replace Audio") { $0.setAudio(assetID: audio.id) }
+            Task { await editor.waveforms.ensureWaveform(for: audio) }
+        }
+        if let lyrics = assets.first(where: { $0.kind == .lyrics }) {
+            var track = 0
+            if case .lyric(let t)? = row { track = t }
+            editor.lyricsDropped?(lyrics, track)
         }
         return true
     }
@@ -488,7 +822,7 @@ enum Timecode {
     /// mm:ss:ff
     static func string(_ t: Double, fps: Double) -> String {
         let rate = max(1, Int(fps.rounded()))
-        let frames = Int((t * fps).rounded())
+        let frames = Int((max(0, t) * fps).rounded())
         let s = frames / rate, f = frames % rate
         return String(format: "%02d:%02d:%02d", s / 60, s % 60, f)
     }

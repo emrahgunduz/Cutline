@@ -108,6 +108,14 @@ extension Project {
 
     mutating func addVideoTrack() { videoTracks.append(VideoTrack()) }
 
+    /// Insert a video track just above (higher layer than) `index`.
+    mutating func insertVideoTrack(above index: Int) { videoTracks.insert(VideoTrack(), at: min(index + 1, videoTracks.count)) }
+
+    mutating func moveVideoTrack(from: Int, to: Int) {
+        guard videoTracks.indices.contains(from), videoTracks.indices.contains(to), from != to else { return }
+        videoTracks.insert(videoTracks.remove(at: from), at: to)
+    }
+
     /// Removes the track and its clips. The last remaining track cannot be removed.
     mutating func removeVideoTrack(at index: Int) {
         guard videoTracks.count > 1, videoTracks.indices.contains(index) else { return }
@@ -142,6 +150,13 @@ extension Project {
     }
 
     mutating func addLyricTrack() { lyricTracks.append(LyricTrack()) }
+
+    mutating func insertLyricTrack(below index: Int) { lyricTracks.insert(LyricTrack(), at: min(index + 1, lyricTracks.count)) }
+
+    mutating func moveLyricTrack(from: Int, to: Int) {
+        guard lyricTracks.indices.contains(from), lyricTracks.indices.contains(to), from != to else { return }
+        lyricTracks.insert(lyricTracks.remove(at: from), at: to)
+    }
 
     /// Removes the track; its lines go too. The last remaining track cannot be removed.
     mutating func removeLyricTrack(at index: Int) {

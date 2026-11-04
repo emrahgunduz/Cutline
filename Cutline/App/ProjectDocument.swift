@@ -5,6 +5,9 @@ struct LayoutState: Codable, Equatable {
     var assetsWidth: Double = 280
     var inspectorWidth: Double = 300
     var timelineHeight: Double = 320
+    /// Timeline row heights keyed by track id ("audio" for the audio row).
+    var trackHeights: [String: Double]?
+    var snapping: Bool?
 }
 
 enum ProjectFileError: LocalizedError {
