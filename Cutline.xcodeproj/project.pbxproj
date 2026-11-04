@@ -36,8 +36,10 @@
 		5CFD23FE861E33BBA818A101 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB71F1E5EFB9D8BC6E0A8F9 /* AppDelegate.swift */; };
 		6290C072CCA367F39B29E887 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2E7898909EAD3252329FD738 /* Assets.xcassets */; };
 		633C7CD0E3D7DF25A089DE2D /* ProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263C40DE25F06B14F13BC4A6 /* ProxyManager.swift */; };
+		70ADDC3D30D50E669727BC66 /* LyricImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */; };
 		70E4F9970450129B7032B46D /* ProxyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38156AC8C58F8D0E10425F10 /* ProxyManagerTests.swift */; };
 		7DDAD07CAE072A0F9F01D9E2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858F6775E8B4AA655EC12500 /* ExportSettings.swift */; };
+		801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75B629399C7ACF1CFA72AEA /* LyricImport.swift */; };
 		81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */; };
 		8C93807386D4A76192988DB3 /* FilterChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */; };
 		8F12F68EF5BE700BD8B53D81 /* Filmstrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF90EE62F3B92ADD7ED730F /* Filmstrip.swift */; };
@@ -118,12 +120,14 @@
 		C4371C9285B8EDE09CEF3349 /* WaveformBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformBuilder.swift; sourceTree = "<group>"; };
 		C58D79DCCA1558080D8443DD /* TimelineLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineLayout.swift; sourceTree = "<group>"; };
 		C61B588EFD4F7FDB1987B63B /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		C75B629399C7ACF1CFA72AEA /* LyricImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricImport.swift; sourceTree = "<group>"; };
 		CD02505D46A8FF9B68A2B4C5 /* CutlineCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutlineCompositor.swift; sourceTree = "<group>"; };
 		CECA242B50C1CD9AD30485E4 /* TestMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestMedia.swift; sourceTree = "<group>"; };
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D308F2CA6627635889BC272A /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		D41363E6F47DBE1A2B1227C3 /* AssetImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetImporter.swift; sourceTree = "<group>"; };
 		E0C6DD7080EBE3BFA0B8888B /* ProjectCodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCodingTests.swift; sourceTree = "<group>"; };
+		E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricImportTests.swift; sourceTree = "<group>"; };
 		E3C182DB0059761B881EC2E6 /* ThumbnailGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailGenerator.swift; sourceTree = "<group>"; };
 		E8497D29B044D92820FCC58A /* LyricModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricModelTests.swift; sourceTree = "<group>"; };
 		E97E38B962C1BCFAC09AAE54 /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
@@ -170,6 +174,7 @@
 				F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */,
 				2F29BB3D7693A806D2EFC85B /* ExportSettingsTests.swift */,
 				EEAF106698E854825259E481 /* FilterChainTests.swift */,
+				E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */,
 				1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */,
 				E8497D29B044D92820FCC58A /* LyricModelTests.swift */,
 				9274C7F6E607FAA343E05201 /* MainWindowTests.swift */,
@@ -271,6 +276,7 @@
 			children = (
 				B57241241CDE82184DC86E55 /* EditCommands.swift */,
 				B7D07C62E0D47CC496685E9C /* EditorModel.swift */,
+				C75B629399C7ACF1CFA72AEA /* LyricImport.swift */,
 				19F8AA3C08E957501BF0222F /* Presets.swift */,
 				C61B588EFD4F7FDB1987B63B /* Project.swift */,
 				0E62B5EB25F99802FE30610C /* ProjectType.swift */,
@@ -397,6 +403,7 @@
 				8C93807386D4A76192988DB3 /* FilterChain.swift in Sources */,
 				33A3E32D65EB1DE91425AB42 /* FrameRenderer.swift in Sources */,
 				35DD116F2970C41E9FFD9D9D /* InspectorView.swift in Sources */,
+				801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */,
 				AB5C2AE9691112978278C917 /* LyricLayout.swift in Sources */,
 				81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */,
 				F723A3DF86EA6416D4968F51 /* LyricStyleView.swift in Sources */,
@@ -430,6 +437,7 @@
 				AE11F51F480A446F082371AB /* ExportSettingsTests.swift in Sources */,
 				4D1575E75E19A0AC441575D3 /* ExporterIntegrationTests.swift in Sources */,
 				A7A803232A98903E35FEF5E1 /* FilterChainTests.swift in Sources */,
+				70ADDC3D30D50E669727BC66 /* LyricImportTests.swift in Sources */,
 				41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */,
 				3754CD3D955A136263FFECF3 /* LyricModelTests.swift in Sources */,
 				5744FF40D09A805C85B912E8 /* MainWindowTests.swift in Sources */,

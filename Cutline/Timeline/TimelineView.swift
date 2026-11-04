@@ -806,7 +806,7 @@ final class TimelineView: NSView {
         if let lyrics = assets.first(where: { $0.kind == .lyrics }) {
             var track = 0
             if case .lyric(let t)? = row { track = t }
-            editor.lyricsDropped?(lyrics, track)
+            editor.placeLyrics(lyrics, track: track, at: max(0, layout.time(for: p.x)), window: window)
         }
         return true
     }
