@@ -20,8 +20,6 @@ final class EditorModel: ObservableObject {
     @Published private(set) var revision = 0
 
     weak var document: ProjectDocument?
-    /// Called when a lyrics TXT is dropped on the timeline (asset, target lyric track).
-    var lyricsDropped: ((Asset, Int) -> Void)?
     private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
 
