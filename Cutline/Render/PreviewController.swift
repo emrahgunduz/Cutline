@@ -16,6 +16,15 @@ final class PreviewController: ObservableObject {
     private var pendingSeek: Double?
     private var settingPlayheadFromPlayer = false
     var useProxies = true
+    /// Viewport zoom (canvas pixels → view points); nil fits the canvas to the view.
+    @Published var zoom: CGFloat?
+    @Published var pan: CGPoint = .zero
+    /// Current fit scale in percent, for the zoom menu.
+    @Published var fitPercent = 100
+
+    func resetView() { zoom = nil; pan = .zero }
+    func setZoom(percent: Double) { zoom = CGFloat(percent / 100); pan = .zero }
+    func stepZoom(_ factor: CGFloat) { zoom = min(max((zoom ?? CGFloat(fitPercent) / 100) * factor, 0.05), 8) }
 
     init(editor: EditorModel) {
         self.editor = editor

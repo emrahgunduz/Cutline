@@ -36,6 +36,7 @@
 		5CFD23FE861E33BBA818A101 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EB71F1E5EFB9D8BC6E0A8F9 /* AppDelegate.swift */; };
 		6290C072CCA367F39B29E887 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2E7898909EAD3252329FD738 /* Assets.xcassets */; };
 		633C7CD0E3D7DF25A089DE2D /* ProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263C40DE25F06B14F13BC4A6 /* ProxyManager.swift */; };
+		694E32FB938517F8178010A4 /* PreviewGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */; };
 		70ADDC3D30D50E669727BC66 /* LyricImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */; };
 		70E4F9970450129B7032B46D /* ProxyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38156AC8C58F8D0E10425F10 /* ProxyManagerTests.swift */; };
 		7DDAD07CAE072A0F9F01D9E2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858F6775E8B4AA655EC12500 /* ExportSettings.swift */; };
@@ -55,6 +56,7 @@
 		B5DAFDD09855E2084CA17E1C /* ProjectType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E62B5EB25F99802FE30610C /* ProjectType.swift */; };
 		BE6C3603C812D9ED98C2C650 /* AssetUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1CD2C7867C9E87D828B4A0 /* AssetUsageTests.swift */; };
 		BF7AB35E4C264F4499A22C6F /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55120AF47C20743C6FF292E8 /* PreviewView.swift */; };
+		C1448F251493C0A6DC33166A /* PreviewCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */; };
 		C2B91A0740ECEE4E2003275E /* SampleMediaImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5986D783A144C13227A543EF /* SampleMediaImportTests.swift */; };
 		C9098E168CA54FE2974429E6 /* SizeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
@@ -99,6 +101,7 @@
 		3F86A8C237D2346DBF191F17 /* presets.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = presets.json; sourceTree = "<group>"; };
 		4572ED9F4E345B083FB20AF9 /* ProjectDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDocument.swift; sourceTree = "<group>"; };
 		469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChain.swift; sourceTree = "<group>"; };
+		49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCanvasView.swift; sourceTree = "<group>"; };
 		5325553413F834E7931554AE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		55120AF47C20743C6FF292E8 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		5986D783A144C13227A543EF /* SampleMediaImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleMediaImportTests.swift; sourceTree = "<group>"; };
@@ -129,6 +132,7 @@
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D308F2CA6627635889BC272A /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		D41363E6F47DBE1A2B1227C3 /* AssetImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetImporter.swift; sourceTree = "<group>"; };
+		DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewGeometryTests.swift; sourceTree = "<group>"; };
 		DE9552D1BBCE487AFBEAD510 /* AssetUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetUsage.swift; sourceTree = "<group>"; };
 		E0C6DD7080EBE3BFA0B8888B /* ProjectCodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCodingTests.swift; sourceTree = "<group>"; };
 		E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricImportTests.swift; sourceTree = "<group>"; };
@@ -184,6 +188,7 @@
 				1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */,
 				E8497D29B044D92820FCC58A /* LyricModelTests.swift */,
 				9274C7F6E607FAA343E05201 /* MainWindowTests.swift */,
+				DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */,
 				00EAA2C07BF4BE00113F684B /* PreviewPerformanceTests.swift */,
 				E0C6DD7080EBE3BFA0B8888B /* ProjectCodingTests.swift */,
 				38156AC8C58F8D0E10425F10 /* ProxyManagerTests.swift */,
@@ -242,6 +247,7 @@
 				F1D8E193DCC13514C90ADD93 /* ExportSheet.swift */,
 				EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */,
 				1E6492F46E4214AD109DDBC3 /* MainWindowController.swift */,
+				49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */,
 				55120AF47C20743C6FF292E8 /* PreviewView.swift */,
 				4572ED9F4E345B083FB20AF9 /* ProjectDocument.swift */,
 			);
@@ -417,6 +423,7 @@
 				E595C8588F4292E299228E7B /* MainMenu.swift in Sources */,
 				518C4503BF19A867E8E2CCCE /* MainWindowController.swift in Sources */,
 				4767FD52352B89696CD5E022 /* Presets.swift in Sources */,
+				C1448F251493C0A6DC33166A /* PreviewCanvasView.swift in Sources */,
 				268B7EF688691F6E5DA75D72 /* PreviewController.swift in Sources */,
 				BF7AB35E4C264F4499A22C6F /* PreviewView.swift in Sources */,
 				04E554C1E0C3AB7A36916365 /* Project.swift in Sources */,
@@ -449,6 +456,7 @@
 				41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */,
 				3754CD3D955A136263FFECF3 /* LyricModelTests.swift in Sources */,
 				5744FF40D09A805C85B912E8 /* MainWindowTests.swift in Sources */,
+				694E32FB938517F8178010A4 /* PreviewGeometryTests.swift in Sources */,
 				A47713E0C9AC27C96F8F700B /* PreviewPerformanceTests.swift in Sources */,
 				278C36D9E3DCCA647FE22CFF /* ProjectCodingTests.swift in Sources */,
 				70E4F9970450129B7032B46D /* ProxyManagerTests.swift in Sources */,
