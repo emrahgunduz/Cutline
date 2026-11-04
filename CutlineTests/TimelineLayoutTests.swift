@@ -61,3 +61,21 @@ final class TimelineLayoutTests: XCTestCase {
         XCTAssertEqual(p.lyricTracks.map(\.id), [lids[1], lids[0]])
     }
 }
+
+@MainActor
+final class TimelineClampTests: XCTestCase {
+    func testRemovingTheLastClipShrinksScrollableWidth() {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        let e = doc.editor
+        let img = Asset(kind: .image, name: "i", path: "/i")
+        e.edit("a") { p in p.assets = [img]; for i in 0..<20 { p.addClip(assetID: img.id, track: 0, at: Double(i) * 5) } }
+        let view = TimelineView(editor: e)
+        view.frame = CGRect(x: 0, y: 0, width: 1132, height: 300)
+        view.pixelsPerSecond = 10
+        view.scrollTime = 80
+        e.edit("b") { p in p.videoTracks[0].clips.removeLast(10) }   // now 50 s long
+        view.clampToContent()
+        XCTAssertLessThanOrEqual(view.scrollTime, max(0, view.contentDuration - view.layout.visibleDuration) + 1e-9)
+        XCTAssertLessThan(view.contentDuration, 80)
+    }
+}

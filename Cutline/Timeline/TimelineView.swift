@@ -49,6 +49,7 @@ final class TimelineView: NSView {
         let redraw: () -> Void = { [weak self] in self?.needsDisplay = true }
         filmstrip.onUpdate = redraw
         editor.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in self?.needsDisplay = true; self?.onScroll?() }.store(in: &cancellables)
+        editor.$revision.receive(on: RunLoop.main).sink { [weak self] _ in self?.clampToContent() }.store(in: &cancellables)
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
@@ -103,6 +104,17 @@ final class TimelineView: NSView {
     /// Scrollable extent in seconds (a little past the project end).
     var contentDuration: Double { max(project.duration, layout.visibleDuration) + layout.visibleDuration * 0.25 }
     var maxScrollY: CGFloat { max(0, layout.contentHeight - bounds.height) }
+
+    /// After the project gets shorter (or tracks are removed), pull zoom and scroll back
+    /// inside the new extent so no empty width is left behind.
+    func clampToContent() {
+        guard bounds.width > 0 else { return }
+        let range = TimelineLayout.zoomRange(duration: project.duration, fps: project.fps, width: bounds.width)
+        if pixelsPerSecond < range.lowerBound { pixelsPerSecond = range.lowerBound }
+        let maxTime = max(0, contentDuration - layout.visibleDuration)
+        if scrollTime > maxTime { scrollTime = maxTime }
+        if scrollY > maxScrollY { scrollY = maxScrollY }
+    }
 
     // MARK: Drawing
 
