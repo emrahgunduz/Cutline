@@ -1,0 +1,22 @@
+[
+  {
+    "type": "musicVideo",
+    "canvases": [{ "width": 1920, "height": 1080 }, { "width": 3840, "height": 2160 }],
+    "codec": "hevc"
+  },
+  {
+    "type": "social",
+    "canvases": [{ "width": 1080, "height": 1920 }],
+    "maxDuration": 180,
+    "codec": "h264",
+    "defaultBitrateMbps": 16
+  },
+  {
+    "type": "ad",
+    "canvases": [{ "width": 1080, "height": 1920 }],
+    "maxDuration": 30,
+    "codec": "h264",
+    "defaultBitrateMbps": 12,
+    "defaultSizeTargetMB": 50
+  }
+]

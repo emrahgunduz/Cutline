@@ -1,0 +1,100 @@
+import AppKit
+import SwiftUI
+
+/// Four regions: assets (left), preview (center), inspector (right), timeline (bottom).
+/// Divider positions are restored from and saved to the project's layout.
+final class MainWindowController: NSWindowController, NSSplitViewDelegate {
+    private let vertical = NSSplitView()
+    private let horizontal = NSSplitView()
+    private var restoring = true
+    private var projectDocument: ProjectDocument { document as! ProjectDocument }
+
+    init(document: ProjectDocument) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1600, height: 1000),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                              backing: .buffered, defer: false)
+        window.minSize = NSSize(width: 1000, height: 640)
+        window.center()
+        window.setFrameAutosaveName("CutlineMainWindow")
+        super.init(window: window)
+        self.document = document
+        buildContent()
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    private func buildContent() {
+        let editor = projectDocument.editor
+        horizontal.isVertical = true
+        horizontal.dividerStyle = .thin
+        vertical.isVertical = false
+        vertical.dividerStyle = .thin
+        horizontal.delegate = self
+        vertical.delegate = self
+
+        horizontal.addArrangedSubview(NSHostingView(rootView: AssetsPanelView().environmentObject(editor)))
+        horizontal.addArrangedSubview(PreviewContainer.make(editor: editor))
+        horizontal.addArrangedSubview(NSHostingView(rootView: InspectorView().environmentObject(editor)))
+        vertical.addArrangedSubview(horizontal)
+        vertical.addArrangedSubview(TimelineContainer.make(editor: editor))
+
+        for (i, p) in [NSLayoutConstraint.Priority(260), .init(250), .init(260)].enumerated() {
+            horizontal.setHoldingPriority(p, forSubviewAt: i)
+        }
+        vertical.setHoldingPriority(.init(250), forSubviewAt: 0)
+        vertical.setHoldingPriority(.init(260), forSubviewAt: 1)
+        window?.contentView = vertical
+    }
+
+    override func windowDidLoad() { super.windowDidLoad() }
+
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        restoreLayout()
+    }
+
+    private func restoreLayout() {
+        restoring = true
+        vertical.layoutSubtreeIfNeeded()
+        let l = projectDocument.layout
+        let width = horizontal.bounds.width
+        horizontal.setPosition(l.assetsWidth, ofDividerAt: 0)
+        horizontal.setPosition(width - l.inspectorWidth, ofDividerAt: 1)
+        vertical.setPosition(vertical.bounds.height - l.timelineHeight, ofDividerAt: 0)
+        DispatchQueue.main.async { self.restoring = false }
+    }
+
+    func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        if splitView === vertical { return 200 }
+        return dividerIndex == 0 ? 160 : proposedMinimumPosition + 320
+    }
+
+    func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        if splitView === vertical { return splitView.bounds.height - 140 }
+        return dividerIndex == 0 ? splitView.bounds.width - 600 : splitView.bounds.width - 200
+    }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        guard !restoring, horizontal.arrangedSubviews.count == 3, vertical.arrangedSubviews.count == 2 else { return }
+        var l = projectDocument.layout
+        l.assetsWidth = horizontal.arrangedSubviews[0].frame.width
+        l.inspectorWidth = horizontal.arrangedSubviews[2].frame.width
+        l.timelineHeight = vertical.arrangedSubviews[1].frame.height
+        guard l != projectDocument.layout else { return }
+        projectDocument.layout = l
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(saveLayout), object: nil)
+        perform(#selector(saveLayout), with: nil, afterDelay: 0.5)
+    }
+
+    @objc private func saveLayout() { projectDocument.persistLayout() }
+
+    // MARK: Menu actions
+
+    @objc func importMedia(_ sender: Any?) {
+        AssetImporter.presentOpenPanel(for: projectDocument.editor, window: window)
+    }
+
+    @objc func showExport(_ sender: Any?) {
+        ExportSheet.present(editor: projectDocument.editor, window: window)
+    }
+}
