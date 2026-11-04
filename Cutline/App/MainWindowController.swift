@@ -44,7 +44,30 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         vertical.setHoldingPriority(.init(250), forSubviewAt: 0)
         vertical.setHoldingPriority(.init(260), forSubviewAt: 1)
         window?.contentView = vertical
+        installTransportKeys()
     }
+
+    private var keyMonitor: Any?
+
+    /// Space, arrows, Home and End drive playback anywhere in the window except text fields.
+    private func installTransportKeys() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window === self.window, !event.modifierFlags.contains(.command),
+                  !(self.window?.firstResponder is NSText) else { return event }
+            let editor = self.projectDocument.editor
+            switch event.keyCode {
+            case 49: editor.togglePlay()
+            case 123: editor.stepFrame(-1)
+            case 124: editor.stepFrame(1)
+            case 115: editor.goToStart()
+            case 119: editor.goToEnd()
+            default: return event
+            }
+            return nil
+        }
+    }
+
+    deinit { if let keyMonitor { NSEvent.removeMonitor(keyMonitor) } }
 
     override func windowDidLoad() { super.windowDidLoad() }
 
