@@ -715,6 +715,26 @@ final class TimelineView: NSView {
             i.representedObject = target
             menu.addItem(i)
         }
+        if case .clip(let id, _) = hit(at: p), let clip = editor.clip(id), let asset = project.asset(clip.assetID) {
+            editor.selection = .clip(id)
+            let t = layout.time(for: p.x)
+            item("Split Here") { self.editor.edit("Split") { $0.split(at: t, clipID: id) } }
+            item("Delete Clip") { self.editor.edit("Delete Clip") { $0.deleteClip(id) } }
+            if asset.kind == .video {
+                menu.addItem(.separator())
+                for scale in ProxyScale.allCases {
+                    item("\(asset.proxy == nil ? "Create" : "Replace with") \(scale.label) Proxy") { [editor] in
+                        Task { @MainActor in
+                            do { try await editor.createProxy(assetID: asset.id, scale: scale) }
+                            catch { NSAlert(error: error).runModal() }
+                        }
+                    }
+                }
+                if asset.proxy != nil { item("Remove Proxy") { [editor] in editor.deleteProxy(assetID: asset.id) } }
+            }
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+            return
+        }
         switch row {
         case .video(let t):
             item("Add Video Track Above") { self.headerAction(row, .add) }
