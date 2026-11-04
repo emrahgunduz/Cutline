@@ -13,7 +13,9 @@ enum Selection: Equatable {
 /// `edit(_:_:)`, which registers an undo step that restores the previous project value.
 final class EditorModel: ObservableObject {
     @Published private(set) var project: Project
-    @Published var selection: Selection = .none
+    @Published var selection: Selection = .none { didSet { syncAssetSelection() } }
+    /// Assets selected in the assets panel.
+    @Published var selectedAssets: Set<UUID> = []
     @Published var playhead: Double = 0
     @Published var isPlaying = false
     /// Bumped on every project change so renderers can rebuild.
@@ -69,7 +71,19 @@ final class EditorModel: ObservableObject {
         validateSelection()
     }
 
+    /// Selecting a timeline item selects the asset it uses.
+    private func syncAssetSelection() {
+        switch selection {
+        case .clip(let id): if let c = clip(id) { selectedAssets = [c.assetID] }
+        case .audio: if let a = project.audio { selectedAssets = [a.assetID] }
+        case .lyricLine, .lyricWord:
+            if let l = project.assets.first(where: { $0.kind == .lyrics }) { selectedAssets = [l.id] }
+        case .none: break
+        }
+    }
+
     private func validateSelection() {
+        selectedAssets = selectedAssets.filter { project.asset($0) != nil }
         switch selection {
         case .clip(let id) where clip(id) == nil: selection = .none
         case .lyricLine(let id) where line(id) == nil: selection = .none
