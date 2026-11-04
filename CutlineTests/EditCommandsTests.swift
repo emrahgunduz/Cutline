@@ -83,3 +83,21 @@ final class EditCommandsTests: XCTestCase {
         XCTAssertEqual(editor.project.videoTracks[0].clips.count, 2)
     }
 }
+
+@MainActor
+final class LiveEditTests: XCTestCase {
+    func testLiveEditsCollapseIntoOneUndoStep() throws {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        let e = doc.editor
+        let um = try XCTUnwrap(doc.undoManager)
+        um.groupsByEvent = false
+        for v in stride(from: 0.06, through: 0.12, by: 0.02) {
+            e.liveEdit { $0.lyricStyle.sizeFraction = v }
+            XCTAssertEqual(e.project.lyricStyle.sizeFraction, v, accuracy: 1e-9)   // visible while dragging
+        }
+        um.beginUndoGrouping(); e.endLiveEdit("Size"); um.endUndoGrouping()
+        XCTAssertEqual(e.project.lyricStyle.sizeFraction, 0.12, accuracy: 1e-9)
+        um.undo()
+        XCTAssertEqual(e.project.lyricStyle.sizeFraction, 0.06, accuracy: 1e-9)
+    }
+}

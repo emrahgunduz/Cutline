@@ -30,7 +30,8 @@ final class PreviewController: ObservableObject {
         self.editor = editor
         player.actionAtItemEnd = .pause
         editor.$revision
-            .debounce(for: .milliseconds(120), scheduler: RunLoop.main)
+            // Throttle (not debounce) so continuous edits like slider drags show while dragging.
+            .throttle(for: .milliseconds(40), scheduler: RunLoop.main, latest: true)
             .sink { [weak self] _ in self?.scheduleRebuild() }
             .store(in: &cancellables)
         editor.$playhead.removeDuplicates().sink { [weak self] t in self?.playheadChanged(t) }.store(in: &cancellables)

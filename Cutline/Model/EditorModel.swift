@@ -49,6 +49,28 @@ final class EditorModel: ObservableObject {
         revision += 1
     }
 
+    // MARK: Live edits (slider drags): many updates, one undo step.
+
+    private var liveOriginal: Project?
+
+    func liveEdit(_ change: (inout Project) -> Void) {
+        if liveOriginal == nil { liveOriginal = project }
+        var next = project
+        change(&next)
+        guard next != project else { return }
+        project = next
+        revision += 1
+    }
+
+    func endLiveEdit(_ actionName: String) {
+        guard let original = liveOriginal else { return }
+        liveOriginal = nil
+        let final = project
+        project = original
+        guard final != original else { return }
+        apply(final, actionName: actionName)
+    }
+
     /// Apply a change as one undoable step.
     func edit(_ actionName: String, _ change: (inout Project) -> Void) {
         var next = project
