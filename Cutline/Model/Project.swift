@@ -174,14 +174,14 @@ struct RGBA: Codable, Equatable {
 }
 
 struct LyricStyle: Codable, Equatable {
-    var fontName = "Helvetica Neue Bold"
+    var fontName = "HelveticaNeue-Bold"   // PostScript name
     /// Font size as a fraction of canvas height, so it scales across resolutions.
     var sizeFraction: Double = 0.06
     var color = RGBA.white
     var shadowEnabled = true
     var shadowBlur: Double = 8
     var shadowDX: Double = 0
-    var shadowDY: Double = -4
+    var shadowDY: Double = 4   // +down
     var shadowColor = RGBA(r: 0, g: 0, b: 0, a: 0.8)
     /// Vertical center of the lyric block, as a fraction of canvas height from the top.
     var verticalPosition: Double = 0.82
