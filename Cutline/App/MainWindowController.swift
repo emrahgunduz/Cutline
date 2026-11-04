@@ -7,7 +7,7 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
     private let vertical = NSSplitView()
     private let horizontal = NSSplitView()
     private var restoring = true
-    private var projectDocument: ProjectDocument { document as! ProjectDocument }
+    private let projectDocument: ProjectDocument
 
     init(document: ProjectDocument) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1600, height: 1000),
@@ -16,8 +16,10 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         window.minSize = NSSize(width: 1000, height: 640)
         window.center()
         window.setFrameAutosaveName("CutlineMainWindow")
+        projectDocument = document
         super.init(window: window)
-        self.document = document
+        // `document` is set by NSDocument.addWindowController; setting it here first makes
+        // that call skip the controller, and the window never opens.
         buildContent()
     }
 
