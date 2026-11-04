@@ -18,7 +18,7 @@ execution: code
 - **Open blockers:** None.
 - **Stop conditions:** Stop and ask the user if a requirement can't be met on the M1 test machine as written, for example realtime HD preview failing even with proxies. Also stop if a Product Contract decision proves infeasible.
 - **Execution profile:** Three PRs in dependency order (see Implementation Units). The executing agent builds and verifies each PR, and the user merges.
-- **Product Contract preservation:** Product Contract unchanged.
+- **Product Contract preservation:** changed: R32 — it now says preview and export share the keying and invalidation logic rather than stored frames, because preview frames (from proxies) can't serve a full-quality export. No change in what the user experiences.
 
 ## Product Contract
 
@@ -40,7 +40,7 @@ The user edits their own music videos and used After Effects for the sample proj
 - **Alignment, not transcription, run on-device.** The TXT is ground truth. The app only finds when each known word is sung, works offline, and supports Turkish. Governs R20–R22.
 - **Correction is the core lyric feature.** No aligner is perfect on sung vocals, so fast keyboard correction matters more than squeezing extra model accuracy. Governs R23–R25.
 - **The song is the timeline grid.** Beats, downbeats and sections are snap targets, and markers are anchored to audio time. Governs R13–R15.
-- **Preview and export share one render cache.** Invalidation is exact per time range. Governs R32–R34.
+- **Preview and export share one cache keying and invalidation scheme.** Invalidation is exact per time range. Governs R32–R34.
 
 ### Requirements
 
@@ -101,7 +101,7 @@ The user edits their own music videos and used After Effects for the sample proj
 
 **Render cache**
 
-- R32. Rendered frames are cached and reused by both preview and export. An edit invalidates only the time ranges whose output it changes.
+- R32. Preview and export share one cache keying and invalidation scheme. Preview keeps rendered frames and export keeps encoded segments, and an edit invalidates only the time ranges whose output it changes.
 - R33. The timeline shows a cache strip marking valid, stale and uncached ranges.
 - R34. Re-exporting after a small edit re-renders only the changed ranges, and a cancelled export can resume.
 
@@ -163,8 +163,8 @@ The user edits their own music videos and used After Effects for the sample proj
 ### Key Technical Decisions
 
 - KTD1. **The app is native SwiftUI, and the timeline is drawn by a custom AppKit view.** The shell, panels, inspector and dialogs are SwiftUI. The timeline is an `NSView` (Core Animation/Metal backed) that draws only the visible items and does its own hit-testing. Rationale: thousands of word items as SwiftUI views stutter during zoom and scroll.
-- KTD2. **AVFoundation with a custom `AVVideoCompositing` compositor built on Core Image over Metal is the single render path.** Preview uses `AVPlayer`. Export uses AVAssetReader/AVAssetWriter on the same composition and instructions. Clip transforms, filters, lyrics and letterbox are evaluated per frame from the instruction data as functions of time. Scrubbing uses zero-tolerance seeks, where a new seek starts only after the previous one finishes, and ±1 frame uses frame stepping. Rationale: one path means preview and export can't disagree (R11, R32). A fully custom Metal player loop is the fallback, and only if seek latency proves unacceptable.
-- KTD3. **Lyric lines are rasterized with Core Text and cached per line and style, then composited with a Core Image blur shadow.** Rationale: preview needs live text, which `AVVideoCompositionCoreAnimationTool` can't provide. Core Text covers the Turkish glyphs. Case changes use the `tr` locale.
+- KTD2. **AVFoundation with a custom `AVVideoCompositing` compositor built on Core Image over Metal is the single render path.** Preview uses `AVPlayer`. Export uses AVAssetReader/AVAssetWriter on the same instructions. The composition builder takes a media mode (proxy or original). Instructions express transforms in canvas space and are scaled by each source's resolution, so preview builds from proxies and export from originals. Clip transforms, filters, lyrics and letterbox are evaluated per frame from the instruction data as functions of time. Scrubbing uses zero-tolerance seeks, where a new seek starts only after the previous one finishes, and ±1 frame uses frame stepping. Rationale: one path means preview and export can't disagree (R11, R32). A fully custom Metal player loop is the fallback, and only if seek latency proves unacceptable.
+- KTD3. **Lyric lines are rasterized with Core Text and cached per line and style, along with each word's glyph rect, then composited with a Core Image blur shadow.** Each word is composited as a crop of the line raster with its own alpha, so word fades are independent (R26) and kerning is kept. Rationale: preview needs live text, which `AVVideoCompositionCoreAnimationTool` can't provide. Core Text covers the Turkish glyphs. Case changes use the `tr` locale.
 - KTD4. **ML runs in a bundled, offline Python helper process.** The runtime and every model weight live inside `Cutline.app/Contents/Resources/` and are fetched at build time, never at runtime, with no user-cache directories. The Swift app starts the helper per job and talks to it over JSON lines on stdin/stdout, showing progress. Rationale: HTDemucs, Beat This! and CTC aligners are mature in Python and fragile as ad-hoc Core ML ports. The user directed that models live in the app folder and that Python is bundled. (session-settled: user-directed — chosen over models in a shared or user cache: everything ships inside the app.) Every library cache variable (`HF_HOME`, `TORCH_HOME`, `XDG_CACHE_HOME`) is pointed into the bundle, and network access is disabled at the helper's start.
 - KTD5. **The vocal stem comes from HTDemucs (MIT), run once per song.** It's stored in the project package (R6).
 - KTD6. **Beats and downbeats come from Beat This! (MIT).** Sections come from a chroma/MFCC self-similarity novelty curve, plus repeated-stanza hints from the TXT, where blank lines separate stanzas and a repeated stanza marks a chorus. Results are stored as audio-time arrays, and markers reference the nearest beat index so they can follow corrections (R14, R15).
@@ -172,8 +172,8 @@ The user edits their own music videos and used After Effects for the sample proj
 - KTD8. **Anchor stretch is a pure function.** Given the ordered words, the confirmed set and the original durations, unconfirmed runs between anchors are rescaled proportionally into the gap, so each word keeps its relative length (R25). It's unit-testable without audio.
 - KTD9. **A project is a `.cutline` package directory managed by `NSDocument`.** It holds `project.json` (versioned schema), `layout.json` (panel sizes), `analysis/` (waveform peak pyramid, beats, sections, alignment, vocal stem), `thumbnails/`, `proxies/` and `cache/`. Media is referenced by security-scoped bookmark plus path and never copied. Rationale: NSDocument allows incremental writes, so a multi-MB stem isn't rewritten on every save.
 - KTD10. **Proxies are H.265 (music video) or H.264 (social and ad) at 1/2, 1/4 or 1/8 size, with a short GOP.** Keyframes come every 6 frames. (session-settled: user-directed — chosen over ProRes/all-intra proxies: the user wants low-quality H.264/H.265.) Conflict call-out: research shows long-GOP sources slow down exact-frame seeking. The short GOP reduces this. If scrubbing on the M1 still lags, the remedy is shorter GOPs or all-intra H.264, which changes only the proxy encoder settings. Proxy choice is per source and never touches export (R9).
-- KTD11. **The render cache is keyed by a content hash per frame range.** The key covers source identity and in-point, transform, enabled filter parameters, the visible lyric words and style, the letterbox value, output size and the proxy-vs-original flag. Preview caches decoded composited frames in an in-memory LRU. Export renders in closed-GOP segments, which are written to `cache/segments/` keyed by range hash, reused when the hash is unchanged, and concatenated without re-encoding (R32–R34).
-- KTD12. **Size-targeted export computes the bitrate, encodes, verifies and corrects once.** The video bitrate is `(target_bytes × 8 − audio_bits) / duration × 0.95`, and `DataRateLimits` caps peaks at about 1.5× over 1 s. After the encode the app measures the file. If it's over the target, it re-encodes with the bitrate scaled by target/actual × 0.97, at most twice, and reports failure if it's still over (R37).
+- KTD11. **The render cache is keyed by a content hash per frame range.** The frame key covers source identity and in-point, transform, enabled filter parameters, the visible lyric words and style, the letterbox value and output size. Preview caches decoded composited frames in an in-memory LRU under the frame key plus the proxy flag. Export segments are keyed by the frame keys in their range plus the encoder settings (codec, bit depth, bitrate or quality, DataRateLimits). They're written to `cache/segments/`, reused when the key is unchanged, and the video segments are joined without re-encoding. Only video is segmented. Audio is encoded once for the full length and muxed in a final passthrough step, which avoids AAC priming gaps at the joins. The cache strip shows export-segment state (R32–R34).
+- KTD12. **Size-targeted export computes the bitrate, encodes, verifies and corrects up to twice.** The video bitrate is `(target_bytes × 8 − audio_bits) / duration × 0.95`, and `DataRateLimits` caps peaks at about 1.5× over 1 s. After the encode the app measures the file. If it's over the target, it re-encodes with the bitrate scaled by target/actual × 0.97, at most twice, and reports failure if it's still over (R37). A retry changes the encoder settings, so it re-encodes every segment.
 - KTD13. **Presets live in a JSON resource that is copied into Application Support on first launch and editable from Settings** (R39). Built-in rows hold the Product Contract limits.
 - KTD14. **Frame rate comes from the first video clip added, falling back to 30 fps, and is fixed per project from then on.** Rationale: the sample footage is 24 fps, and the user never asked to pick a rate.
 - KTD15. **Undo/redo goes through `NSUndoManager` with every timeline mutation expressed as a command on the project model.**
@@ -234,6 +234,8 @@ Cutline/
 - Seek and step latency on long-GOP proxies on the M1 (see KTD10).
 - The app bundle grows by about 2–3 GB because of the models and runtime. Accepted for a personal app.
 - The M1 hardware encoder may not strictly follow the rate limits. The verify-and-correct loop (KTD12) covers this.
+- Joining independently encoded VideoToolbox segments without re-encoding may produce mismatched parameter sets. U14 starts with a spike to check this. If it fails, the fallback is to re-encode on export with segment reuse turned off, keeping the cache for preview.
+- faster-whisper runs on the CPU (no Metal), so the first lyric generation for a 4-minute song may take several minutes on the M1. This is accepted, and the job shows progress.
 
 ---
 
@@ -261,7 +263,7 @@ Waits on: nothing.
 ### U2. Asset import, thumbnails, waveform and proxies
 
 **Goal:** Import video, image and TXT assets with thumbnails, build the audio waveform pyramid, and manage per-video proxies.
-**Requirements:** R5, R6 (thumbnail and waveform parts), R7, R8, R9
+**Requirements:** R5, R6 (thumbnail and waveform parts), R7, R8
 **Dependencies:** U1
 **Files:** `Cutline/Assets/AssetLibrary.swift`, `Cutline/Assets/ThumbnailGenerator.swift`, `Cutline/Assets/WaveformBuilder.swift`, `Cutline/Assets/ProxyManager.swift`, `Cutline/App/AssetsPanelView.swift`, `CutlineTests/WaveformBuilderTests.swift`, `CutlineTests/ProxyManagerTests.swift`
 **Approach:** Bookmarks per KTD9. Thumbnails come from the async image generator with tolerance and are stored in `thumbnails/`. The waveform is a vDSP min/max/RMS pyramid at 256, 2048 and 16384 samples per bucket. Proxy encoding follows KTD10, writing to `proxies/<asset-id>.mov`. A second create replaces the existing proxy, and delete removes it. Only one TXT is allowed per project, and importing another replaces it after confirmation.
@@ -269,7 +271,6 @@ Waits on: nothing.
 - The waveform of a known sine file has the expected peak per bucket.
 - Creating a 1/4 proxy and then a 1/2 proxy leaves one file at 1/2 size.
 - Deleting a proxy removes the file and the badge.
-- Export media resolution ignores proxies (AE5).
 - A PNG with alpha keeps its alpha channel in the thumbnail and the frame.
 **Verification:** Importing `Example_Music_Video/Footage/` shows 58 thumbnailed clips. The WAV waveform appears within seconds.
 
@@ -330,7 +331,7 @@ Waits on: nothing.
 **Test scenarios:**
 - The music-video default produces an HEVC 10-bit file.
 - A social export produces H.264 at 1080×1920.
-- Export of a clip that has a proxy decodes the original resolution.
+- Export of a clip that has a proxy decodes the original resolution (AE5).
 - Cancelling mid-export leaves no partial output file.
 - Output duration equals the project length.
 **Verification:** A 30 s sample cut exports and plays in QuickTime with correct codec and duration.
@@ -360,7 +361,7 @@ Waits on: PR 1 merged.
 **Requirements:** R6, R13, R14
 **Dependencies:** U7, U3
 **Files:** `helper/cutline_helper/separate.py`, `helper/cutline_helper/beats.py`, `helper/cutline_helper/sections.py`, `helper/tests/test_sections.py`, `Cutline/Analysis/AudioAnalysis.swift`, `Cutline/Timeline/SectionLane.swift`, `CutlineTests/AudioAnalysisTests.swift`
-**Approach:** KTD5 and KTD6. Results are stored in `analysis/`, keyed by audio file hash, so reopening reuses them. Loud/quiet regions come from the RMS envelope of the waveform pyramid. The user can drag section boundaries and downbeats, and the corrections are stored separately from the raw analysis.
+**Approach:** KTD5 and KTD6. Onsets are also detected on the vocal stem for tap snapping (U11). Results are stored in `analysis/`, keyed by audio file hash, so reopening reuses them. Loud/quiet regions come from the RMS envelope of the waveform pyramid. The user can drag section boundaries and downbeats, and the corrections are stored separately from the raw analysis.
 **Test scenarios:**
 - A synthetic 120 BPM click track yields beats 0.5 s apart within 20 ms.
 - Repeated stanzas in the TXT raise the section-boundary score at their starts.
@@ -389,7 +390,7 @@ Waits on: PR 1 merged.
 **Files:** `helper/cutline_helper/align.py`, `helper/cutline_helper/romanize_tr.py`, `helper/tests/test_romanize_tr.py`, `helper/tests/test_align_match.py`, `Cutline/Analysis/LyricAlignment.swift`, `Cutline/Model/LyricImport.swift`, `CutlineTests/LyricImportTests.swift`
 **Approach:** KTD7. Parsing follows R20, preserving the original Unicode words. Romanization is used only for alignment input. The Whisper cross-check is matched by Levenshtein word alignment. Words that align nowhere are interpolated between neighbours and given confidence 0. Re-running generation asks before it overwrites confirmed words.
 **Test scenarios:**
-- The sample TXT yields 19 lines with stanza breaks after lines 7, 14 and 17 (AE7).
+- The sample TXT yields 19 lines with stanza breaks after lines 7, 14, 17 and 18 (AE7).
 - Romanizing "Sığınakların" gives "siginaklarin" and maps back to the original word.
 - An unaligned middle word is interpolated with confidence 0.
 - The edit-distance matcher pairs a transcript with one substituted word correctly.
@@ -401,7 +402,7 @@ Waits on: PR 1 merged.
 **Requirements:** R23, R24, R25
 **Dependencies:** U10
 **Files:** `Cutline/Timeline/LyricCorrection.swift`, `Cutline/Model/AnchorStretch.swift`, `CutlineTests/AnchorStretchTests.swift`, `CutlineTests/LyricCorrectionTests.swift`
-**Approach:** KTD8. "Low confidence" means below 0.6. The loop region spans the word ±0.75 s. Tap mode plays at 1.0×, 0.75× or 0.5× using time-pitch audio, and a tap sets the current word's start (snapped to the nearest onset within 40 ms when snapping is on) and confirms it.
+**Approach:** KTD8. "Low confidence" means below 0.6. The loop region spans the word ±0.75 s. Tap mode plays at 1.0×, 0.75× or 0.5× using time-pitch audio, and a tap sets the current word's start (snapped to the nearest vocal onset from U8 within 40 ms when snapping is on) and confirms it.
 **Test scenarios:**
 - AE1: anchors at 10 s and 12 s re-time w2–w4 proportionally, and the anchors stay put.
 - A run with no right anchor keeps its original offsets after the left anchor.
@@ -439,7 +440,7 @@ Waits on: PR 2 merged.
 - A 30 s target of 20 MB with 320 kbps audio yields the expected video bitrate.
 - A simulated first result 3% over triggers one corrected re-encode (AE4).
 - Still over after two retries reports failure and keeps the closest file.
-- Trim on a 31.4 s ad lands on the last downbeat ≤ 30 s.
+- Trim on a 31.4 s ad lands on the latest downbeat or lyric-line end ≤ 30 s (AE3).
 - A music-video project shows no hard-out line.
 **Verification:** A 30 s ad export targeting 20 MB lands at 18–20 MB.
 
@@ -449,13 +450,14 @@ Waits on: PR 2 merged.
 **Requirements:** R32, R33, R34
 **Dependencies:** U6, U12
 **Files:** `Cutline/Render/RenderKey.swift`, `Cutline/Render/FrameCache.swift`, `Cutline/Export/SegmentExporter.swift`, `Cutline/Timeline/CacheStrip.swift`, `CutlineTests/RenderKeyTests.swift`, `CutlineTests/SegmentExporterTests.swift`
-**Approach:** KTD11. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
+**Approach:** KTD11. Start with a spike: encode two segments with identical settings, join them by passthrough, and check for a single format description and clean playback. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
 **Test scenarios:**
 - Changing one clip's brightness changes keys only within that clip's range.
 - Moving a lyric word changes keys only where that word was or now is visible.
 - Re-export after a one-clip edit re-encodes only overlapping segments.
 - The concatenated output plays without glitches at segment joins.
 - Resume after cancel encodes only the missing segments.
+- Changing the export bitrate re-encodes every segment.
 **Verification:** After a one-word fix, re-exporting the full sample song takes a small fraction of the first export.
 
 ### U15. Import from another project
