@@ -119,7 +119,7 @@ struct ExportSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label("Export \(editor.project.type.title)", systemImage: "square.and.arrow.up").font(.title3.bold())
-            Text("\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Timecode.string(editor.project.duration, fps: editor.project.fps)) · \(settings.codec == .hevc ? "H.265 (HEVC, 10-bit)" : "H.264")")
+            Text(verbatim: "\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Timecode.string(editor.project.duration, fps: editor.project.fps)) · \(settings.codec == .hevc ? "H.265 (HEVC, 10-bit)" : "H.264")")
                 .foregroundStyle(.secondary)
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {

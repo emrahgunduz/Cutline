@@ -61,6 +61,7 @@
 		C1448F251493C0A6DC33166A /* PreviewCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */; };
 		C2B91A0740ECEE4E2003275E /* SampleMediaImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5986D783A144C13227A543EF /* SampleMediaImportTests.swift */; };
 		C9098E168CA54FE2974429E6 /* SizeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */; };
+		C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
 		E595C8588F4292E299228E7B /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */; };
 		EB548A9EA1E729689E9268F2 /* presets.json in Resources */ = {isa = PBXBuildFile; fileRef = 3F86A8C237D2346DBF191F17 /* presets.json */; };
@@ -131,6 +132,7 @@
 		C58D79DCCA1558080D8443DD /* TimelineLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineLayout.swift; sourceTree = "<group>"; };
 		C61B588EFD4F7FDB1987B63B /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
 		C75B629399C7ACF1CFA72AEA /* LyricImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricImport.swift; sourceTree = "<group>"; };
+		CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProjectView.swift; sourceTree = "<group>"; };
 		CD02505D46A8FF9B68A2B4C5 /* CutlineCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutlineCompositor.swift; sourceTree = "<group>"; };
 		CECA242B50C1CD9AD30485E4 /* TestMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestMedia.swift; sourceTree = "<group>"; };
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -252,6 +254,7 @@
 				F1D8E193DCC13514C90ADD93 /* ExportSheet.swift */,
 				EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */,
 				1E6492F46E4214AD109DDBC3 /* MainWindowController.swift */,
+				CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */,
 				49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */,
 				55120AF47C20743C6FF292E8 /* PreviewView.swift */,
 				4572ED9F4E345B083FB20AF9 /* ProjectDocument.swift */,
@@ -429,6 +432,7 @@
 				F723A3DF86EA6416D4968F51 /* LyricStyleView.swift in Sources */,
 				E595C8588F4292E299228E7B /* MainMenu.swift in Sources */,
 				518C4503BF19A867E8E2CCCE /* MainWindowController.swift in Sources */,
+				C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */,
 				4767FD52352B89696CD5E022 /* Presets.swift in Sources */,
 				C1448F251493C0A6DC33166A /* PreviewCanvasView.swift in Sources */,
 				268B7EF688691F6E5DA75D72 /* PreviewController.swift in Sources */,
