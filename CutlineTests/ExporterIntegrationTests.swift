@@ -79,3 +79,38 @@ final class ExporterIntegrationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: out.path))
     }
 }
+
+@MainActor
+final class ExportOptionsTests: XCTestCase {
+    func testContainerChoiceControlsFileType() async throws {
+        let doc = ProjectDocument(project: Project(type: .social, canvas: .init(width: 1080, height: 1920)))
+        let src = try await TestMedia.video(width: 320, height: 180, fps: 24, frames: 24)
+        defer { try? FileManager.default.removeItem(at: src) }
+        _ = await doc.editor.importFiles([src])
+        let v = doc.editor.project.assets[0].id
+        doc.editor.edit("s") { $0.addClip(assetID: v, track: 0, at: 0) }
+        var s = ExportSettings.defaults(for: doc.editor.project)
+        s.container = .mov
+        let out = TestMedia.tempURL("mov")
+        defer { try? FileManager.default.removeItem(at: out) }
+        try await Exporter().export(project: doc.editor.project, settings: s, to: out) { _ in }
+        let header = try FileHandle(forReadingFrom: out).readData(ofLength: 12)
+        XCTAssertEqual(String(data: header.subdata(in: 8..<12), encoding: .ascii), "qt  ")
+    }
+
+    func testQualityEstimateComesFromProbe() async throws {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 640, height: 360)))
+        let src = try await TestMedia.video(width: 320, height: 180, fps: 24, frames: 96)
+        defer { try? FileManager.default.removeItem(at: src) }
+        _ = await doc.editor.importFiles([src])
+        let v = doc.editor.project.assets[0].id
+        doc.editor.edit("s") { $0.addClip(assetID: v, track: 0, at: 0) }
+        let est = try await SizeEstimator.estimateBytes(project: doc.editor.project, settings: .defaults(for: doc.editor.project))
+        XCTAssertGreaterThan(est, 0)
+    }
+
+    func testDefaultNameDropsPackageExtension() {
+        let doc = ProjectDocument(project: Project(type: .ad, canvas: .init(width: 1080, height: 1920)))
+        XCTAssertFalse(ExportSheet.defaultName(doc.editor).lowercased().hasSuffix(".cutline"))
+    }
+}
