@@ -119,3 +119,31 @@ final class MoveAudioTests: XCTestCase {
         XCTAssertEqual(p.lyricTracks[0].lines[0].start, 10)
     }
 }
+
+@MainActor
+final class MultiSelectTests: XCTestCase {
+    func testToggleBuildsMultiSelectionAndDeleteRemovesAll() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        let a = Asset(kind: .image, name: "i", path: "/i")
+        p.assets = [a]
+        let c1 = p.addClip(assetID: a.id, track: 0, at: 0)!, c2 = p.addClip(assetID: a.id, track: 0, at: 10)!, c3 = p.addClip(assetID: a.id, track: 0, at: 20)!
+        let doc = ProjectDocument(project: p)
+        let e = doc.editor
+        e.selection = .clip(c1)
+        e.toggleSelected(.clip(c3))
+        XCTAssertEqual(e.selectedItems, [.clip(c1), .clip(c3)])
+        e.toggleSelected(.clip(c1))
+        XCTAssertEqual(e.selectedItems, [.clip(c3)])
+        e.toggleSelected(.clip(c1))
+        e.deleteSelection()
+        XCTAssertEqual(e.project.videoTracks[0].clips.map(\.id), [c2])
+        XCTAssertTrue(e.selectedItems.isEmpty)
+    }
+
+    func testPlainSelectionResetsMulti() {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        doc.editor.setSelection([.audio, .clip(UUID())])
+        doc.editor.selection = .none
+        XCTAssertTrue(doc.editor.selectedItems.isEmpty)
+    }
+}
