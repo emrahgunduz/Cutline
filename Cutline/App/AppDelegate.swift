@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Show tooltips quickly (system default is about a second).
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
         // The first NSDocumentController instantiated becomes the shared one.
         _ = CutlineDocumentController()
         NSApp.mainMenu = MainMenu.build()
