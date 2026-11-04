@@ -15,10 +15,13 @@ final class EditorModel: ObservableObject {
     @Published private(set) var project: Project
     @Published var selection: Selection = .none
     @Published var playhead: Double = 0
+    @Published var isPlaying = false
     /// Bumped on every project change so renderers can rebuild.
     @Published private(set) var revision = 0
 
     weak var document: ProjectDocument?
+    /// Called when a lyrics TXT is dropped on the timeline.
+    var lyricsDropped: ((Asset) -> Void)?
     private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
 
