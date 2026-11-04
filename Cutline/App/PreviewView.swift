@@ -19,7 +19,7 @@ struct PreviewView: View {
                     .padding(12)
             }
             Divider()
-            Text(timecode(editor.playhead)).font(.system(.body, design: .monospaced)).padding(8)
+            Text(Timecode.string(editor.playhead, fps: editor.project.fps)).font(.system(.body, design: .monospaced)).padding(8)
         }
     }
 
