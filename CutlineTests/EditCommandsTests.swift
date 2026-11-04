@@ -101,3 +101,21 @@ final class LiveEditTests: XCTestCase {
         XCTAssertEqual(e.project.lyricStyle.sizeFraction, 0.06, accuracy: 1e-9)
     }
 }
+
+final class MoveAudioTests: XCTestCase {
+    func testMovingAudioAddsIntroAndCarriesLyrics() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        p.assets = [Asset(kind: .audio, name: "a", path: "/a", duration: 100)]
+        p.setAudio(assetID: p.assets[0].id)
+        p.lyricTracks[0].lines = [LyricLine(start: 10, end: 12, words: [LyricWord(text: "x", start: 10, end: 12)])]
+        p.moveAudio(start: 8)
+        XCTAssertEqual(p.audio?.start, 8)
+        XCTAssertEqual(p.audio?.duration, 100)
+        XCTAssertEqual(p.duration, 108)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 18)
+        p.moveAudio(start: -5)
+        XCTAssertEqual(p.audio?.start, 0)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].start, 10)
+    }
+}

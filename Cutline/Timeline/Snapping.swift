@@ -5,14 +5,14 @@ import Foundation
 enum Snapping {
     static let radiusPixels = 8.0
 
-    static func targets(in project: Project, playhead: Double, excluding ids: Set<UUID>) -> [Double] {
+    static func targets(in project: Project, playhead: Double, excluding ids: Set<UUID>, includeAudio: Bool = true) -> [Double] {
         var out: [Double] = [0, playhead]
         for c in project.videoTracks.flatMap(\.clips) where !ids.contains(c.id) { out += [c.start, c.end] }
         for l in project.lyricTracks.flatMap(\.lines) where !ids.contains(l.id) {
             out += [l.start, l.end]
             for w in l.words where !ids.contains(w.id) { out += [w.start, w.end] }
         }
-        if let a = project.audio { out += [a.start, a.end] }
+        if includeAudio, let a = project.audio { out += [a.start, a.end] }
         return out
     }
 

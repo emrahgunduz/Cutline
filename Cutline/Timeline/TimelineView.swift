@@ -479,7 +479,7 @@ final class TimelineView: NSView {
         switch hit(at: p) {
         case .clip(_, .left), .clip(_, .right), .line(_, .left), .line(_, .right), .word(_, .left), .word(_, .right):
             NSCursor.resizeLeftRight.set()
-        case .clip(_, .body), .line(_, .body), .word(_, .body):
+        case .clip(_, .body), .line(_, .body), .word(_, .body), .audio:
             NSCursor.openHand.set()
         case .headerResize: NSCursor.resizeUpDown.set()
         case .headerButton: NSCursor.pointingHand.set()
@@ -518,11 +518,16 @@ final class TimelineView: NSView {
         drag = Drag(kind: .edit(h, original: editor.project), startPoint: p)
     }
 
+    private var draggingAudio: Bool {
+        if case .edit(.audio, _)? = drag?.kind { return true }
+        return false
+    }
+
     /// Snap `time` to nearby targets unless snapping is off or ⌘ is held.
     private func snapped(_ time: Double, excluding ids: Set<UUID>, event: NSEvent?) -> Double {
         guard snappingEnabled, !(event?.modifierFlags.contains(.command) ?? false) else { snapGuide = nil; return time }
         let targets = Snapping.targets(in: drag.map { if case .edit(_, let o) = $0.kind { return o } else { return project } } ?? project,
-                                       playhead: editor.playhead, excluding: ids)
+                                       playhead: editor.playhead, excluding: ids, includeAudio: !draggingAudio)
         if let s = Snapping.snap(time, targets: targets, pixelsPerSecond: Double(pixelsPerSecond)) { snapGuide = s; return s }
         snapGuide = nil
         return time
@@ -582,6 +587,12 @@ final class TimelineView: NSView {
                 case .right: next.retimeWord(id, end: max(snapped(w.end + dt, excluding: [id], event: event), w.start + next.frameDuration))
                 case .body: next.moveWord(id, start: snapped(w.start + dt, excluding: [id], event: event))
                 }
+            case .audio:
+                guard let a = original.audio else { return }
+                var start = a.start + dt
+                let s1 = snapped(start, excluding: [], event: event)
+                start = s1 != start ? s1 : snapped(start + a.duration, excluding: [], event: event) - a.duration
+                next.moveAudio(start: start)
             default: return
             }
             // Live preview of the drag; committed as one undo step on mouse up.
@@ -609,6 +620,7 @@ final class TimelineView: NSView {
     private func actionName(for hit: Hit) -> String {
         switch hit {
         case .clip(_, .body), .line(_, .body), .word(_, .body): "Move"
+        case .audio: "Move Audio"
         default: "Trim"
         }
     }

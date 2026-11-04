@@ -131,6 +131,26 @@ extension Project {
 
     mutating func removeAudio() { audio = nil }
 
+    /// Move the song in time (length unchanged). Lyrics are timed to the song, so they move too.
+    mutating func moveAudio(start: Double) {
+        guard var a = audio else { return }
+        let newStart = quantize(max(0, start))
+        let delta = newStart - a.start
+        guard delta != 0 else { return }
+        a.start = newStart
+        audio = a
+        for t in lyricTracks.indices {
+            for l in lyricTracks[t].lines.indices {
+                lyricTracks[t].lines[l].start += delta
+                lyricTracks[t].lines[l].end += delta
+                for w in lyricTracks[t].lines[l].words.indices {
+                    lyricTracks[t].lines[l].words[w].start += delta
+                    lyricTracks[t].lines[l].words[w].end += delta
+                }
+            }
+        }
+    }
+
     // MARK: Lyrics
 
     func lineLocation(_ id: UUID) -> (track: Int, index: Int)? {
