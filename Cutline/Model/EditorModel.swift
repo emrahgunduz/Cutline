@@ -19,6 +19,8 @@ final class EditorModel: ObservableObject {
     @Published private(set) var revision = 0
 
     weak var document: ProjectDocument?
+    private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
+    private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
 
     init(document: ProjectDocument?) {
         self.document = document
