@@ -38,7 +38,14 @@ final class EditorModel: ObservableObject {
         setSelection(items, primary: items.contains(s) ? s : nil)
     }
     /// Assets selected in the assets panel.
-    @Published var selectedAssets: Set<UUID> = []
+    @Published var selectedAssets: Set<UUID> = [] {
+        didSet {
+            assetSelectionOrder.removeAll { !selectedAssets.contains($0) }
+            for id in selectedAssets where !assetSelectionOrder.contains(id) { assetSelectionOrder.append(id) }
+        }
+    }
+    /// The selected assets in the order they were clicked (used when dropping several at once).
+    private(set) var assetSelectionOrder: [UUID] = []
     @Published var playhead: Double = 0
     @Published var isPlaying = false
     /// Bumped on every project change so renderers can rebuild.

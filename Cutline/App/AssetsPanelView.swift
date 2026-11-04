@@ -22,7 +22,8 @@ struct AssetsPanelView: View {
             Divider()
             ScrollViewReader { reader in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10, pinnedViews: [.sectionHeaders]) {
+                    // Not lazy: a lazy stack keeps stale heights after a section collapses.
+                    VStack(alignment: .leading, spacing: 10) {
                         ForEach(Self.groups, id: \.0) { kind, title, icon in
                             let items = editor.project.assets.filter { $0.kind == kind }
                             if !items.isEmpty { section(kind, title, icon, items) }
@@ -93,14 +94,18 @@ struct AssetsPanelView: View {
     // MARK: Sections
 
     private func section(_ kind: AssetKind, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
-        Section {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader(kind, title, icon, items)
             if !collapsed.contains(kind) {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(items) { asset in tile(asset, items) }
                 }
                 .padding(.horizontal, 8)
             }
-        } header: {
+        }
+    }
+
+    private func sectionHeader(_ kind: AssetKind, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
             Button {
                 if collapsed.contains(kind) { collapsed.remove(kind) } else { collapsed.insert(kind) }
             } label: {
@@ -114,9 +119,9 @@ struct AssetsPanelView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(.background.opacity(0.95))
-        }
+            .padding(.horizontal, 10).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.06)))
+            .padding(.horizontal, 6)
     }
 
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
@@ -128,7 +133,8 @@ struct AssetsPanelView: View {
             .gesture(TapGesture().modifiers(.shift).onEnded { extend(to: asset.id, in: group) })
             .onTapGesture { editor.selectedAssets = [asset.id]; lastClicked = asset.id }
             .onDrag {
-                let ids = selection.contains(asset.id) ? editor.project.assets.filter { selection.contains($0.id) }.map(\.id) : [asset.id]
+                // Several selected assets drop in the order they were clicked.
+                let ids = selection.contains(asset.id) ? editor.assetSelectionOrder.filter { selection.contains($0) } : [asset.id]
                 return NSItemProvider(object: ids.map(\.uuidString).joined(separator: ",") as NSString)
             }
             .contextMenu { menu(for: asset) }
