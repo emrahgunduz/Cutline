@@ -3,8 +3,9 @@ import AppKit
 /// Timeline with its button bar and scrollbars.
 final class TimelineContainer: NSView {
     let timeline: TimelineView
-    private let hScroller = NSScroller()
-    private let vScroller = NSScroller()
+    // NSScroller takes its orientation from the initial frame: wide = horizontal.
+    private let hScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 200, height: 15))
+    private let vScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 200))
     private let bar = NSStackView()
     private var snapButton: NSButton!
     static let barHeight: CGFloat = 30
@@ -76,10 +77,11 @@ final class TimelineContainer: NSView {
         super.layout()
         let w = bounds.width, h = bounds.height
         let s = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+        // Top to bottom: button bar, horizontal scroller, timeline (with the vertical scroller on its right).
         bar.frame = CGRect(x: 0, y: h - Self.barHeight, width: w, height: Self.barHeight)
-        timeline.frame = CGRect(x: 0, y: s, width: w - s, height: h - Self.barHeight - s)
-        hScroller.frame = CGRect(x: TimelineLayout.headerWidth, y: 0, width: w - s - TimelineLayout.headerWidth, height: s)
-        vScroller.frame = CGRect(x: w - s, y: s, width: s, height: h - Self.barHeight - s)
+        hScroller.frame = CGRect(x: TimelineLayout.headerWidth, y: h - Self.barHeight - s, width: w - s - TimelineLayout.headerWidth, height: s)
+        timeline.frame = CGRect(x: 0, y: 0, width: w - s, height: h - Self.barHeight - s)
+        vScroller.frame = CGRect(x: w - s, y: 0, width: s, height: h - Self.barHeight - s)
         syncScrollers()
     }
 
