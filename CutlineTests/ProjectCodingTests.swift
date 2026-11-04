@@ -56,3 +56,36 @@ final class ProjectCodingTests: XCTestCase {
         XCTAssertEqual(Project(type: .social, canvas: .init(width: 1080, height: 1920)).duration, 0)
     }
 }
+
+@MainActor
+final class ReopenTests: XCTestCase {
+    func testReopenedProjectLoadsCachedWaveform() async throws {
+        let wav = try TestMedia.sineWAV(seconds: 1)
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("reopen-\(UUID()).cutline")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        _ = await doc.editor.importFiles([wav])
+        try await Task.sleep(nanoseconds: 300_000_000)
+        try await doc.save(to: url, ofType: "com.emrahgunduz.cutline.project", for: .saveAsOperation)
+
+        let reopened = try ProjectDocument(contentsOf: url, ofType: "com.emrahgunduz.cutline.project")
+        let id = try XCTUnwrap(reopened.editor.project.assets.first?.id)
+        XCTAssertNil(reopened.editor.waveforms.waveforms[id])
+        reopened.editor.warmCaches()
+        for _ in 0..<50 where reopened.editor.waveforms.waveforms[id] == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertNotNil(reopened.editor.waveforms.waveforms[id])
+    }
+
+    func testCacheWritesDoNotLookLikeOutsideEdits() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("moddate-\(UUID()).cutline")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        try await doc.save(to: url, ofType: "com.emrahgunduz.cutline.project", for: .saveAsOperation)
+        try await Task.sleep(nanoseconds: 1_100_000_000)
+        _ = doc.folder("analysis")            // internal write after save
+        doc.persistLayout()
+        let onDisk = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        XCTAssertEqual(doc.fileModificationDate, onDisk)
+    }
+}

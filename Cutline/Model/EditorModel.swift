@@ -32,6 +32,18 @@ final class EditorModel: ObservableObject {
 
     var undoManager: UndoManager? { document?.undoManager }
 
+    /// Load cached thumbnails and waveforms (or build them) for every asset, e.g. after opening.
+    @MainActor
+    func warmCaches() {
+        for a in project.assets {
+            switch a.kind {
+            case .video, .image: Task { await thumbnails.ensureThumbnail(for: a) }
+            case .audio: Task { await waveforms.ensureWaveform(for: a) }
+            case .lyrics: break
+            }
+        }
+    }
+
     func replaceWithoutUndo(_ p: Project) {
         project = p
         revision += 1

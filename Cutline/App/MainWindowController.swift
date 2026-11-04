@@ -47,6 +47,7 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         vertical.setHoldingPriority(.init(260), forSubviewAt: 1)
         window?.contentView = vertical
         installTransportKeys()
+        editor.warmCaches()
     }
 
     private var keyMonitor: Any?
