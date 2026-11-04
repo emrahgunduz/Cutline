@@ -10,6 +10,19 @@ struct ExportSettings: Equatable {
     /// Mbit/s, used in bitrate mode.
     var bitrateMbps: Double
     var audioBitrateKbps: Double = 320
+    var container: Container = .mp4
+
+    enum Container: String, CaseIterable, Identifiable {
+        case mp4, mov
+        var id: String { rawValue }
+        var title: String { self == .mp4 ? "MP4 (.mp4)" : "QuickTime (.mov)" }
+        var fileType: AVFileType { self == .mp4 ? .mp4 : .mov }
+    }
+
+    /// Size estimate for bitrate mode (exact up to container overhead).
+    func estimatedBytes(duration: Double) -> Double {
+        (bitrateMbps * 1_000_000 + audioBitrateKbps * 1000) * duration / 8
+    }
 
     /// Music videos default to highest-quality HEVC; social and ads to bitrate-driven H.264.
     static func defaults(for project: Project) -> ExportSettings {

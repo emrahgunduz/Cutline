@@ -26,14 +26,19 @@ final class Exporter {
         reader?.cancelReading()
     }
 
-    func export(project: Project, settings: ExportSettings, to url: URL, progress: @escaping (Double) -> Void) async throws {
+    /// Export the whole project, or only `range` (seconds) — used for size-estimate probes.
+    func export(project: Project, settings: ExportSettings, to url: URL, range: ClosedRange<Double>? = nil,
+                progress: @escaping (Double) -> Void) async throws {
         guard project.duration > 0 else { throw ExportError.empty }
         let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project))
         let built = try await CompositionBuilder.build(project: project, mediaURL: { $0.url }, snapshot: snapshot)
         try? FileManager.default.removeItem(at: url)
 
         let reader = try AVAssetReader(asset: built.composition)
-        reader.timeRange = CMTimeRange(start: .zero, duration: built.duration)
+        let span: CMTimeRange = range.map {
+            CMTimeRange(start: CompositionBuilder.time($0.lowerBound), end: CompositionBuilder.time(min($0.upperBound, built.duration.seconds)))
+        } ?? CMTimeRange(start: .zero, duration: built.duration)
+        reader.timeRange = span
         let videoOut = AVAssetReaderVideoCompositionOutput(videoTracks: built.composition.tracks(withMediaType: .video), videoSettings: nil)
         videoOut.videoComposition = built.videoComposition
         videoOut.alwaysCopiesSampleData = false
@@ -46,7 +51,7 @@ final class Exporter {
             audioOut = o
         }
 
-        let fileType: AVFileType = url.pathExtension.lowercased() == "mov" ? .mov : .mp4
+        let fileType = settings.container.fileType
         let writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         let videoIn = AVAssetWriterInput(mediaType: .video, outputSettings: settings.videoOutputSettings(canvas: project.canvas, fps: project.fps))
         videoIn.expectsMediaDataInRealTime = false
@@ -63,10 +68,10 @@ final class Exporter {
 
         guard reader.startReading() else { throw ExportError.failed(reader.error?.localizedDescription ?? "reader") }
         guard writer.startWriting() else { throw ExportError.failed(writer.error?.localizedDescription ?? "writer") }
-        writer.startSession(atSourceTime: .zero)
+        writer.startSession(atSourceTime: span.start)
 
-        let total = built.duration.seconds
-        async let v: Void = pump(output: videoOut, input: videoIn, label: "video") { progress(min(1, $0 / total)) }
+        let total = span.duration.seconds, offset = span.start.seconds
+        async let v: Void = pump(output: videoOut, input: videoIn, label: "video") { progress(min(1, ($0 - offset) / total)) }
         async let a: Void = {
             if let audioOut, let audioIn { await self.pump(output: audioOut, input: audioIn, label: "audio", progress: nil) }
         }()
@@ -82,7 +87,7 @@ final class Exporter {
             try? FileManager.default.removeItem(at: url)
             throw ExportError.failed(reader.error?.localizedDescription ?? "read")
         }
-        writer.endSession(atSourceTime: built.duration)
+        writer.endSession(atSourceTime: span.end)
         await writer.finishWriting()
         guard writer.status == .completed else {
             try? FileManager.default.removeItem(at: url)
