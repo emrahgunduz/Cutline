@@ -114,3 +114,17 @@ final class ExportOptionsTests: XCTestCase {
         XCTAssertFalse(ExportSheet.defaultName(doc.editor).lowercased().hasSuffix(".cutline"))
     }
 }
+
+final class SizeEstimatorSamplingTests: XCTestCase {
+    func testSamplesComeFromClipsNotGaps() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        let a = Asset(kind: .image, name: "i", path: "/i")
+        p.assets = [a]
+        p.audio = AudioClip(assetID: UUID(), duration: 200)
+        p.addClip(assetID: a.id, track: 0, at: 0)      // 0-5
+        p.addClip(assetID: a.id, track: 0, at: 10)     // 10-15
+        for s in SizeEstimator.sampleStarts(p) {
+            XCTAssertTrue((0...5).contains(s) || (10...15).contains(s), "\(s)")
+        }
+    }
+}

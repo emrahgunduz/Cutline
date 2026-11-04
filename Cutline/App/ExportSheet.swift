@@ -8,11 +8,13 @@ enum ExportSheet {
     static func present(editor: EditorModel, window: NSWindow?) {
         guard let window, window.attachedSheet == nil else { return }
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
-        sheet.contentViewController = NSHostingController(rootView: ExportSettingsView(editor: editor, finish: { settings in
+        let host = NSHostingController(rootView: ExportSettingsView(editor: editor, finish: { settings in
             window.endSheet(sheet)
             guard let settings else { return }
             DispatchQueue.main.async { chooseDestination(editor: editor, settings: settings, window: window) }
         }))
+        host.sizingOptions = [.preferredContentSize]
+        sheet.contentViewController = host
         window.beginSheet(sheet)
     }
 
@@ -36,8 +38,10 @@ enum ExportSheet {
         let exporter = Exporter()
         let model = ExportProgressModel()
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
-        sheet.contentViewController = NSHostingController(rootView: ExportProgressView(model: model, fileName: url.lastPathComponent,
-                                                                                       cancel: { exporter.cancel() }))
+        let host = NSHostingController(rootView: ExportProgressView(model: model, fileName: url.lastPathComponent,
+                                                                    cancel: { exporter.cancel() }))
+        host.sizingOptions = [.preferredContentSize]
+        sheet.contentViewController = host
         window.beginSheet(sheet)
         let project = editor.project
         Task { @MainActor in
@@ -117,41 +121,60 @@ struct ExportSettingsView: View {
             Label("Export \(editor.project.type.title)", systemImage: "square.and.arrow.up").font(.title3.bold())
             Text("\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Timecode.string(editor.project.duration, fps: editor.project.fps)) · \(settings.codec == .hevc ? "H.265 (HEVC, 10-bit)" : "H.264")")
                 .foregroundStyle(.secondary)
-            Form {
-                Picker("Format", selection: $settings.container) {
-                    ForEach(ExportSettings.Container.allCases) { Text($0.title).tag($0) }
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    Text("Format").gridColumnAlignment(.trailing)
+                    Picker("", selection: $settings.container) {
+                        ForEach(ExportSettings.Container.allCases) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden().frame(width: 200)
                 }
-                Picker("Rate control", selection: $settings.rateMode) {
-                    Text("Constant quality").tag(ExportSettings.RateMode.quality)
-                    Text("Target bitrate").tag(ExportSettings.RateMode.bitrate)
+                GridRow {
+                    Text("Rate control")
+                    Picker("", selection: $settings.rateMode) {
+                        Text("Constant quality").tag(ExportSettings.RateMode.quality)
+                        Text("Target bitrate").tag(ExportSettings.RateMode.bitrate)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 260)
                 }
-                .pickerStyle(.segmented)
                 if settings.rateMode == .quality {
-                    LabeledContent("Quality") {
+                    GridRow {
+                        Text("Quality")
                         HStack {
-                            Slider(value: $settings.quality, in: 0.3...1)
-                            Text("\(Int(settings.quality * 100))%").monospacedDigit().frame(width: 40)
+                            Slider(value: $settings.quality, in: 0.3...1).frame(width: 220)
+                            Text("\(Int(settings.quality * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
                         }
                     }
                 } else {
-                    LabeledContent("Video bitrate") {
+                    GridRow {
+                        Text("Video bitrate")
                         HStack {
-                            TextField("", value: $settings.bitrateMbps, format: .number.precision(.fractionLength(0...1))).frame(width: 70)
+                            TextField("", value: $settings.bitrateMbps, format: .number.precision(.fractionLength(0...1)))
+                                .textFieldStyle(.roundedBorder).frame(width: 70)
                             Text("Mbit/s")
                         }
                     }
                 }
-                Picker("Audio", selection: $settings.audioBitrateKbps) {
-                    ForEach([128.0, 192, 256, 320], id: \.self) { Text("AAC \(Int($0)) kbit/s").tag($0) }
+                GridRow {
+                    Text("Audio")
+                    Picker("", selection: $settings.audioBitrateKbps) {
+                        ForEach([128.0, 192, 256, 320], id: \.self) { Text("AAC \(Int($0)) kbit/s").tag($0) }
+                    }
+                    .labelsHidden().frame(width: 200)
                 }
-                LabeledContent("Estimated size") {
-                    if estimating { ProgressView().controlSize(.small) }
-                    else if let estimate { Text(ByteCountFormatter.string(fromByteCount: Int64(estimate), countStyle: .file)) }
+                GridRow {
+                    Text("Estimated size")
+                    HStack {
+                        if estimating { ProgressView().controlSize(.small); Text("Measuring…").foregroundStyle(.secondary) }
+                        else if let estimate { Text(ByteCountFormatter.string(fromByteCount: Int64(estimate), countStyle: .file)).bold() }
+                        else { Text("—").foregroundStyle(.secondary) }
+                    }
                 }
             }
-            .formStyle(.grouped)
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
             Text(settings.rateMode == .quality
-                 ? "Constant quality keeps the picture at a chosen quality; busy scenes use more data, so the size is estimated from a 2-second test encode."
+                 ? "Constant quality keeps the picture at a chosen quality; busy scenes use more data, so the size is estimated from short test encodes of your clips."
                  : "Target bitrate keeps the data rate fixed, so the file size is predictable (bitrate × length). Use it when a platform limits file size.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
@@ -162,7 +185,8 @@ struct ExportSettingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 480)
+        .frame(width: 500)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: refreshEstimate)
         .onChange(of: settings) { _, _ in refreshEstimate() }
     }
