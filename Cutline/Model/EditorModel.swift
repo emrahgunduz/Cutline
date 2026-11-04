@@ -121,6 +121,9 @@ final class EditorModel: ObservableObject {
     func line(_ id: UUID) -> LyricLine? { project.lyricTracks.lazy.flatMap(\.lines).first { $0.id == id } }
     func word(_ id: UUID) -> LyricWord? { project.lyricTracks.lazy.flatMap(\.lines).flatMap(\.words).first { $0.id == id } }
 
+    /// Multi-selection membership (filled in by multi-select; single selection otherwise).
+    func isSelected(_ s: Selection) -> Bool { selection == s }
+
     var selectedClip: Clip? { if case .clip(let id) = selection { return clip(id) }; return nil }
 
     func folder(_ name: String) -> URL? { document?.folder(name) }

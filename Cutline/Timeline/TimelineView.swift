@@ -346,31 +346,59 @@ final class TimelineView: NSView {
         NSColor(calibratedRed: 0.55, green: 1, blue: 0.75, alpha: 0.9).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
     }
 
+    /// Lyric row layout: a line bar on top, then two word rows that words alternate between,
+    /// so neighbouring words never touch and each word's edges are easy to grab.
+    struct LyricRowParts { var line: CGRect; var words: [CGRect] }
+
+    static func lyricParts(_ rect: CGRect) -> LyricRowParts {
+        let lineH: CGFloat = min(15, max(12, rect.height - 4))
+        let line = CGRect(x: rect.minX, y: rect.minY + 2, width: rect.width, height: lineH)
+        let remaining = rect.maxY - 3 - line.maxY - 2
+        guard remaining >= 16 else { return LyricRowParts(line: line, words: []) }
+        let rowH = (remaining - 2) / 2
+        let w0 = CGRect(x: rect.minX, y: line.maxY + 2, width: rect.width, height: rowH)
+        let w1 = CGRect(x: rect.minX, y: w0.maxY + 2, width: rect.width, height: rowH)
+        return LyricRowParts(line: line, words: [w0, w1])
+    }
+
+    static let lineColor = NSColor(calibratedRed: 0.34, green: 0.22, blue: 0.46, alpha: 1)
+    static let wordColor = NSColor(calibratedRed: 0.66, green: 0.52, blue: 0.86, alpha: 1)
+
     private func drawLyricTrack(_ t: Int, _ rect: CGRect, _ l: TimelineLayout) {
         let visible = l.visibleTimeRange
-        let showWords = rect.height >= 36
+        let parts = Self.lyricParts(rect)
         for line in project.lyricTracks[t].lines where line.end >= visible.lowerBound && line.start <= visible.upperBound {
-            let lr = CGRect(x: l.x(for: line.start), y: rect.minY + 2, width: CGFloat(line.end - line.start) * l.pixelsPerSecond, height: rect.height - 5)
-            let lineSelected = editor.selection == .lyricLine(line.id)
-            NSColor(calibratedRed: 0.36, green: 0.24, blue: 0.46, alpha: 1).setFill()
-            let lp = NSBezierPath(roundedRect: lr, xRadius: 3, yRadius: 3)
-            lp.fill()
-            if lineSelected { NSColor.controlAccentColor.setStroke(); lp.lineWidth = 2; lp.stroke() }
-            if showWords {
-                for w in line.words {
-                    let wr = CGRect(x: l.x(for: w.start), y: lr.minY + 13, width: max(2, CGFloat(w.end - w.start) * l.pixelsPerSecond), height: lr.height - 15)
-                    let selected = editor.selection == .lyricWord(w.id)
-                    let lowConfidence = !w.confirmed && w.confidence < 0.6
-                    (selected ? NSColor.controlAccentColor : lowConfidence ? NSColor.systemOrange.withAlphaComponent(0.85) : NSColor(calibratedRed: 0.62, green: 0.45, blue: 0.80, alpha: 1)).setFill()
-                    NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
-                    if wr.width > 14 {
-                        (w.text as NSString).draw(in: wr.insetBy(dx: 2, dy: 1), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.white])
-                    }
-                }
+            let x0 = l.x(for: line.start), w = CGFloat(line.end - line.start) * l.pixelsPerSecond
+            let lineSelected = editor.selection == .lyricLine(line.id) || editor.isSelected(.lyricLine(line.id))
+            // The line spans its whole box (bar plus word rows) so its extent stays readable.
+            let span = CGRect(x: x0, y: parts.line.minY, width: w, height: (parts.words.last?.maxY ?? parts.line.maxY) - parts.line.minY)
+            Self.lineColor.withAlphaComponent(0.35).setFill()
+            NSBezierPath(roundedRect: span, xRadius: 3, yRadius: 3).fill()
+            let bar = CGRect(x: x0, y: parts.line.minY, width: w, height: parts.line.height)
+            let bp = NSBezierPath(roundedRect: bar, xRadius: 3, yRadius: 3)
+            Self.lineColor.setFill()
+            bp.fill()
+            if lineSelected {
+                NSColor.controlAccentColor.setStroke()
+                let outline = NSBezierPath(roundedRect: span, xRadius: 3, yRadius: 3)
+                outline.lineWidth = 2
+                outline.stroke()
             }
-            if lr.width > 30 {
-                (line.text as NSString).draw(in: CGRect(x: lr.minX + 4, y: lr.minY, width: lr.width - 8, height: 12),
-                                             withAttributes: [.font: NSFont.systemFont(ofSize: 9), .foregroundColor: NSColor.white.withAlphaComponent(0.7)])
+            if bar.width > 30 {
+                (line.text as NSString).draw(in: bar.insetBy(dx: 4, dy: 0),
+                                             withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.85)])
+            }
+            guard parts.words.count == 2 else { continue }
+            for (i, wd) in line.words.enumerated() {
+                let row = parts.words[i % 2]
+                let wr = CGRect(x: l.x(for: wd.start), y: row.minY, width: max(2, CGFloat(wd.end - wd.start) * l.pixelsPerSecond), height: row.height)
+                let selected = editor.selection == .lyricWord(wd.id) || editor.isSelected(.lyricWord(wd.id))
+                (selected ? NSColor.controlAccentColor : Self.wordColor).setFill()
+                NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
+                if wr.width > 14 {
+                    (wd.text as NSString).draw(in: wr.insetBy(dx: 3, dy: 0),
+                                               withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.black.withAlphaComponent(0.8)])
+                }
             }
         }
     }
@@ -447,12 +475,15 @@ final class TimelineView: NSView {
             if let a = project.audio, t >= a.start, t <= a.end { return .audio }
         case .lyric(let ti):
             guard let frame = l.frame(of: row) else { break }
-            let inWordBand = frame.height >= 36 && p.y > frame.minY + 14
-            for line in project.lyricTracks[ti].lines where t >= line.start && t <= line.end {
-                if inWordBand, let w = line.words.first(where: { t >= $0.start && t <= $0.end }) {
-                    return .word(w.id, edge(w.start, w.end))
+            let parts = Self.lyricParts(frame)
+            for line in project.lyricTracks[ti].lines where t >= line.start - grab && t <= line.end + grab {
+                for (i, w) in line.words.enumerated() where parts.words.count == 2 {
+                    let r = parts.words[i % 2]
+                    if p.y >= r.minY && p.y <= r.maxY && t >= w.start - grab && t <= w.end + grab {
+                        return .word(w.id, edge(w.start, w.end))
+                    }
                 }
-                return .line(line.id, edge(line.start, line.end))
+                if t >= line.start && t <= line.end { return .line(line.id, edge(line.start, line.end)) }
             }
         case .ruler: break
         }
