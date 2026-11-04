@@ -22,11 +22,18 @@ extension EditorModel {
     }
 
     func deleteSelection() {
-        switch selection {
-        case .clip(let id): edit("Delete Clip") { $0.deleteClip(id) }
-        case .lyricLine(let id): edit("Delete Line") { $0.deleteLine(id) }
-        case .audio: edit("Remove Audio") { $0.removeAudio() }
-        default: break
+        let items = selectedItems.isEmpty ? [selection] : Array(selectedItems)
+        guard items.contains(where: { $0 != .none }) else { return }
+        edit(items.count > 1 ? "Delete Items" : "Delete") { p in
+            for item in items {
+                switch item {
+                case .clip(let id): p.deleteClip(id)
+                case .lyricLine(let id): p.deleteLine(id)
+                case .lyricWord(let id): p.deleteWord(id)
+                case .audio: p.removeAudio()
+                case .none: break
+                }
+            }
         }
     }
 }

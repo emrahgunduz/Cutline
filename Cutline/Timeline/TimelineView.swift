@@ -34,12 +34,15 @@ final class TimelineView: NSView {
         case pan(startScroll: Double, startY: CGFloat)
         case resize(TimelineRow, startHeight: CGFloat)
         case reorder(TimelineRow)
+        case marquee
+        case group(original: Project, clips: [UUID], lines: [UUID])
     }
     private struct Drag { var kind: DragKind; var startPoint: CGPoint; var didEdit = false }
     private var drag: Drag?
     /// Time of the snap target the current drag is locked to (drawn as a guide line).
     private var snapGuide: Double?
     private var reorderTarget: TimelineRow?
+    private var marqueeRect: CGRect?
 
     init(editor: EditorModel) {
         self.editor = editor
@@ -146,6 +149,14 @@ final class TimelineView: NSView {
         }
         NSGraphicsContext.restoreGraphicsState()
         drawRuler(l)
+        if let m = marqueeRect {
+            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+            m.fill()
+            NSColor.controlAccentColor.setStroke()
+            let path = NSBezierPath(rect: m.insetBy(dx: 0.5, dy: 0.5))
+            path.lineWidth = 1
+            path.stroke()
+        }
         if let g = snapGuide {
             let x = l.x(for: g)
             NSColor.systemYellow.setFill()
@@ -242,7 +253,7 @@ final class TimelineView: NSView {
         let visible = l.visibleTimeRange
         for clip in project.videoTracks[t].clips where clip.end >= visible.lowerBound && clip.start <= visible.upperBound {
             let r = CGRect(x: l.x(for: clip.start), y: rect.minY + 2, width: CGFloat(clip.duration) * l.pixelsPerSecond, height: rect.height - 5)
-            let selected = editor.selection == .clip(clip.id)
+            let selected = editor.isSelected(.clip(clip.id))
             let path = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
             clipColor(selected).setFill()
             path.fill()
@@ -318,7 +329,7 @@ final class TimelineView: NSView {
             return
         }
         let r = CGRect(x: l.x(for: audio.start), y: rect.minY + 2, width: CGFloat(audio.duration) * l.pixelsPerSecond, height: rect.height - 5)
-        let selected = editor.selection == .audio
+        let selected = editor.isSelected(.audio)
         NSColor(calibratedRed: 0.15, green: 0.38, blue: 0.27, alpha: 1).setFill()
         let path = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
         path.fill()
@@ -369,7 +380,7 @@ final class TimelineView: NSView {
         let parts = Self.lyricParts(rect)
         for line in project.lyricTracks[t].lines where line.end >= visible.lowerBound && line.start <= visible.upperBound {
             let x0 = l.x(for: line.start), w = CGFloat(line.end - line.start) * l.pixelsPerSecond
-            let lineSelected = editor.selection == .lyricLine(line.id) || editor.isSelected(.lyricLine(line.id))
+            let lineSelected = editor.isSelected(.lyricLine(line.id))
             // The line spans its whole box (bar plus word rows) so its extent stays readable.
             let span = CGRect(x: x0, y: parts.line.minY, width: w, height: (parts.words.last?.maxY ?? parts.line.maxY) - parts.line.minY)
             Self.lineColor.withAlphaComponent(0.35).setFill()
@@ -392,7 +403,7 @@ final class TimelineView: NSView {
             for (i, wd) in line.words.enumerated() {
                 let row = parts.words[i % 2]
                 let wr = CGRect(x: l.x(for: wd.start), y: row.minY, width: max(2, CGFloat(wd.end - wd.start) * l.pixelsPerSecond), height: row.height)
-                let selected = editor.selection == .lyricWord(wd.id) || editor.isSelected(.lyricWord(wd.id))
+                let selected = editor.isSelected(.lyricWord(wd.id))
                 (selected ? NSColor.controlAccentColor : Self.wordColor).setFill()
                 NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
                 if wr.width > 14 {
@@ -525,6 +536,29 @@ final class TimelineView: NSView {
         window?.makeFirstResponder(self)
         let p = convert(event.locationInWindow, from: nil)
         let h = hit(at: p)
+        let item: Selection? = {
+            switch h {
+            case .clip(let id, _): .clip(id)
+            case .line(let id, _): .lyricLine(id)
+            case .word(let id, _): .lyricWord(id)
+            case .audio: .audio
+            default: nil
+            }
+        }()
+        if event.modifierFlags.contains(.command), let item { editor.toggleSelected(item); return }
+        if event.modifierFlags.contains(.shift), item == nil, p.x > TimelineLayout.headerWidth, p.y > TimelineLayout.rulerHeight {
+            drag = Drag(kind: .marquee, startPoint: p); return
+        }
+        // Dragging the body of an item that is part of a multi-selection moves the whole group.
+        if let item, editor.selectedItems.count > 1, editor.isSelected(item) {
+            switch h {
+            case .clip(_, .body), .line(_, .body):
+                drag = Drag(kind: .group(original: editor.project, clips: editor.selectedClipIDs, lines: editor.selectedLineIDs), startPoint: p)
+                NSCursor.closedHand.set()
+                return
+            default: break
+            }
+        }
         switch h {
         case .clip(let id, let e): editor.selection = .clip(id); if e == .body { NSCursor.closedHand.set() }
         case .line(let id, _): editor.selection = .lyricLine(id)
@@ -578,6 +612,26 @@ final class TimelineView: NSView {
         case .reorder(let row):
             reorderTarget = reorderDestination(for: row, at: p.y)
             needsDisplay = true
+            return
+        case .marquee:
+            let r = CGRect(x: min(p.x, d.startPoint.x), y: min(p.y, d.startPoint.y), width: abs(p.x - d.startPoint.x), height: abs(p.y - d.startPoint.y))
+            marqueeRect = r
+            editor.setSelection(items(in: r))
+            needsDisplay = true
+            return
+        case .group(let original, let clips, let lines):
+            guard abs(p.x - d.startPoint.x) > 2 || d.didEdit else { return }
+            var dt = Double((p.x - d.startPoint.x) / l.pixelsPerSecond)
+            // Never push any member before 0.
+            let earliest = (original.videoTracks.flatMap(\.clips).filter { clips.contains($0.id) }.map(\.start)
+                            + original.lyricTracks.flatMap(\.lines).filter { lines.contains($0.id) }.map(\.start)).min() ?? 0
+            dt = max(dt, -earliest)
+            var next = original
+            for id in clips { if let loc = original.clipLocation(id), let c = original.videoTracks[loc.track].clips.first(where: { $0.id == id }) { next.moveClip(id, toTrack: loc.track, start: c.start + dt) } }
+            for id in lines { if let loc = original.lineLocation(id), let ln = original.lyricTracks[loc.track].lines.first(where: { $0.id == id }) { next.moveLine(id, toTrack: loc.track, start: ln.start + dt) } }
+            editor.replaceWithoutUndo(next)
+            d.didEdit = true
+            drag = d
             return
         case .edit(let hit, let original):
             guard abs(p.x - d.startPoint.x) > 2 || d.didEdit else { return }
@@ -634,12 +688,16 @@ final class TimelineView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { drag = nil; snapGuide = nil; reorderTarget = nil; needsDisplay = true; updateCursor(at: convert(event.locationInWindow, from: nil)) }
+        defer { drag = nil; snapGuide = nil; reorderTarget = nil; marqueeRect = nil; needsDisplay = true; updateCursor(at: convert(event.locationInWindow, from: nil)) }
         guard let d = drag else { return }
         switch d.kind {
         case .resize: editor.document?.persistLayout()
         case .reorder(let row):
             if let target = reorderTarget { performReorder(row, to: target) }
+        case .group(let original, _, _) where d.didEdit:
+            let final = editor.project
+            editor.replaceWithoutUndo(original)
+            editor.edit("Move Items") { $0 = final }
         case .edit(let hit, let original) where d.didEdit:
             let final = editor.project
             editor.replaceWithoutUndo(original)
@@ -654,6 +712,30 @@ final class TimelineView: NSView {
         case .audio: "Move Audio"
         default: "Trim"
         }
+    }
+
+    /// Clips and lyric lines whose boxes intersect a view rectangle.
+    private func items(in r: CGRect) -> Set<Selection> {
+        let l = layout
+        var out: Set<Selection> = []
+        for (row, y, h) in l.rows.dropFirst() {
+            let band = CGRect(x: TimelineLayout.headerWidth, y: y, width: bounds.width, height: h)
+            guard band.intersects(r) else { continue }
+            switch row {
+            case .video(let t):
+                for c in project.videoTracks[t].clips {
+                    let cr = CGRect(x: l.x(for: c.start), y: y, width: CGFloat(c.duration) * l.pixelsPerSecond, height: h)
+                    if cr.intersects(r) { out.insert(.clip(c.id)) }
+                }
+            case .lyric(let t):
+                for ln in project.lyricTracks[t].lines {
+                    let lr = CGRect(x: l.x(for: ln.start), y: y, width: CGFloat(ln.end - ln.start) * l.pixelsPerSecond, height: h)
+                    if lr.intersects(r) { out.insert(.lyricLine(ln.id)) }
+                }
+            default: break
+            }
+        }
+        return out
     }
 
     // MARK: Track reordering

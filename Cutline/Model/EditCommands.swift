@@ -232,6 +232,13 @@ extension Project {
         retimeWord(id, start: s, end: s + (w.end - w.start))
     }
 
+    /// Remove a word; a line left without words is removed too.
+    mutating func deleteWord(_ id: UUID) {
+        guard let loc = wordLocation(id) else { return }
+        lyricTracks[loc.track].lines[loc.line].words.remove(at: loc.word)
+        if lyricTracks[loc.track].lines[loc.line].words.isEmpty { lyricTracks[loc.track].lines.remove(at: loc.line) }
+    }
+
     mutating func deleteLine(_ id: UUID) {
         guard let loc = lineLocation(id) else { return }
         lyricTracks[loc.track].lines.remove(at: loc.index)

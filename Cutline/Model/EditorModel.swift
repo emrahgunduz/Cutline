@@ -1,7 +1,7 @@
 import AppKit
 import Combine
 
-enum Selection: Equatable {
+enum Selection: Hashable {
     case none
     case clip(UUID)
     case lyricLine(UUID)
@@ -13,7 +13,30 @@ enum Selection: Equatable {
 /// `edit(_:_:)`, which registers an undo step that restores the previous project value.
 final class EditorModel: ObservableObject {
     @Published private(set) var project: Project
-    @Published var selection: Selection = .none { didSet { syncAssetSelection() } }
+    /// The primary (last clicked) selected item.
+    @Published var selection: Selection = .none {
+        didSet {
+            if !updatingMulti { selectedItems = selection == .none ? [] : [selection] }
+            syncAssetSelection()
+        }
+    }
+    /// Everything selected on the timeline (includes `selection`).
+    @Published private(set) var selectedItems: Set<Selection> = []
+    private var updatingMulti = false
+
+    func setSelection(_ items: Set<Selection>, primary: Selection? = nil) {
+        updatingMulti = true
+        selectedItems = items
+        selection = primary.flatMap { items.contains($0) ? $0 : nil } ?? items.first ?? .none
+        updatingMulti = false
+    }
+
+    /// ⌘-click: add or remove one item.
+    func toggleSelected(_ s: Selection) {
+        var items = selectedItems
+        if items.contains(s) { items.remove(s) } else { items.insert(s) }
+        setSelection(items, primary: items.contains(s) ? s : nil)
+    }
     /// Assets selected in the assets panel.
     @Published var selectedAssets: Set<UUID> = []
     @Published var playhead: Double = 0
@@ -106,6 +129,16 @@ final class EditorModel: ObservableObject {
 
     private func validateSelection() {
         selectedAssets = selectedAssets.filter { project.asset($0) != nil }
+        let alive = selectedItems.filter {
+            switch $0 {
+            case .clip(let id): clip(id) != nil
+            case .lyricLine(let id): line(id) != nil
+            case .lyricWord(let id): word(id) != nil
+            case .audio: project.audio != nil
+            case .none: false
+            }
+        }
+        if alive != selectedItems { setSelection(alive, primary: selection) }
         switch selection {
         case .clip(let id) where clip(id) == nil: selection = .none
         case .lyricLine(let id) where line(id) == nil: selection = .none
@@ -121,8 +154,10 @@ final class EditorModel: ObservableObject {
     func line(_ id: UUID) -> LyricLine? { project.lyricTracks.lazy.flatMap(\.lines).first { $0.id == id } }
     func word(_ id: UUID) -> LyricWord? { project.lyricTracks.lazy.flatMap(\.lines).flatMap(\.words).first { $0.id == id } }
 
-    /// Multi-selection membership (filled in by multi-select; single selection otherwise).
-    func isSelected(_ s: Selection) -> Bool { selection == s }
+    func isSelected(_ s: Selection) -> Bool { selectedItems.contains(s) }
+
+    var selectedClipIDs: [UUID] { selectedItems.compactMap { if case .clip(let id) = $0 { return id } else { return nil } } }
+    var selectedLineIDs: [UUID] { selectedItems.compactMap { if case .lyricLine(let id) = $0 { return id } else { return nil } } }
 
     var selectedClip: Clip? { if case .clip(let id) = selection { return clip(id) }; return nil }
 
