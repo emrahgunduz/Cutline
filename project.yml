@@ -1,0 +1,64 @@
+name: Cutline
+options:
+  bundleIdPrefix: com.emrahgunduz
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    ARCHS: arm64
+    ENABLE_HARDENED_RUNTIME: NO
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+targets:
+  Cutline:
+    type: application
+    platform: macOS
+    sources: [Cutline]
+    info:
+      path: Cutline/Info.plist
+      properties:
+        CFBundleName: Cutline
+        CFBundleDisplayName: Cutline
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        NSPrincipalClass: NSApplication
+        LSMinimumSystemVersion: "15.0"
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Cutline Project
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes: [com.emrahgunduz.cutline.project]
+            LSTypeIsPackage: true
+            NSDocumentClass: $(PRODUCT_MODULE_NAME).ProjectDocument
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.emrahgunduz.cutline.project
+            UTTypeDescription: Cutline Project
+            UTTypeConformsTo: [com.apple.package, public.composite-content]
+            UTTypeTagSpecification:
+              public.filename-extension: [cutline]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.emrahgunduz.cutline
+        ENABLE_APP_SANDBOX: NO
+        GENERATE_INFOPLIST_FILE: NO
+  CutlineTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [CutlineTests]
+    dependencies:
+      - target: Cutline
+    settings:
+      base:
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Cutline.app/Contents/MacOS/Cutline
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Cutline:
+    build:
+      targets:
+        Cutline: all
+        CutlineTests: [test]
+    test:
+      targets: [CutlineTests]
