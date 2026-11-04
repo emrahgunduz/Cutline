@@ -9,25 +9,25 @@ struct LyricStyleView: View {
     var body: some View {
         let style = editor.project.lyricStyle
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 if let text = selectedText { Text(text).font(.headline).lineLimit(3) }
-                Text("Lyric Style").font(.subheadline.bold())
-                Picker("Font", selection: binding(\.fontName, "Font")) {
-                    ForEach(fontChoices(current: style.fontName), id: \.self) { Text($0).tag($0) }
+                InspectorSection(title: "Text", icon: "textformat") {
+                    Picker("Font", selection: binding(\.fontName, "Font")) {
+                        ForEach(fontChoices(current: style.fontName), id: \.self) { Text($0).tag($0) }
+                    }
+                    .controlSize(.small)
+                    row("Size", style.sizeFraction * 100, 2...20, format: "%.1f%%") { $0.sizeFraction = $1 / 100 }
+                    ColorPicker("Color", selection: color(\.color, "Lyric Color")).font(.system(size: 12))
+                    row("Position", style.verticalPosition * 100, 5...95, format: "%.0f%%") { $0.verticalPosition = $1 / 100 }
                 }
-                slider("Size", style.sizeFraction * 100, 2...20, "%.1f%%") { $0.sizeFraction = $1 / 100 }
-                ColorPicker("Color", selection: color(\.color, "Lyric Color"))
-                slider("Position", style.verticalPosition * 100, 5...95, "%.0f%%") { $0.verticalPosition = $1 / 100 }
-                Divider()
-                Toggle("Drop Shadow", isOn: binding(\.shadowEnabled, "Drop Shadow")).toggleStyle(.switch).font(.subheadline.bold())
-                if style.shadowEnabled {
-                    slider("Blur", style.shadowBlur, 0...40, "%.1f") { $0.shadowBlur = $1 }
-                    slider("Distance X", style.shadowDX, -50...50, "%.0f") { $0.shadowDX = $1 }
-                    slider("Distance Y", style.shadowDY, -50...50, "%.0f") { $0.shadowDY = $1 }
-                    ColorPicker("Shadow Color", selection: color(\.shadowColor, "Shadow Color"))
+                InspectorSection(title: "Drop Shadow", icon: "shadow", isOn: binding(\.shadowEnabled, "Drop Shadow")) {
+                    row("Blur", style.shadowBlur, 0...40, format: "%.1f") { $0.shadowBlur = $1 }
+                    row("Distance X", style.shadowDX, -50...50, format: "%.0f") { $0.shadowDX = $1 }
+                    row("Distance Y", style.shadowDY, -50...50, format: "%.0f") { $0.shadowDY = $1 }
+                    ColorPicker("Color", selection: color(\.shadowColor, "Shadow Color")).font(.system(size: 12))
                 }
             }
-            .padding(14)
+            .padding(12)
         }
     }
 
@@ -66,12 +66,10 @@ struct LyricStyleView: View {
         })
     }
 
-    private func slider(_ label: String, _ value: Double, _ range: ClosedRange<Double>, _ fmt: String,
-                        set: @escaping (inout LyricStyle, Double) -> Void) -> some View {
-        HStack {
-            Text(label).frame(width: 84, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: { v in update(label) { set(&$0, v) } }), in: range)
-            Text(String(format: fmt, value)).font(.caption.monospacedDigit()).frame(width: 52, alignment: .trailing)
-        }
+    private func row(_ label: String, _ value: Double, _ range: ClosedRange<Double>, format: String,
+                     set: @escaping (inout LyricStyle, Double) -> Void) -> some View {
+        ValueRow(label: label, value: value, range: range, format: format,
+                 onChange: { v in editor.liveEdit { set(&$0.lyricStyle, v) } },
+                 onCommit: { editor.endLiveEdit(label) })
     }
 }

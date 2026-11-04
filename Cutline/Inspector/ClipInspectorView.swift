@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Size, placement and filters of the selected clip. Each filter has an on/off switch;
+/// Size, placement and filters of the selected clip. Each filter section has an on/off switch;
 /// its controls show only while it is on, and switching it off removes the effect.
 struct ClipInspectorView: View {
     @EnvironmentObject var editor: EditorModel
@@ -9,57 +9,52 @@ struct ClipInspectorView: View {
     var body: some View {
         if let clip = editor.clip(clipID) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(editor.project.asset(clip.assetID)?.name ?? "Clip").font(.headline).lineLimit(1)
-                    section("Size & Position") {
-                        slider("Scale", clip.transform.scale, 0.1...4) { $0.transform.scale = $1 }
-                        slider("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width)) { $0.transform.offsetX = $1 }
-                        slider("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height)) { $0.transform.offsetY = $1 }
-                        Button("Reset") { update("Reset Transform") { $0.transform = ClipTransform() } }
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(editor.project.asset(clip.assetID)?.name ?? "Clip").font(.headline).lineLimit(1).truncationMode(.middle)
+                        Text("\(Timecode.string(clip.start, fps: editor.project.fps)) – \(Timecode.string(clip.end, fps: editor.project.fps))")
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
-                    toggleSection("Color", clip.filters.color.enabled) { $0.filters.color.enabled = $1 } content: {
-                        slider("Hue", clip.filters.color.hue, -180...180) { $0.filters.color.hue = $1 }
-                        slider("Saturation", clip.filters.color.saturation, 0...2) { $0.filters.color.saturation = $1 }
-                        slider("Brightness", clip.filters.color.brightness, -1...1) { $0.filters.color.brightness = $1 }
-                        slider("Contrast", clip.filters.color.contrast, 0...2) { $0.filters.color.contrast = $1 }
+                    InspectorSection(title: "Size & Position", icon: "arrow.up.left.and.arrow.down.right") {
+                        row("Scale", clip.transform.scale, 0.05...4, step: 0.01) { $0.transform.scale = $1 }
+                        row("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width), step: 1, format: "%.0f") { $0.transform.offsetX = $1 }
+                        row("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height), step: 1, format: "%.0f") { $0.transform.offsetY = $1 }
+                        HStack {
+                            Spacer()
+                            Button("Reset") { editor.edit("Reset Transform") { $0.updateClip(clipID) { $0.transform = ClipTransform() } } }
+                                .controlSize(.small)
+                                .disabled(clip.transform == ClipTransform())
+                        }
                     }
-                    toggleSection("Fade In / Out", clip.filters.fade.enabled) { $0.filters.fade.enabled = $1 } content: {
-                        slider("Fade in (s)", clip.filters.fade.fadeIn, 0...min(5, clip.duration)) { $0.filters.fade.fadeIn = $1 }
-                        slider("Fade out (s)", clip.filters.fade.fadeOut, 0...min(5, clip.duration)) { $0.filters.fade.fadeOut = $1 }
+                    InspectorSection(title: "Color", icon: "paintpalette", isOn: toggle(clip.filters.color.enabled, "Color") { $0.filters.color.enabled = $1 }) {
+                        row("Hue", clip.filters.color.hue, -180...180, step: 1, format: "%.0f°") { $0.filters.color.hue = $1 }
+                        row("Saturation", clip.filters.color.saturation, 0...2) { $0.filters.color.saturation = $1 }
+                        row("Brightness", clip.filters.color.brightness, -1...1) { $0.filters.color.brightness = $1 }
+                        row("Contrast", clip.filters.color.contrast, 0...2) { $0.filters.color.contrast = $1 }
+                        HStack {
+                            Spacer()
+                            Button("Reset") { editor.edit("Reset Color") { $0.updateClip(clipID) { $0.filters.color = ColorFilter(enabled: true) } } }
+                                .controlSize(.small)
+                        }
+                    }
+                    InspectorSection(title: "Fade In / Out", icon: "circle.lefthalf.filled", isOn: toggle(clip.filters.fade.enabled, "Fade") { $0.filters.fade.enabled = $1 }) {
+                        row("Fade in", clip.filters.fade.fadeIn, 0...min(5, clip.duration), step: 0.01, format: "%.2fs") { $0.filters.fade.fadeIn = $1 }
+                        row("Fade out", clip.filters.fade.fadeOut, 0...min(5, clip.duration), step: 0.01, format: "%.2fs") { $0.filters.fade.fadeOut = $1 }
                     }
                 }
-                .padding(14)
+                .padding(12)
             }
         }
     }
 
-    private func update(_ name: String, _ change: @escaping (inout Clip) -> Void) {
-        editor.edit(name) { $0.updateClip(clipID, change) }
+    private func toggle(_ on: Bool, _ name: String, set: @escaping (inout Clip, Bool) -> Void) -> Binding<Bool> {
+        Binding(get: { on }, set: { v in editor.edit(v ? "Enable \(name)" : "Disable \(name)") { $0.updateClip(clipID) { set(&$0, v) } } })
     }
 
-    @ViewBuilder
-    private func section<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.subheadline.bold())
-            content()
-        }
-    }
-
-    @ViewBuilder
-    private func toggleSection<C: View>(_ title: String, _ on: Bool, set: @escaping (inout Clip, Bool) -> Void,
-                                        @ViewBuilder content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(title, isOn: Binding(get: { on }, set: { v in update(v ? "Enable \(title)" : "Disable \(title)") { set(&$0, v) } }))
-                .toggleStyle(.switch).font(.subheadline.bold())
-            if on { content() }
-        }
-    }
-
-    private func slider(_ label: String, _ value: Double, _ range: ClosedRange<Double>, set: @escaping (inout Clip, Double) -> Void) -> some View {
-        HStack {
-            Text(label).frame(width: 84, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: { v in update(label) { set(&$0, v) } }), in: range)
-            Text(String(format: "%.2f", value)).font(.caption.monospacedDigit()).frame(width: 52, alignment: .trailing)
-        }
+    private func row(_ label: String, _ value: Double, _ range: ClosedRange<Double>, step: Double? = nil, format: String = "%.2f",
+                     set: @escaping (inout Clip, Double) -> Void) -> some View {
+        ValueRow(label: label, value: value, range: range, step: step, format: format,
+                 onChange: { v in editor.liveEdit { $0.updateClip(clipID) { set(&$0, v) } } },
+                 onCommit: { editor.endLiveEdit(label) })
     }
 }
