@@ -30,9 +30,9 @@ final class TimelineContainer: NSView {
         let addLyrics = button("text.badge.plus", "Add lyrics track") { [weak editor] in
             editor?.edit("Add Lyrics Track") { $0.addLyricTrack() }
         }
-        let split = button("scissors", "Split at playhead (⌘B)") { [weak editor] in editor?.splitAtPlayhead() }
+        let split = button("scissors", "Cut at playhead (C)") { [weak editor] in editor?.splitAtPlayhead() }
         let delete = button("trash", "Delete selection (⌫)") { [weak editor] in editor?.deleteSelection() }
-        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (N): edges, playhead and lyrics attract while dragging. Hold ⌘ to bypass.") { [weak self] in
+        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (S): edges, playhead and lyrics attract while dragging. Hold ⌘ to bypass.") { [weak self] in
             self?.timeline.snappingEnabled.toggle()
         }
         snapButton.setButtonType(.pushOnPushOff)
@@ -48,8 +48,8 @@ final class TimelineContainer: NSView {
             }
         }
         cinemaButton.setButtonType(.pushOnPushOff)
-        let zoomOut = button("minus.magnifyingglass", "Zoom out (⌘−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
-        let zoomIn = button("plus.magnifyingglass", "Zoom in (⌘=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
+        let zoomOut = button("minus.magnifyingglass", "Zoom out (−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
+        let zoomIn = button("plus.magnifyingglass", "Zoom in (=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)

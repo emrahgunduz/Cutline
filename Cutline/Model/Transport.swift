@@ -12,6 +12,28 @@ extension EditorModel {
     }
 
     func goToStart() { isPlaying = false; setPlayhead(0) }
+
+    /// Clip, lyric line and audio edges, sorted — where ↑/↓ jump to.
+    var editPoints: [Double] {
+        var pts: Set<Double> = [0, project.duration]
+        for c in project.videoTracks.flatMap(\.clips) { pts.insert(c.start); pts.insert(c.end) }
+        for l in project.lyricTracks.flatMap(\.lines) { pts.insert(l.start); pts.insert(l.end) }
+        if let a = project.audio { pts.insert(a.start); pts.insert(a.end) }
+        if project.cinemascope.enabled { pts.insert(project.cinemascope.startMarker); pts.insert(project.cinemascope.endMarker) }
+        return pts.map { project.quantize($0) }.sorted()
+    }
+
+    func jumpToEditPoint(forward: Bool) {
+        isPlaying = false
+        let eps = project.frameDuration / 2
+        let target = forward ? editPoints.first { $0 > playhead + eps } : editPoints.last { $0 < playhead - eps }
+        if let target { setPlayhead(target) }
+    }
+
+    func step(seconds: Double) {
+        isPlaying = false
+        setPlayhead(playhead + seconds)
+    }
     func goToEnd() { isPlaying = false; setPlayhead(project.duration) }
     func togglePlay() { isPlaying.toggle() }
 
