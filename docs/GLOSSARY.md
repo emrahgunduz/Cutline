@@ -91,7 +91,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Lead-in** | Lyric inspector > Animation: aligned words appear this much before they are sung (default 0.15 s). Changing it moves aligned words live; confirmed and hand-placed words stay put. |
 | **Next unsure word** | N (⇧N back): selects the next unsure, unconfirmed word in sung order and loops the song around it (±1.75 s, yellow band on the ruler). Return confirms it; Esc stops the loop. |
 | **Tap mode** | T: plays from 5 s before the selected word; each Space sets the current word's start to that moment, confirms it, and moves to the next word sung (any track). 1/2/3 play at 100/75/50% with pitch kept. After the last word the song plays 5 s more, then pauses. Esc ends. |
-| **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
+| **Anchor stretch** | Tap mode: confirmed words are anchors, and unconfirmed words between two anchors are re-timed in proportion to fit between them. Dragging a word on the timeline changes only that word. |
 | **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
 | **Word timing** | New or aligned words start on their own time and end with their line; each word's end can then be changed on its own. Dragging a line's start moves every word's start with it (ends stay); dragging its end moves every word's end with it (starts stay). |
 | **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |
