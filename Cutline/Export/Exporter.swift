@@ -27,11 +27,33 @@ final class Exporter {
     }
 
     /// Export the whole project. Size probes pass an excerpt project and `includeAudio: false`.
+    /// Cancelling the calling task cancels the export like `cancel()`.
+    /// Renders into a temporary file next to `url` and replaces `url` only on success,
+    /// so a cancelled or failed re-export keeps the previous file.
     func export(project: Project, settings: ExportSettings, to url: URL,
                 includeAudio: Bool = true, progress: @escaping (Double) -> Void) async throws {
+        try await withTaskCancellationHandler {
+            let temp = url.deletingLastPathComponent()
+                .appendingPathComponent(".\(url.deletingPathExtension().lastPathComponent)-\(UUID().uuidString).\(url.pathExtension)")
+            defer { try? FileManager.default.removeItem(at: temp) }
+            try await render(project: project, settings: settings, to: temp, includeAudio: includeAudio, progress: progress)
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)
+            } else {
+                try FileManager.default.moveItem(at: temp, to: url)
+            }
+            progress(1)
+        } onCancel: {
+            self.cancel()
+        }
+    }
+
+    private func render(project: Project, settings: ExportSettings, to url: URL,
+                        includeAudio: Bool, progress: @escaping (Double) -> Void) async throws {
         guard project.duration > 0 else { throw ExportError.empty }
         let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project))
         let built = try await CompositionBuilder.build(project: project, mediaURL: { $0.url }, snapshot: snapshot)
+        if isCancelled { throw ExportError.cancelled }
         try? FileManager.default.removeItem(at: url)
 
         let reader = try AVAssetReader(asset: built.composition)
@@ -91,7 +113,6 @@ final class Exporter {
             try? FileManager.default.removeItem(at: url)
             throw ExportError.failed(writer.error?.localizedDescription ?? "write")
         }
-        progress(1)
     }
 
     private func pump(output: AVAssetReaderOutput, input: AVAssetWriterInput, label: String, progress: ((Double) -> Void)?) async {

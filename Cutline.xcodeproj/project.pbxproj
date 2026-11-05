@@ -23,6 +23,7 @@
 		37239B0E5F339867D8C45CDB /* ThumbnailGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C182DB0059761B881EC2E6 /* ThumbnailGenerator.swift */; };
 		3754CD3D955A136263FFECF3 /* LyricModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8497D29B044D92820FCC58A /* LyricModelTests.swift */; };
 		392F596D7B0F84402A9D850D /* AssetLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B9F6AE38DC41DC924985AC /* AssetLibrary.swift */; };
+		3A111F1D9BE53268BAA2D296 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86364879801D464F4CA7B592 /* Timecode.swift */; };
 		41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */; };
 		46328A8BDE1E662B50DF4721 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A15C4D7584ACEF73D94EDA7 /* StatusBarView.swift */; };
 		4767FD52352B89696CD5E022 /* Presets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F8AA3C08E957501BF0222F /* Presets.swift */; };
@@ -125,6 +126,7 @@
 		81AC03D61FA4DFDB21042B81 /* ClipInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipInspectorView.swift; sourceTree = "<group>"; };
 		81BF6447E10E82DFF132DB56 /* WindowToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowToolbar.swift; sourceTree = "<group>"; };
 		858F6775E8B4AA655EC12500 /* ExportSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettings.swift; sourceTree = "<group>"; };
+		86364879801D464F4CA7B592 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
 		8A15C4D7584ACEF73D94EDA7 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
 		910CE9F27A8B6B8232C5BE7A /* TimelineLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineLayoutTests.swift; sourceTree = "<group>"; };
 		9274C7F6E607FAA343E05201 /* MainWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowTests.swift; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				19F8AA3C08E957501BF0222F /* Presets.swift */,
 				C61B588EFD4F7FDB1987B63B /* Project.swift */,
 				0E62B5EB25F99802FE30610C /* ProjectType.swift */,
+				86364879801D464F4CA7B592 /* Timecode.swift */,
 				051E14094EBD9B055B68F982 /* Transport.swift */,
 			);
 			path = Model;
@@ -467,6 +470,7 @@
 				599AAF0C4E1B215E3C1AAADF /* Snapping.swift in Sources */,
 				46328A8BDE1E662B50DF4721 /* StatusBarView.swift in Sources */,
 				37239B0E5F339867D8C45CDB /* ThumbnailGenerator.swift in Sources */,
+				3A111F1D9BE53268BAA2D296 /* Timecode.swift in Sources */,
 				2DA99A7158AA2B61BDDE8CBA /* TimelineContainer.swift in Sources */,
 				AD882AE9EB70FABB86EF8780 /* TimelineLayout.swift in Sources */,
 				4CBCAB9E4A7E9532D3BED6BB /* TimelineView.swift in Sources */,

@@ -651,6 +651,13 @@ final class TimelineView: NSView {
         return time
     }
 
+    /// New start for an item being moved: snap its start, or failing that its end.
+    private func snappedMove(start: Double, duration: Double, excluding ids: Set<UUID>, event: NSEvent?) -> Double {
+        let s1 = snapped(start, excluding: ids, event: event)
+        if s1 != start { return s1 }
+        return snapped(start + duration, excluding: ids, event: event) - duration
+    }
+
     override func mouseDragged(with event: NSEvent) {
         guard var d = drag else { return }
         let p = convert(event.locationInWindow, from: nil)
@@ -708,13 +715,7 @@ final class TimelineView: NSView {
                 case .body:
                     var track = original.clipLocation(id)!.track
                     if case .video(let t)? = l.row(atY: p.y) { track = t }
-                    var start = c.start + dt
-                    let s1 = snapped(start, excluding: [id], event: event)
-                    if s1 != start { start = s1 } else {
-                        let endSnap = snapped(start + c.duration, excluding: [id], event: event)
-                        start = endSnap - c.duration
-                    }
-                    next.moveClip(id, toTrack: track, start: start)
+                    next.moveClip(id, toTrack: track, start: snappedMove(start: c.start + dt, duration: c.duration, excluding: [id], event: event))
                 }
             case .line(let id, let edge):
                 guard let line = original.lyricTracks.flatMap(\.lines).first(where: { $0.id == id }) else { return }
@@ -736,10 +737,7 @@ final class TimelineView: NSView {
                 }
             case .audio:
                 guard let a = original.audio else { return }
-                var start = a.start + dt
-                let s1 = snapped(start, excluding: [], event: event)
-                start = s1 != start ? s1 : snapped(start + a.duration, excluding: [], event: event) - a.duration
-                next.moveAudio(start: start)
+                next.moveAudio(start: snappedMove(start: a.start + dt, duration: a.duration, excluding: [], event: event))
             default: return
             }
             // Live preview of the drag; committed as one undo step on mouse up.
@@ -1039,14 +1037,4 @@ private final class MenuAction: NSObject {
     let action: () -> Void
     init(_ action: @escaping () -> Void) { self.action = action }
     @objc func run() { action() }
-}
-
-enum Timecode {
-    /// mm:ss:ff
-    static func string(_ t: Double, fps: Double) -> String {
-        let rate = max(1, Int(fps.rounded()))
-        let frames = Int((max(0, t) * fps).rounded())
-        let s = frames / rate, f = frames % rate
-        return String(format: "%02d:%02d:%02d", s / 60, s % 60, f)
-    }
 }

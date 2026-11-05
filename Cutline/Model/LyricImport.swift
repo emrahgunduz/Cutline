@@ -60,7 +60,7 @@ extension EditorModel {
     /// Place the lyrics file on a lyric track, from `time` to the end of the song (or ~3 s per line).
     @MainActor
     func placeLyrics(_ asset: Asset, track: Int, at time: Double, window: NSWindow?) {
-        guard let text = try? String(contentsOf: asset.url, encoding: .utf8) ?? String(contentsOf: asset.url, encoding: .isoLatin1) else {
+        guard let text = (try? String(contentsOf: asset.url, encoding: .utf8)) ?? (try? String(contentsOf: asset.url, encoding: .isoLatin1)) else {
             if let window { NSAlert(error: CocoaError(.fileReadCorruptFile)).beginSheetModal(for: window) { _ in } }
             return
         }

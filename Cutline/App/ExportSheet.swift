@@ -197,8 +197,8 @@ struct ExportSettingsView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
-                Button("Export…") { finish(settings) }.keyboardShortcut(.defaultAction).controlSize(.large)
+                Button("Cancel") { estimateTask?.cancel(); finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
+                Button("Export…") { estimateTask?.cancel(); finish(settings) }.keyboardShortcut(.defaultAction).controlSize(.large)
                     .disabled(editor.project.duration <= 0)
             }
         }
@@ -206,6 +206,7 @@ struct ExportSettingsView: View {
         .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: refreshEstimate)
+        .onDisappear { estimateTask?.cancel() }
         .onChange(of: settings) { _, _ in refreshEstimate() }
     }
 
