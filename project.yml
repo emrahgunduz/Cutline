@@ -26,6 +26,10 @@ settings:
       ENABLE_NS_ASSERTIONS: NO
       DEAD_CODE_STRIPPING: YES
       DEBUG_INFORMATION_FORMAT: dwarf-with-dsym # symbols stay in a separate dSYM, not the app
+      DEPLOYMENT_POSTPROCESSING: YES            # makes the strip settings apply to plain builds, not only Archive
+      STRIP_INSTALLED_PRODUCT: YES
+      STRIP_STYLE: all
+      COPY_PHASE_STRIP: YES
 targets:
   Cutline:
     type: application

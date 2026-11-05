@@ -4,9 +4,10 @@
 # helper/cutline_helper into Cutline.app/Contents/Resources/ml. The models are NOT bundled:
 # the app downloads them (New Project screen, Settings > Models) into a folder the user picks.
 #
-#   scripts/build_python_runtime.sh          build runtime + models (skips parts already done)
-#   scripts/build_python_runtime.sh --clean  start over
-#   scripts/build_python_runtime.sh --lock   re-resolve helper/requirements.lock
+#   scripts/build_python_runtime.sh              build runtime + models (skips parts already done)
+#   scripts/build_python_runtime.sh --no-models  only the runtime (CI, Release builds)
+#   scripts/build_python_runtime.sh --clean      rebuild the runtime from scratch (keeps build/ml/models)
+#   scripts/build_python_runtime.sh --lock       re-resolve helper/requirements.lock
 set -euo pipefail
 ROOT=${0:A:h:h}
 ML=$ROOT/build/ml
@@ -22,7 +23,14 @@ if [[ ${1:-} == --lock ]]; then
     -o $ROOT/helper/requirements.lock
   exit 0
 fi
-[[ ${1:-} == --clean ]] && rm -rf $ML $UV_PYTHON_INSTALL_DIR
+models=1
+for arg in "$@"; do
+  case $arg in
+    --clean) rm -rf $ML/python $ML/.packages $UV_PYTHON_INSTALL_DIR ;;
+    --no-models) models=0 ;;
+    *) echo "unknown option $arg" >&2; exit 2 ;;
+  esac
+done
 
 mkdir -p $ML
 if [[ ! -x $ML/python/bin/python3 ]]; then
@@ -42,7 +50,7 @@ if [[ $(cat $ML/.packages 2>/dev/null) != $LOCK_HASH ]]; then
   echo $LOCK_HASH > $ML/.packages
 fi
 
-if [[ ! -f $ML/models/.complete ]]; then
+if (( models )) && [[ ! -f $ML/models/.complete ]]; then
   mkdir -p $ML/models
   $PY -s $ROOT/scripts/fetch_models.py $ML/models
 fi
@@ -51,5 +59,6 @@ fi
 if [[ ! -d $ROOT/build/ml-dev/pytest ]]; then
   uv pip install --python $PY --target $ROOT/build/ml-dev pytest -q
 fi
-du -sh $ML/python $ML/models
+du -sh $ML/python
+[[ -d $ML/models ]] && du -sh $ML/models
 echo "==> done. Helper tests: PYTHONPATH=build/ml-dev build/ml/python/bin/python3 -B -m pytest -c helper/pytest.ini --rootdir helper helper/tests"
