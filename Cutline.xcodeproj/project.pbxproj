@@ -114,6 +114,7 @@
 		C9098E168CA54FE2974429E6 /* SizeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */; };
 		C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */; };
 		CAC01F81B3B02C0FA28115DF /* LineLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AE431F918E57B6B59F8139 /* LineLayoutTests.swift */; };
+		CBB83956E1B120DADA0DFDBC /* FlipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E36BC4C2C7A14C8AB089974 /* FlipTests.swift */; };
 		CDD4C5819081069F157ADF5F /* LineLayoutEdits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8830845079114BBD02ED9DC2 /* LineLayoutEdits.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
 		D06650ADD7E107DBBD60CB91 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA421E8C312CB7B4257A1569 /* main.swift */; };
@@ -169,6 +170,7 @@
 		2ABFAB894CC5875B45C117A7 /* SizeSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSolver.swift; sourceTree = "<group>"; };
 		2B22B3DC2BB9AF28995BE746 /* LyricsLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsLanguage.swift; sourceTree = "<group>"; };
 		2E30DF3BC8EF1EF1AC661937 /* ControlProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlProtocol.swift; sourceTree = "<group>"; };
+		2E36BC4C2C7A14C8AB089974 /* FlipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipTests.swift; sourceTree = "<group>"; };
 		2E7898909EAD3252329FD738 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F17E5F28B1246F79C69B619 /* ShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsView.swift; sourceTree = "<group>"; };
 		2F29BB3D7693A806D2EFC85B /* ExportSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsTests.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 				F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */,
 				2F29BB3D7693A806D2EFC85B /* ExportSettingsTests.swift */,
 				EEAF106698E854825259E481 /* FilterChainTests.swift */,
+				2E36BC4C2C7A14C8AB089974 /* FlipTests.swift */,
 				F0D0ACB939B25A4B6DEA9C41 /* JobRunnerTests.swift */,
 				B885123EFA34EFDA73BC3CCD /* LetterboxTests.swift */,
 				B1AE431F918E57B6B59F8139 /* LineLayoutTests.swift */,
@@ -816,6 +819,7 @@
 				AE11F51F480A446F082371AB /* ExportSettingsTests.swift in Sources */,
 				4D1575E75E19A0AC441575D3 /* ExporterIntegrationTests.swift in Sources */,
 				A7A803232A98903E35FEF5E1 /* FilterChainTests.swift in Sources */,
+				CBB83956E1B120DADA0DFDBC /* FlipTests.swift in Sources */,
 				49C28E9C73CB6AE1364DCB3B /* JobRunnerTests.swift in Sources */,
 				8B83F1E2D6B67088AC884AEA /* LetterboxTests.swift in Sources */,
 				CAC01F81B3B02C0FA28115DF /* LineLayoutTests.swift in Sources */,

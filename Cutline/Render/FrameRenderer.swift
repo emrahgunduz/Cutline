@@ -53,10 +53,12 @@ enum FrameRenderer {
         let w = e.width * fit, h = e.height * fit
         let x = canvas.midX - w / 2 + transform.offsetX
         let y = canvas.midY - h / 2 + transform.offsetY
-        return src
+        var img = src
             .transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
             .transformed(by: CGAffineTransform(scaleX: fit, y: fit))
-            .transformed(by: CGAffineTransform(translationX: x, y: y))
+        // Horizontal flip: mirrored in place (the picture keeps its position and size).
+        if transform.isFlippedH { img = img.transformed(by: CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: w, ty: 0)) }
+        return img.transformed(by: CGAffineTransform(translationX: x, y: y))
     }
 
     static func loadImages(_ project: Project) -> [UUID: CIImage] {
