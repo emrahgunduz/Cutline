@@ -88,3 +88,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Unsure word** | A lyric word whose timing confidence is below 60% and that you haven't confirmed. Drawn with an orange outline and bar on the timeline. |
 | **Confirmed word** | A word you've checked; alignment asks whether to keep its time. |
 | **Lead-in** | Lyric inspector > Animation: aligned words appear this much before they are sung (default 0.15 s). Changing it moves aligned words live; confirmed and hand-placed words stay put. |
+| **Next unsure word** | N (⇧N back): selects the next unsure, unconfirmed word in sung order and loops the song around it (±0.75 s, yellow band on the ruler). Return confirms it; Esc stops the loop. |
+| **Tap mode** | T: plays from the selected word; each Space sets the current word's start to that moment, confirms it, and moves to the next word sung (any track). 1/2/3 play at 100/75/50% with pitch kept. Esc ends. |
+| **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
+| **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |

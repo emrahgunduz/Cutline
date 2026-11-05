@@ -20,33 +20,42 @@ enum LyricAlignment {
 }
 
 extension Project {
-    /// Put aligned times (audio-file seconds) onto the lines of `track`, in order.
-    /// With `keepConfirmed`, words the user confirmed keep their times.
+    /// Put aligned times (audio-file seconds) onto the lines of `track`, in time order.
     mutating func applyAlignment(_ r: LyricAlignment.Result, track: Int, audioStart: Double, keepConfirmed: Bool) {
         guard lyricTracks.indices.contains(track) else { return }
+        let ids = lyricTracks[track].lines.sorted { $0.start < $1.start }.map(\.id)
+        applyAlignment(r, lineIDs: ids, audioStart: audioStart, keepConfirmed: keepConfirmed)
+    }
+
+    /// Put aligned times onto the given lines (result line k goes to `lineIDs[k]`).
+    /// With `keepConfirmed`, words the user confirmed keep their times.
+    mutating func applyAlignment(_ r: LyricAlignment.Result, lineIDs: [UUID], audioStart: Double, keepConfirmed: Bool) {
         let f = frameDuration
         let lead = lyricStyle.leadIn
-        var lines = lyricTracks[track].lines.sorted { $0.start < $1.start }
-        for (li, aligned) in r.lines.enumerated() where lines.indices.contains(li) && lines[li].words.count == aligned.count {
+        for (li, aligned) in r.lines.enumerated() where lineIDs.indices.contains(li) {
+            guard let loc = lineLocation(lineIDs[li]) else { continue }
+            var line = lyricTracks[loc.track].lines[loc.index]
+            guard line.words.count == aligned.count else { continue }
             for (wi, a) in aligned.enumerated() {
-                if keepConfirmed && lines[li].words[wi].confirmed { continue }
+                if keepConfirmed && line.words[wi].confirmed { continue }
                 let s = quantize(max(0, audioStart + a.start - lead))
-                lines[li].words[wi].start = s
-                lines[li].words[wi].end = max(s + f, quantize(audioStart + a.end - lead))
-                lines[li].words[wi].confidence = a.confidence
-                lines[li].words[wi].alignedStart = audioStart + a.start
-                lines[li].words[wi].alignedEnd = audioStart + a.end
+                line.words[wi].start = s
+                line.words[wi].end = max(s + f, quantize(audioStart + a.end - lead))
+                line.words[wi].confidence = a.confidence
+                line.words[wi].confirmed = false   // re-timed by alignment, no longer the user's time
+                line.words[wi].alignedStart = audioStart + a.start
+                line.words[wi].alignedEnd = audioStart + a.end
             }
             // Words never overlap after quantizing.
-            for wi in lines[li].words.indices.dropFirst() where lines[li].words[wi].start < lines[li].words[wi - 1].end {
-                lines[li].words[wi - 1].end = max(lines[li].words[wi - 1].start + f, lines[li].words[wi].start)
-                if lines[li].words[wi].start < lines[li].words[wi - 1].end { lines[li].words[wi].start = lines[li].words[wi - 1].end }
-                lines[li].words[wi].end = max(lines[li].words[wi].end, lines[li].words[wi].start + f)
+            for wi in line.words.indices.dropFirst() where line.words[wi].start < line.words[wi - 1].end {
+                line.words[wi - 1].end = max(line.words[wi - 1].start + f, line.words[wi].start)
+                if line.words[wi].start < line.words[wi - 1].end { line.words[wi].start = line.words[wi - 1].end }
+                line.words[wi].end = max(line.words[wi].end, line.words[wi].start + f)
             }
-            lines[li].start = lines[li].words.first!.start
-            lines[li].end = lines[li].words.last!.end
+            line.fitToWords()
+            lyricTracks[loc.track].lines[loc.index] = line
         }
-        lyricTracks[track].lines = lines
+        for t in lyricTracks.indices { lyricTracks[t].lines.sort { $0.start < $1.start } }
     }
 
     /// Re-place aligned, unconfirmed words for the current lead-in. Lines that hugged their
@@ -74,27 +83,29 @@ extension Project {
 }
 
 extension EditorModel {
-    /// Time the words on `track` to the song. Waits for song analysis if it is still running.
-    /// Asks before overwriting words the user confirmed.
+    /// Time every lyric word to the song: the lines of all lyric tracks, in time order, are
+    /// one sung sequence. Waits for song analysis if it is still running, and asks before
+    /// re-timing words the user confirmed.
     @MainActor
-    func alignLyrics(track: Int, window: NSWindow?) {
-        guard project.lyricTracks.indices.contains(track), !project.lyricTracks[track].lines.isEmpty else { return }
-        let confirmed = project.lyricTracks[track].lines.flatMap(\.words).filter(\.confirmed).count
-        guard confirmed > 0, let window else { startAlignment(track: track, keepConfirmed: true, window: window); return }
+    func alignLyrics(window: NSWindow?) {
+        let words = project.lyricTracks.flatMap(\.lines).flatMap(\.words)
+        guard !words.isEmpty else { return }
+        let confirmed = words.filter(\.confirmed).count
+        guard confirmed > 0, let window else { startAlignment(keepConfirmed: true, window: window); return }
         let alert = NSAlert()
-        alert.messageText = "Keep the \(confirmed) confirmed word\(confirmed == 1 ? "" : "s") on Lyrics \(track + 1)?"
-        alert.informativeText = "Alignment re-times every word. Confirmed words can keep the times you set."
+        alert.messageText = "Keep the \(confirmed) confirmed word\(confirmed == 1 ? "" : "s")?"
+        alert.informativeText = "Alignment re-times every word. Confirmed words can keep the times you set; the words around them are fitted between them."
         alert.addButton(withTitle: "Keep Confirmed")
         alert.addButton(withTitle: "Re-time All")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { [weak self] r in
             guard r != .alertThirdButtonReturn else { return }
-            self?.startAlignment(track: track, keepConfirmed: r == .alertFirstButtonReturn, window: window)
+            self?.startAlignment(keepConfirmed: r == .alertFirstButtonReturn, window: window)
         }
     }
 
     @MainActor
-    private func startAlignment(track: Int, keepConfirmed: Bool, window: NSWindow?) {
+    private func startAlignment(keepConfirmed: Bool, window: NSWindow?) {
         alignmentTask?.cancel()
         alignmentTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -104,19 +115,22 @@ extension EditorModel {
                       let vocals = self.audioAnalysis.vocalsURL(a.audioHash), FileManager.default.fileExists(atPath: vocals.path) else {
                     throw AlignmentError.noAnalysis
                 }
-                let trackID = self.project.lyricTracks[track].id
-                let lines = self.project.lyricTracks[track].lines.sorted { $0.start < $1.start }.map { $0.words.map(\.text) }
+                let order = self.project.lyricLineOrder()
+                let ids = order.map(\.id)
+                let lines = order.map { $0.words.map(\.text) }
                 var args: [String: Any] = ["vocals": vocals.path, "lines": lines]
                 if let lang = LyricAlignment.language(for: lines.flatMap { $0 }) { args["language"] = lang }
                 let result = try await self.jobs.run("Aligning lyrics", command: "align_lyrics", args: args) { data, _ in
                     try JSONDecoder().decode(LyricAlignment.Result.self, from: data)
                 }
-                // The track may have moved while the job ran; apply only if its text is unchanged.
-                guard let t = self.project.lyricTracks.firstIndex(where: { $0.id == trackID }),
-                      self.project.lyricTracks[t].lines.sorted(by: { $0.start < $1.start }).map({ $0.words.map(\.text) }) == lines else {
-                    throw AlignmentError.lyricsChanged
+                // Apply only if the words didn't change while the job ran.
+                let now = Dictionary(uniqueKeysWithValues: self.project.lyricTracks.flatMap(\.lines).map { ($0.id, $0.words.map(\.text)) })
+                guard zip(ids, lines).allSatisfy({ now[$0.0] == $0.1 }) else { throw AlignmentError.lyricsChanged }
+                self.edit("Align Lyrics") { p in
+                    p.applyAlignment(result, lineIDs: ids, audioStart: audio.start, keepConfirmed: keepConfirmed)
+                    // Newly aligned words never overlap the confirmed words that were kept.
+                    if keepConfirmed { p.resolveLyricOverlaps() }
                 }
-                self.edit("Align Lyrics") { $0.applyAlignment(result, track: t, audioStart: audio.start, keepConfirmed: keepConfirmed) }
             } catch is CancellationError {
             } catch {
                 if let window { NSAlert(error: error).beginSheetModal(for: window) { _ in } }

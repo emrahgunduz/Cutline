@@ -37,8 +37,22 @@ final class PreviewController: ObservableObject {
             .store(in: &cancellables)
         editor.transport.$playhead.removeDuplicates().sink { [weak self] t in self?.playheadChanged(t) }.store(in: &cancellables)
         editor.transport.$isPlaying.removeDuplicates().sink { [weak self] playing in self?.setPlaying(playing) }.store(in: &cancellables)
+        editor.transport.$rate.removeDuplicates().sink { [weak self] rate in
+            guard let self else { return }
+            self.player.defaultRate = rate
+            if self.player.rate != 0 { self.player.rate = rate }
+        }.store(in: &cancellables)
+        editor.transport.currentTime = { [weak self] in
+            guard let self else { return 0 }
+            let t = self.player.currentTime().seconds
+            return t.isFinite ? t : self.editor.playhead
+        }
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 60), queue: .main) { [weak self] time in
             guard let self, self.player.rate != 0 else { return }
+            if let loop = self.editor.transport.loop, time.seconds >= loop.upperBound {
+                self.player.seek(to: CompositionBuilder.time(loop.lowerBound), toleranceBefore: .zero, toleranceAfter: .zero)
+                return
+            }
             self.settingPlayheadFromPlayer = true
             self.editor.playhead = min(time.seconds, self.editor.project.duration)
             self.settingPlayheadFromPlayer = false
@@ -94,6 +108,7 @@ final class PreviewController: ObservableObject {
                 guard !Task.isCancelled else { return }
                 let item = AVPlayerItem(asset: b.composition)
                 item.videoComposition = b.videoComposition
+                item.audioTimePitchAlgorithm = .spectral   // slowed tap-mode playback keeps its pitch
                 self.built = b
                 self.structureKey = key
                 let wasPlaying = self.player.rate != 0
@@ -128,6 +143,8 @@ final class PreviewController: ObservableObject {
     private func setPlaying(_ playing: Bool) {
         if playing {
             if editor.playhead >= editor.project.duration - editor.project.frameDuration { editor.playhead = 0; seek(to: 0) }
+            if let loop = editor.transport.loop, !loop.contains(editor.playhead) { editor.playhead = loop.lowerBound; seek(to: loop.lowerBound) }
+            player.defaultRate = editor.transport.rate
             player.play()
         } else {
             player.pause()
