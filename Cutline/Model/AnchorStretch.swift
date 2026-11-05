@@ -88,11 +88,12 @@ extension Project {
         return all.map { $0.line }
     }
 
-    /// Every lyric word in sung order (lines in `lyricLineOrder`, then words in each line),
+    /// Every lyric word in sung order (lines in `lyricTextOrder`, then words in each line),
     /// with where it sits. The order follows the text, not the possibly edited word times.
     func lyricOrder() -> [(track: Int, line: Int, word: Int, value: LyricWord)] {
         var out: [(track: Int, line: Int, word: Int, value: LyricWord)] = []
-        for line in lyricLineOrder() {
+        // The file's order: a line moved out of place is still sung where it belongs.
+        for line in lyricTextOrder() {
             guard let loc = lineLocation(line.id) else { continue }
             for (i, w) in line.words.enumerated() { out.append((loc.track, loc.index, i, w)) }
         }
