@@ -80,6 +80,12 @@ final class PreviewCanvasView: NSView {
         controller.$zoom.sink { _ in DispatchQueue.main.async(execute: relayout) }.store(in: &cancellables)
         controller.$pan.sink { _ in DispatchQueue.main.async(execute: relayout) }.store(in: &cancellables)
         editor.objectWillChange.sink { _ in DispatchQueue.main.async(execute: relayout) }.store(in: &cancellables)
+        // The selection overlay depends on what is on screen at the playhead; skip the
+        // relayout during playback when nothing is selected.
+        editor.transport.$playhead.removeDuplicates().sink { [weak self] _ in
+            guard let self, self.editor.selection != .none else { return }
+            DispatchQueue.main.async(execute: relayout)
+        }.store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }

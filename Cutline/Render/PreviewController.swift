@@ -35,8 +35,8 @@ final class PreviewController: ObservableObject {
             .throttle(for: .milliseconds(40), scheduler: RunLoop.main, latest: true)
             .sink { [weak self] _ in self?.scheduleRebuild() }
             .store(in: &cancellables)
-        editor.$playhead.removeDuplicates().sink { [weak self] t in self?.playheadChanged(t) }.store(in: &cancellables)
-        editor.$isPlaying.removeDuplicates().sink { [weak self] playing in self?.setPlaying(playing) }.store(in: &cancellables)
+        editor.transport.$playhead.removeDuplicates().sink { [weak self] t in self?.playheadChanged(t) }.store(in: &cancellables)
+        editor.transport.$isPlaying.removeDuplicates().sink { [weak self] playing in self?.setPlaying(playing) }.store(in: &cancellables)
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 60), queue: .main) { [weak self] time in
             guard let self, self.player.rate != 0 else { return }
             self.settingPlayheadFromPlayer = true

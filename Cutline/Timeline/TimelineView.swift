@@ -44,6 +44,8 @@ final class TimelineView: NSView {
     private var snapGuide: Double?
     private var reorderTarget: TimelineRow?
     private var marqueeRect: CGRect?
+    /// The red playhead line and flag, a layer so moving it repaints nothing underneath.
+    private let playheadLayer = CAShapeLayer()
 
     init(editor: EditorModel) {
         self.editor = editor
@@ -56,7 +58,11 @@ final class TimelineView: NSView {
         editor.$revision.receive(on: RunLoop.main).sink { [weak self] _ in self?.clampToContent() }.store(in: &cancellables)
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
-        editor.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
+        editor.transport.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
+        playheadLayer.fillColor = NSColor.systemRed.cgColor
+        playheadLayer.zPosition = 10
+        playheadLayer.actions = ["position": NSNull(), "bounds": NSNull(), "path": NSNull(), "hidden": NSNull()]
+        layer?.addSublayer(playheadLayer)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -163,7 +169,7 @@ final class TimelineView: NSView {
             NSColor.systemYellow.setFill()
             CGRect(x: x - 0.5, y: 0, width: 1.5, height: bounds.height).fill()
         }
-        drawPlayhead(l)
+        updatePlayheadLayer(l, at: editor.playhead)
     }
 
     private func drawRowBackground(_ row: TimelineRow, _ rect: CGRect) {
@@ -486,15 +492,27 @@ final class TimelineView: NSView {
         }
     }
 
-    private func drawPlayhead(_ l: TimelineLayout) {
-        let x = l.x(for: editor.playhead)
-        guard x >= TimelineLayout.headerWidth, x <= bounds.width else { return }
-        NSColor.systemRed.setFill()
-        CGRect(x: x - 0.5, y: 0, width: 1.5, height: bounds.height).fill()
-        let tri = NSBezierPath()
-        tri.move(to: CGPoint(x: x - 6, y: 0)); tri.line(to: CGPoint(x: x + 6, y: 0)); tri.line(to: CGPoint(x: x, y: 9)); tri.close()
-        tri.fill()
+    /// Place the playhead layer at `t` (hidden when it is scrolled out of view).
+    private func updatePlayheadLayer(_ l: TimelineLayout, at t: Double) {
+        let x = l.x(for: t)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playheadLayer.isHidden = !(x >= TimelineLayout.headerWidth && x <= bounds.width)
+        let size = CGSize(width: 12, height: bounds.height)
+        if playheadLayer.bounds.size != size {
+            playheadLayer.bounds = CGRect(origin: .zero, size: size)
+            let path = CGMutablePath()
+            path.addRect(CGRect(x: 5.5, y: 0, width: 1.5, height: size.height))
+            path.addLines(between: [CGPoint(x: 0, y: 0), CGPoint(x: 12, y: 0), CGPoint(x: 6, y: 9)])
+            path.closeSubpath()
+            playheadLayer.path = path
+        }
+        playheadLayer.position = CGPoint(x: x, y: size.height / 2)
+        CATransaction.commit()
     }
+
+    /// The ruler's header box that shows the playhead timecode.
+    private var playheadTimecodeRect: CGRect { CGRect(x: 0, y: 0, width: TimelineLayout.headerWidth, height: TimelineLayout.rulerHeight) }
 
     // MARK: Hit testing
 
@@ -959,10 +977,13 @@ final class TimelineView: NSView {
     }
 
     /// Keep the playhead visible: continuous scrolling while playing, recentering after jumps.
+    /// Without a scroll only the playhead layer moves and the timecode box repaints.
     private func followPlayhead(_ t: Double) {
-        if case .scrub? = drag?.kind { needsDisplay = true; return }
-        let next = layout.scrollTimeFollowing(t, playing: editor.isPlaying)
-        if next != scrollTime { scrollTime = next } else { needsDisplay = true }
+        let scrubbing: Bool = { if case .scrub? = drag?.kind { return true }; return false }()
+        let next = scrubbing ? scrollTime : layout.scrollTimeFollowing(t, playing: editor.isPlaying)
+        if next != scrollTime { scrollTime = next; return }
+        updatePlayheadLayer(layout, at: t)
+        setNeedsDisplay(playheadTimecodeRect)
     }
 
     // MARK: Keyboard

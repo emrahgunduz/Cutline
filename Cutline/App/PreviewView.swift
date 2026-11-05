@@ -18,18 +18,7 @@ struct PreviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             HStack(spacing: 12) {
-                Group {
-                    Button(action: editor.goToStart) { Image(systemName: "backward.end.fill") }.tip("Go to start (Home)")
-                    Button { editor.stepFrame(-1) } label: { Image(systemName: "backward.frame.fill") }.tip("Previous frame (←)")
-                    Button(action: editor.togglePlay) { Image(systemName: editor.isPlaying ? "pause.fill" : "play.fill").frame(width: 18) }
-                        .tip("Play / pause (Space)")
-                    Button { editor.stepFrame(1) } label: { Image(systemName: "forward.frame.fill") }.tip("Next frame (→)")
-                    Button(action: editor.goToEnd) { Image(systemName: "forward.end.fill") }.tip("Go to end (End)")
-                }
-                .font(.system(size: 14))
-                Spacer()
-                Text("\(Timecode.string(editor.playhead, fps: editor.project.fps)) / \(Timecode.string(editor.project.duration, fps: editor.project.fps))")
-                    .font(.system(.body, design: .monospaced))
+                TransportControls(transport: editor.transport)
                 Spacer()
                 Button { controller.stepZoom(1 / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }.tip("Zoom out (mouse wheel or pinch zooms at the pointer)")
                 Menu(zoomLabel) {
@@ -55,6 +44,28 @@ struct PreviewView: View {
 
     private var zoomLabel: String {
         controller.zoom.map { "\(Int(($0 * 100).rounded()))%" } ?? "Fit (\(controller.fitPercent)%)"
+    }
+}
+
+/// Play controls and timecode. Observes only the transport, so playback ticks redraw
+/// this bar and nothing else in the preview panel.
+private struct TransportControls: View {
+    @EnvironmentObject var editor: EditorModel
+    @ObservedObject var transport: TransportState
+
+    var body: some View {
+        Group {
+            Button(action: editor.goToStart) { Image(systemName: "backward.end.fill") }.tip("Go to start (Home)")
+            Button { editor.stepFrame(-1) } label: { Image(systemName: "backward.frame.fill") }.tip("Previous frame (←)")
+            Button(action: editor.togglePlay) { Image(systemName: transport.isPlaying ? "pause.fill" : "play.fill").frame(width: 18) }
+                .tip("Play / pause (Space)")
+            Button { editor.stepFrame(1) } label: { Image(systemName: "forward.frame.fill") }.tip("Next frame (→)")
+            Button(action: editor.goToEnd) { Image(systemName: "forward.end.fill") }.tip("Go to end (End)")
+        }
+        .font(.system(size: 14))
+        Spacer()
+        Text("\(Timecode.string(transport.playhead, fps: editor.project.fps)) / \(Timecode.string(editor.project.duration, fps: editor.project.fps))")
+            .font(.system(.body, design: .monospaced))
     }
 }
 
