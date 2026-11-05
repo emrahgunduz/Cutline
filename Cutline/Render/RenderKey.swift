@@ -44,7 +44,7 @@ enum RenderKey {
     static func key(project p: Project, start: Double, end: Double, encoder: EncoderSig? = nil, proxies: Bool = false) -> String {
         var sig = Signature(canvas: p.canvas, fps: p.fps, range: [start, end], style: p.lyricStyle,
                             letterbox: letterbox(p, start, end), encoder: encoder)
-        for (t, track) in p.videoTracks.enumerated() {
+        for (t, track) in p.videoTracks.enumerated() where !track.isHidden {
             for c in track.clips where c.start < end && c.end > start {
                 let asset = p.asset(c.assetID)
                 sig.clips.append(ClipSig(track: t, asset: c.assetID, path: asset?.path ?? "", media: mediaStamp(asset),
@@ -55,7 +55,7 @@ enum RenderKey {
             sig.proxies = sig.clips.compactMap { c in p.asset(c.asset)?.proxy.map { "\(c.asset):\($0.fileName)" } }
         }
         let animation = LyricAnimation(style: p.lyricStyle, fps: p.fps)
-        for (t, track) in p.lyricTracks.enumerated() {
+        for (t, track) in p.lyricTracks.enumerated() where !track.isHidden {
             for l in track.lines {
                 let drawnEnd = max(l.end, l.words.map { LyricLayout.visibleEnd(of: $0, letters: $0.text.count, animation: animation) }.max() ?? l.end)
                 guard l.start < end, drawnEnd > start else { continue }

@@ -383,3 +383,31 @@ extension Project {
         return p
     }
 }
+
+extension Project {
+    mutating func toggleAudioMuted() {
+        guard var a = audio else { return }
+        a.muted = a.isMuted ? nil : true
+        audio = a
+    }
+
+    mutating func toggleVideoTrackHidden(_ t: Int) {
+        guard videoTracks.indices.contains(t) else { return }
+        videoTracks[t].hidden = videoTracks[t].isHidden ? nil : true
+    }
+
+    mutating func toggleLyricTrackHidden(_ t: Int) {
+        guard lyricTracks.indices.contains(t) else { return }
+        lyricTracks[t].hidden = lyricTracks[t].isHidden ? nil : true
+    }
+
+    /// What the export leaves out because you muted or hid it (for the export sheet).
+    var exportOmissions: [String] {
+        var out: [String] = []
+        if audio?.isMuted == true { out.append("the song is muted") }
+        let v = videoTracks.enumerated().filter { $0.element.isHidden }.map { "Video \($0.offset + 1)" }
+        let l = lyricTracks.enumerated().filter { $0.element.isHidden }.map { "Lyrics \($0.offset + 1)" }
+        if !(v + l).isEmpty { out.append((v + l).joined(separator: ", ") + ((v + l).count == 1 ? " is hidden" : " are hidden")) }
+        return out
+    }
+}
