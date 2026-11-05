@@ -11,6 +11,8 @@ final class TimelineContainer: NSView {
     private var snapButton: NSButton!
     private var groupButtons: [SnapGroup: NSButton] = [:]
     private var cinemaButton: NSButton!
+    private var analyzeButton: NSButton!
+    private var alignButton: NSButton!
     private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
 
@@ -68,6 +70,17 @@ final class TimelineContainer: NSView {
             }
         }
         cinemaButton.setButtonType(.pushOnPushOff)
+        analyzeButton = button("waveform.badge.magnifyingglass", "Analyze the song again: vocals, beats, downbeats and sections") { [weak editor] in
+            guard let editor, let audio = editor.project.audio else { return }
+            editor.audioAnalysis.ensure(for: editor.project.asset(audio.assetID), force: true)
+        }
+        analyzeButton.title = "Analyze Song"
+        analyzeButton.imagePosition = .imageLeading
+        alignButton = button("text.word.spacing", "Time every lyric word to the song (⌥⌘L)") { [weak self, weak editor] in
+            editor?.alignLyrics(window: self?.window)
+        }
+        alignButton.title = "Align Lyrics"
+        alignButton.imagePosition = .imageLeading
         let zoomOut = button("minus.magnifyingglass", "Zoom out (−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
         let zoomIn = button("plus.magnifyingglass", "Zoom in (=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
@@ -75,12 +88,17 @@ final class TimelineContainer: NSView {
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
         let items: [NSView] = [addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
-            + [separator(), cinemaButton, spacer, zoomOut, zoomIn, fit]
+            + [separator(), cinemaButton, separator(), analyzeButton, alignButton, spacer, zoomOut, zoomIn, fit]
         for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo
         editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
             self.cinemaButton.state = editor.project.cinemascope.enabled ? .on : .off
+            self.updateAnalysisButtons(editor)
+        }.store(in: &cancellables)
+        editor.audioAnalysis.$state.combineLatest(editor.jobs.$active).receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
+            guard let self, let editor else { return }
+            self.updateAnalysisButtons(editor)
         }.store(in: &cancellables)
 
         for v in [bar, timeline, hScroller, vScroller] as [NSView] { addSubview(v) }
@@ -96,6 +114,15 @@ final class TimelineContainer: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Both need the song; aligning needs lyrics too. Neither runs while a job is running.
+    private func updateAnalysisButtons(_ editor: EditorModel) {
+        let p = editor.project
+        let busy = !editor.jobs.active.isEmpty
+        let available = editor.audioAnalysis.state != .unavailable
+        analyzeButton.isEnabled = p.audio != nil && available && !busy
+        alignButton.isEnabled = p.audio != nil && available && !busy && p.lyricTracks.contains { !$0.lines.isEmpty }
+    }
 
     /// Group toggles keep their own state but grey out while snapping is off.
     private func syncSnapButtons() {

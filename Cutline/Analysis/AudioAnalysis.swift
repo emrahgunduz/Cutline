@@ -220,7 +220,9 @@ final class AudioAnalysisStore: ObservableObject {
                 let hash = try await Task.detached(priority: .utility) { try Self.hash(of: url) }.value
                 try Task.checkCancellation()
                 if !force, let cached = self.load(hash: hash) { self.analysis = cached; self.state = .idle; return }
-                self.analysis = nil
+                // Re-analysing the same song keeps the old result on screen until the new one
+                // lands (or the run is cancelled).
+                if !force || self.analysis?.audioHash != hash { self.analysis = nil }
                 self.state = .running
                 self.jobsStarted += 1
                 let wav = FileManager.default.temporaryDirectory.appendingPathComponent("cutline-decode-\(UUID().uuidString).wav")
