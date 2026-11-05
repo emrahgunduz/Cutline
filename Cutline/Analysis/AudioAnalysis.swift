@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import CryptoKit
 import Foundation
 
@@ -165,10 +166,34 @@ enum Loudness {
     enum Kind: Equatable { case loud, quiet }
     struct Region: Equatable { var start: Double; var end: Double; var kind: Kind }
 
+    /// The song's loudness over time (RMS smoothed over a couple of seconds) and the two
+    /// levels that define the patches: above `loudLevel` is loud, below `quietLevel` quiet.
+    struct Envelope: Equatable {
+        /// Seconds per value (audio-file time).
+        var bucket: Double
+        var values: [Float]
+        var loudLevel: Float
+        var quietLevel: Float
+        /// The highest value, for scaling the curve.
+        var peak: Float
+
+        var duration: Double { Double(values.count) * bucket }
+
+        /// The loudness at `t` seconds into the audio file (0 outside it).
+        func value(at t: Double) -> Float {
+            guard bucket > 0, t >= 0 else { return 0 }
+            let i = Int(t / bucket)
+            return i < values.count ? values[i] : 0
+        }
+
+        /// Fraction of the lane's height (0 = silent, 1 = the loudest moment) for a value.
+        func height(_ v: Float) -> CGFloat { peak > 0 ? CGFloat(min(1, max(0, v / peak))) : 0 }
+    }
+
     /// Smooth the RMS over `window` seconds; above `loud`× the median is loud, below
-    /// `quiet`× is quiet. Regions shorter than `minLength` are dropped.
-    static func regions(_ wf: Waveform, window: Double = 2, loud: Float = 1.35, quiet: Float = 0.6, minLength: Double = 2) -> [Region] {
-        guard let level = wf.levels.last, !level.rms.isEmpty else { return [] }
+    /// `quiet`× is quiet.
+    static func envelope(_ wf: Waveform, window: Double = 2, loud: Float = 1.35, quiet: Float = 0.6) -> Envelope? {
+        guard let level = wf.levels.last, !level.rms.isEmpty else { return nil }
         let bucket = Double(level.samplesPerBucket) / wf.sampleRate
         let rms = level.rms
         let half = max(1, Int(window / bucket / 2))
@@ -181,21 +206,33 @@ enum Loudness {
             smooth[i] = sum / Float(hi - lo + 1)
         }
         let audible = smooth.filter { $0 > 1e-4 }.sorted()
-        guard !audible.isEmpty else { return [] }
+        guard !audible.isEmpty else { return nil }
         let median = audible[audible.count / 2]
-        func kind(_ v: Float) -> Kind? { v > median * loud ? .loud : (v < median * quiet ? .quiet : nil) }
+        return Envelope(bucket: bucket, values: smooth, loudLevel: median * loud, quietLevel: median * quiet, peak: smooth.max() ?? 0)
+    }
+
+    /// Stretches where the envelope stays above the loud level or below the quiet level for
+    /// at least `minLength` seconds.
+    static func regions(_ e: Envelope, minLength: Double = 2) -> [Region] {
+        let smooth = e.values, bucket = e.bucket
+        guard !smooth.isEmpty else { return [] }
+        func kind(_ v: Float) -> Kind? { v > e.loudLevel ? .loud : (v < e.quietLevel ? .quiet : nil) }
         var out: [Region] = []
         var runStart = 0, runKind = kind(smooth[0])
         for i in 1...smooth.count {
             let k = i < smooth.count ? kind(smooth[i]) : nil
             if i == smooth.count || k != runKind {
                 if let rk = runKind, Double(i - runStart) * bucket >= minLength {
-                    out.append(Region(start: Double(runStart) * bucket, end: min(Double(i) * bucket, Double(rms.count) * bucket), kind: rk))
+                    out.append(Region(start: Double(runStart) * bucket, end: min(Double(i) * bucket, e.duration), kind: rk))
                 }
                 runStart = i; runKind = k
             }
         }
         return out
+    }
+
+    static func regions(_ wf: Waveform, window: Double = 2, loud: Float = 1.35, quiet: Float = 0.6, minLength: Double = 2) -> [Region] {
+        envelope(wf, window: window, loud: loud, quiet: quiet).map { regions($0, minLength: minLength) } ?? []
     }
 }
 
@@ -209,6 +246,8 @@ final class AudioAnalysisStore: ObservableObject {
 
     @Published private(set) var analysis: AudioAnalysis?
     @Published private(set) var loudness: [Loudness.Region] = []
+    /// The loudness curve the regions come from (drawn over the waveform).
+    @Published private(set) var loudnessEnvelope: Loudness.Envelope?
     @Published private(set) var state: State = .idle
 
     /// Runs the helper on a decoded WAV; `keep` receives the result JSON and output folder.
@@ -279,7 +318,10 @@ final class AudioAnalysisStore: ObservableObject {
     /// Show an analysis directly (tests and previews; normal use goes through ensure).
     func adopt(_ a: AudioAnalysis) { analysis = a; state = .idle }
 
-    func updateLoudness(_ wf: Waveform?) { loudness = wf.map { Loudness.regions($0) } ?? [] }
+    func updateLoudness(_ wf: Waveform?) {
+        loudnessEnvelope = wf.flatMap { Loudness.envelope($0) }
+        loudness = loudnessEnvelope.map { Loudness.regions($0) } ?? []
+    }
 
     /// Wait for the current load or job (tests).
     func wait() async { await task?.value }

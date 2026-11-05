@@ -27,14 +27,64 @@ enum SectionLane {
         return palette[((i % palette.count) + palette.count) % palette.count]
     }
 
-    /// Shading for loud and quiet stretches inside the waveform area.
-    static func drawLoudness(_ regions: [Loudness.Region], audioStart: Double, in wave: CGRect, x: (Double) -> CGFloat) {
+    static let loudColor = NSColor.systemOrange
+    static let quietColor = NSColor(calibratedRed: 0.35, green: 0.6, blue: 1, alpha: 1)
+
+    /// Loudness over the waveform: tinted patches for loud (orange) and quiet (blue) stretches,
+    /// the loudness curve they come from, and the two levels it is measured against (dashed).
+    /// A patch is where the curve stays above the loud line or below the quiet line.
+    static func drawLoudness(_ regions: [Loudness.Region], audioStart: Double, in wave: CGRect,
+                             visible: ClosedRange<CGFloat>, x: (Double) -> CGFloat) {
+        let font = NSFont.systemFont(ofSize: 8, weight: .bold)
         for r in regions {
             let x0 = max(wave.minX, x(audioStart + r.start)), x1 = min(wave.maxX, x(audioStart + r.end))
             guard x1 > x0 else { continue }
-            (r.kind == .loud ? NSColor.systemOrange.withAlphaComponent(0.16) : NSColor.black.withAlphaComponent(0.22)).setFill()
+            let c = r.kind == .loud ? loudColor : quietColor
+            c.withAlphaComponent(0.14).setFill()
             CGRect(x: x0, y: wave.minY, width: x1 - x0, height: wave.height).fill()
+            let label = (r.kind == .loud ? "LOUD" : "QUIET") as NSString
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: c.withAlphaComponent(0.95)]
+            let size = label.size(withAttributes: attrs)
+            if x1 - x0 > size.width + 8 {
+                label.draw(at: CGPoint(x: max(x0, visible.lowerBound) + 3, y: wave.maxY - size.height - 1), withAttributes: attrs)
+            }
         }
+    }
+
+    /// The loudness curve and the loud and quiet levels (dashed), drawn over the waveform.
+    static func drawLoudnessCurve(_ envelope: Loudness.Envelope?, audioStart: Double, in wave: CGRect,
+                                  visible: ClosedRange<CGFloat>, time: (CGFloat) -> Double) {
+        guard let e = envelope, e.peak > 0, wave.height > 12 else { return }
+        let lo = max(visible.lowerBound, wave.minX), hi = min(visible.upperBound, wave.maxX)
+        guard hi > lo else { return }
+        // y for a loudness value (the view is flipped: silent at the bottom).
+        func y(_ v: Float) -> CGFloat { wave.maxY - 1 - curveHeight(e, v, wave) }
+        for (level, color) in [(e.loudLevel, loudColor), (e.quietLevel, quietColor)] {
+            let line = NSBezierPath()
+            line.move(to: CGPoint(x: lo, y: y(level))); line.line(to: CGPoint(x: hi, y: y(level)))
+            line.setLineDash([4, 3], count: 2, phase: 0)
+            line.lineWidth = 1
+            color.withAlphaComponent(0.7).setStroke()
+            line.stroke()
+        }
+        let curve = NSBezierPath()
+        var px = lo
+        var first = true
+        while px <= hi {
+            let t = time(px) - audioStart
+            let p = CGPoint(x: px, y: y(e.value(at: t)))
+            if first { curve.move(to: p); first = false } else { curve.line(to: p) }
+            px += 2
+        }
+        curve.lineWidth = 1.5
+        curve.lineJoinStyle = .round
+        NSColor.systemYellow.withAlphaComponent(0.9).setStroke()
+        curve.stroke()
+    }
+
+    /// Height above the lane's bottom for a loudness value (the loudest moment reaches 85%).
+    static func curveHeight(_ e: Loudness.Envelope, _ v: Float, _ wave: CGRect) -> CGFloat {
+        e.height(v) * (wave.height - 2) * 0.85
     }
 
     static func drawSections(_ sections: [SongSection], audioStart: Double, duration: Double, in clip: CGRect,
