@@ -83,15 +83,58 @@ final class ReopenTests: XCTestCase {
         XCTAssertNotNil(reopened.editor.waveforms.waveforms[id])
     }
 
-    func testCacheWritesDoNotLookLikeOutsideEdits() async throws {
+    private func savedDocument() async throws -> (ProjectDocument, URL) {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("moddate-\(UUID()).cutline")
-        defer { try? FileManager.default.removeItem(at: url) }
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
         let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
         try await doc.save(to: url, ofType: "com.emrahgunduz.cutline.project", for: .saveAsOperation)
-        try await Task.sleep(nanoseconds: 1_100_000_000)
-        _ = doc.folder("analysis")            // internal write after save
-        doc.persistLayout()
-        let onDisk = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        XCTAssertEqual(doc.fileModificationDate, onDisk)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        return (doc, url)
+    }
+
+    private func assertSameDate(_ a: Date?, _ b: Date?, file: StaticString = #filePath, line: UInt = #line) {
+        guard let a, let b else { return XCTFail("missing date", file: file, line: line) }
+        XCTAssertEqual(a.timeIntervalSinceReferenceDate, b.timeIntervalSinceReferenceDate, accuracy: 0.000_5, file: file, line: line)
+    }
+
+    func testSaveCreatesEveryCacheFolder() async throws {
+        let (_, url) = try await savedDocument()
+        for name in ProjectDocument.cacheFolders {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.appendingPathComponent(name).path), name)
+        }
+    }
+
+    func testInternalWritesDoNotLookLikeOutsideEdits() async throws {
+        let (doc, url) = try await savedDocument()
+        let saved = doc.fileModificationDate
+        await MainActor.run { doc.persistLayout() }
+        try Data([1]).write(to: url.appendingPathComponent("thumbnails/x.png"))   // cache write in a subfolder
+        XCTAssertNotEqual(saved, doc.onDiskModificationDate, "layout.json should change the package date")
+        assertSameDate(doc.fileModificationDate, doc.onDiskModificationDate)
+    }
+
+    func testCacheFolderCreatedOffMainIsAdopted() async throws {
+        let (doc, url) = try await savedDocument()
+        try FileManager.default.removeItem(at: url.appendingPathComponent("proxies"))
+        doc.fileModificationDate = doc.onDiskModificationDate          // treat the removal as known
+        await Task.detached { _ = doc.folder("proxies") }.value
+        await MainActor.run {}                                          // let the adoption run
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.appendingPathComponent("proxies").path))
+        assertSameDate(doc.fileModificationDate, doc.onDiskModificationDate)
+    }
+
+    func testOutsideEditIsStillDetected() async throws {
+        let (doc, url) = try await savedDocument()
+        let saved = try XCTUnwrap(doc.fileModificationDate)
+        // Another app replaces project.json (an atomic write changes the package date).
+        let json = try Data(contentsOf: url.appendingPathComponent("project.json"))
+        try json.write(to: url.appendingPathComponent("project.json"), options: .atomic)
+        let edited = try XCTUnwrap(doc.onDiskModificationDate)
+        XCTAssertGreaterThan(edited, saved)
+        assertSameDate(doc.fileModificationDate, saved)
+        // A later internal write must not hide the outside edit.
+        await MainActor.run { doc.persistLayout() }
+        assertSameDate(doc.fileModificationDate, saved)
+        XCTAssertGreaterThan(try XCTUnwrap(doc.onDiskModificationDate), saved)
     }
 }
