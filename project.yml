@@ -31,11 +31,13 @@ targets:
             LSHandlerRank: Owner
             LSItemContentTypes: [com.emrahgunduz.cutline.project]
             LSTypeIsPackage: true
+            CFBundleTypeIconFile: CutlineDocument
             NSDocumentClass: $(PRODUCT_MODULE_NAME).ProjectDocument
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.emrahgunduz.cutline.project
             UTTypeDescription: Cutline Project
             UTTypeConformsTo: [com.apple.package, public.composite-content]
+            UTTypeIconFile: CutlineDocument
             UTTypeTagSpecification:
               public.filename-extension: [cutline]
     settings:

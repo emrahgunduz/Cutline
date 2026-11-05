@@ -63,6 +63,7 @@
 		BF7AB35E4C264F4499A22C6F /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55120AF47C20743C6FF292E8 /* PreviewView.swift */; };
 		C1448F251493C0A6DC33166A /* PreviewCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */; };
 		C2B91A0740ECEE4E2003275E /* SampleMediaImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5986D783A144C13227A543EF /* SampleMediaImportTests.swift */; };
+		C464A325189789A06EBDE0F6 /* CutlineDocument.icns in Resources */ = {isa = PBXBuildFile; fileRef = 519E91B654DBE53619C7C100 /* CutlineDocument.icns */; };
 		C9098E168CA54FE2974429E6 /* SizeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */; };
 		C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
@@ -110,6 +111,7 @@
 		469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChain.swift; sourceTree = "<group>"; };
 		49397BCF482A2F3065FD316F /* PreviewCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCanvasView.swift; sourceTree = "<group>"; };
 		4DDB309B7C757CB36556283A /* Letterbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Letterbox.swift; sourceTree = "<group>"; };
+		519E91B654DBE53619C7C100 /* CutlineDocument.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = CutlineDocument.icns; sourceTree = "<group>"; };
 		5325553413F834E7931554AE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		55120AF47C20743C6FF292E8 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		5986D783A144C13227A543EF /* SampleMediaImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleMediaImportTests.swift; sourceTree = "<group>"; };
@@ -232,6 +234,7 @@
 		57CB7CA69ED9D863BC0CC9D0 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				519E91B654DBE53619C7C100 /* CutlineDocument.icns */,
 				3F86A8C237D2346DBF191F17 /* presets.json */,
 			);
 			path = Resources;
@@ -409,6 +412,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6290C072CCA367F39B29E887 /* Assets.xcassets in Resources */,
+				C464A325189789A06EBDE0F6 /* CutlineDocument.icns in Resources */,
 				EB548A9EA1E729689E9268F2 /* presets.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
