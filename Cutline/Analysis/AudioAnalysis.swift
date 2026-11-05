@@ -186,6 +186,12 @@ enum Loudness {
             return i < values.count ? values[i] : 0
         }
 
+        /// Display gain that makes the curve's loudest moment fill the row (to `fill` of the
+        /// half-height, so it keeps a margin). The waveform uses the same gain so they line up;
+        /// its peaks above that are clipped at the row's edges. Capped so near-silence isn't
+        /// blown up into noise.
+        func displayGain(fill: Float = 0.92) -> Float { peak > 0 ? min(fill / peak, 40) : 1 }
+
         /// Fraction of the lane's height (0 = silent, 1 = the loudest moment) for a value.
         func height(_ v: Float) -> CGFloat { peak > 0 ? CGFloat(min(1, max(0, v / peak))) : 0 }
     }

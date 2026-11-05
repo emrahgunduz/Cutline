@@ -13,6 +13,23 @@ struct Waveform: Codable, Equatable {
     var sampleRate: Double
     var levels: [WaveformLevel]
 
+    /// The song's highest sample (0...1), from the coarsest level.
+    var peakAmplitude: Float {
+        guard let l = levels.last else { return 0 }
+        return max(l.maxs.max() ?? 0, -(l.mins.min() ?? 0))
+    }
+
+    /// The song's highest average level (RMS, 0...1), from the coarsest level.
+    var peakRMS: Float { levels.last?.rms.max() ?? 0 }
+
+    /// Display gain that makes the loudest average level (the green layer, which the loudness
+    /// curve follows) fill 90% of the row, however loud the song was mastered. Peaks above
+    /// that are clipped at the row's edges. Capped so near-silence isn't blown up into noise.
+    var displayGain: Float {
+        let r = peakRMS
+        return r > 0 ? min(0.9 / r, 20) : 1
+    }
+
     /// The coarsest level that still gives at least one bucket per `secondsPerPixel`.
     func level(secondsPerPixel: Double) -> WaveformLevel? {
         let samplesPerPixel = secondsPerPixel * sampleRate
