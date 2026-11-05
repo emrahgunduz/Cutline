@@ -92,3 +92,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Tap mode** | T: plays from 5 s before the selected word; each Space sets the current word's start to that moment, confirms it, and moves to the next word sung (any track). 1/2/3 play at 100/75/50% with pitch kept. After the last word the song plays 5 s more, then pauses. Esc ends. |
 | **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
 | **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
+| **Word timing** | Each word starts on its own time and ends with its line. Dragging a word's right edge moves the line's end for all its words. |

@@ -110,8 +110,10 @@ extension Project {
         let words = lyricOrder()
         guard words.count > 1 else { return }
         let old = Dictionary(uniqueKeysWithValues: before.lyricTracks.flatMap(\.lines).flatMap(\.words).map { ($0.id, $0) })
-        let after = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.end) }
-        let prior = words.map { w in old[w.value.id].map { AnchorStretch.Span(start: $0.start, end: $0.end) } ?? AnchorStretch.Span(start: w.value.start, end: w.value.end) }
+        // Words end with their lines, so only starts take part: each word is a one-frame span.
+        let f = frameDuration
+        let after = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.start + f) }
+        let prior = words.map { w in old[w.value.id].map { AnchorStretch.Span(start: $0.start, end: $0.start + f) } ?? AnchorStretch.Span(start: w.value.start, end: w.value.start + f) }
         let anchored = words.map(\.value.confirmed)
         let follows = words.map { $0.value.alignedStart == nil }
         write(AnchorStretch.stretch(before: prior, after: after, anchored: anchored, follows: follows, minLength: frameDuration), to: words, anchored: anchored)
@@ -120,33 +122,62 @@ extension Project {
     /// Trim unconfirmed words so no two words overlap in sung order (confirmed ones stay).
     mutating func resolveLyricOverlaps() {
         let words = lyricOrder()
-        let spans = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.end) }
+        let spans = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.start + frameDuration) }
         let anchored = words.map(\.value.confirmed)
         write(AnchorStretch.resolveOverlaps(spans, anchored: anchored, minLength: frameDuration), to: words, anchored: anchored)
     }
 
+    /// Write new word starts. A line whose last word moved keeps the same distance from that
+    /// word to its end, so stretched lines don't leave long tails or get cut short.
     private mutating func write(_ result: [AnchorStretch.Span], to words: [(track: Int, line: Int, word: Int, value: LyricWord)], anchored: [Bool]) {
         let lead = lyricStyle.leadIn
         var touched = Set<[Int]>()
+        var oldLast: [[Int]: Double] = [:]
+        for w in words { let key = [w.track, w.line]; oldLast[key] = max(oldLast[key] ?? -.infinity, w.value.start) }
         for (k, w) in words.enumerated() where !anchored[k] {
             var word = lyricTracks[w.track].lines[w.line].words[w.word]
             let s = quantize(max(0, result[k].start))
-            let e = max(s + frameDuration, quantize(result[k].end))
-            guard s != word.start || e != word.end else { continue }
-            word.start = s; word.end = e
+            guard s != word.start else { continue }
+            word.start = s
             // Keep the lead-in from undoing the change later.
-            if word.alignedStart != nil { word.alignedStart = s + lead; word.alignedEnd = e + lead }
+            if word.alignedStart != nil { word.alignedStart = s + lead }
             lyricTracks[w.track].lines[w.line].words[w.word] = word
             touched.insert([w.track, w.line])
         }
-        for tl in touched { lyricTracks[tl[0]].lines[tl[1]].fitToWords() }
+        for tl in touched {
+            var line = lyricTracks[tl[0]].lines[tl[1]]
+            let newLast = line.words.map(\.start).max() ?? line.start
+            line.end = quantize(line.end + newLast - (oldLast[tl] ?? newLast))
+            line.start = line.words.map(\.start).min() ?? line.start
+            line.endWordsWithLine(frame: frameDuration)
+            lyricTracks[tl[0]].lines[tl[1]] = line
+        }
     }
 }
 
 extension LyricLine {
-    /// Make the line hug its first and last word.
+    /// Make the line hug its words: from the first word's start to the last word's end.
     mutating func fitToWords() {
         guard let s = words.map(\.start).min(), let e = words.map(\.end).max() else { return }
         start = s; end = e
+    }
+
+    /// Every word ends with its line (R: words start on their own time, end at the line's end).
+    mutating func endWordsWithLine(frame: Double) {
+        guard let lastStart = words.map(\.start).max(), let firstStart = words.map(\.start).min() else { return }
+        start = min(start, firstStart)
+        end = max(end, lastStart + frame)
+        for i in words.indices { words[i].end = end }
+    }
+}
+
+extension Project {
+    /// Keep every word ending at its line's end. Run after every change to the project.
+    mutating func normalizeWordEnds() {
+        for t in lyricTracks.indices {
+            for l in lyricTracks[t].lines.indices where lyricTracks[t].lines[l].words.contains(where: { $0.end != lyricTracks[t].lines[l].end }) || lyricTracks[t].lines[l].words.contains(where: { $0.start >= lyricTracks[t].lines[l].end }) {
+                lyricTracks[t].lines[l].endWordsWithLine(frame: frameDuration)
+            }
+        }
     }
 }

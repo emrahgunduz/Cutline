@@ -56,6 +56,7 @@ extension Project {
             lyricTracks[loc.track].lines[loc.index] = line
         }
         for t in lyricTracks.indices { lyricTracks[t].lines.sort { $0.start < $1.start } }
+        normalizeWordEnds()
     }
 
     /// Re-place aligned, unconfirmed words for the current lead-in. Lines that hugged their
@@ -79,6 +80,7 @@ extension Project {
                 lyricTracks[t].lines[l] = line
             }
         }
+        normalizeWordEnds()
     }
 }
 

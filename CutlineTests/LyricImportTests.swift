@@ -66,7 +66,8 @@ final class LyricImportTests: XCTestCase {
         let r = result([[(5, 5.5, 0.9), (6, 7, 0.9)], [(8, 9, 0.9), (9, 10, 0.9)]])
         var keep = p
         keep.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: true)
-        XCTAssertEqual(keep.lyricTracks[0].lines[0].words[0], before)
+        XCTAssertEqual(keep.lyricTracks[0].lines[0].words[0].start, before.start)
+        XCTAssertTrue(keep.lyricTracks[0].lines[0].words[0].confirmed)
         p.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: false)
         XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 5)
     }
@@ -75,8 +76,11 @@ final class LyricImportTests: XCTestCase {
         var p = placed()
         p.applyAlignment(result([[(1.0, 1.03, 0.9), (1.01, 1.2, 0.9)], [(3, 3.01, 0.9), (3.01, 3.02, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
         for line in p.lyricTracks[0].lines {
-            for (a, b) in zip(line.words, line.words.dropFirst()) { XCTAssertLessThanOrEqual(a.end, b.start) }
-            for w in line.words { XCTAssertGreaterThanOrEqual(w.end - w.start, p.frameDuration - 1e-9) }
+            for (a, b) in zip(line.words, line.words.dropFirst()) { XCTAssertLessThan(a.start, b.start) }
+            for w in line.words {
+                XCTAssertEqual(w.end, line.end, "every word ends with its line")
+                XCTAssertGreaterThanOrEqual(w.end - w.start, p.frameDuration - 1e-9)
+            }
         }
     }
 
@@ -93,7 +97,8 @@ final class LyricImportTests: XCTestCase {
         p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
         let w = p.lyricTracks[0].lines[0].words[0]
         XCTAssertEqual(w.start, p.quantize(9.75))
-        XCTAssertEqual(w.end, p.quantize(10.25))
+        XCTAssertEqual(w.end, p.lyricTracks[0].lines[0].end)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, p.quantize(11.75), "the line ends at its last word's end, shown early too")
         XCTAssertEqual(w.alignedStart, 10)
         XCTAssertEqual(p.lyricTracks[0].lines[0].start, w.start)
     }

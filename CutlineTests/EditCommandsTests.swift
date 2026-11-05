@@ -228,22 +228,27 @@ final class EditCommandBranchTests: XCTestCase {
         return p
     }
 
-    func testRetimeWordEndBeforeStartKeepsStartAndMinimumLength() {
+    /// Words end with their line: a word's new end moves the line's end, but never before
+    /// one frame after the line's last word starts.
+    func testRetimeWordEndMovesTheLineEndWithinLimits() {
         var p = lyricProject()
         let w = p.lyricTracks[0].lines[0].words[0].id
+        p.retimeWord(w, end: 8)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 8, accuracy: 1e-9)
+        XCTAssertTrue(p.lyricTracks[0].lines[0].words.allSatisfy { $0.end == 8 })
         p.retimeWord(w, end: 4)
-        let word = p.lyricTracks[0].lines[0].words[0]
-        XCTAssertEqual(word.start, 5, accuracy: 1e-9)
-        XCTAssertEqual(word.end, 5 + p.frameDuration, accuracy: 1e-9)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 6.2 + p.frameDuration, accuracy: 1e-9)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 5, accuracy: 1e-9)
     }
 
-    func testRetimeWordStartAfterEndKeepsEndAndMinimumLength() {
+    func testRetimeWordStartPastTheLineEndExtendsTheLine() {
         var p = lyricProject()
         let w = p.lyricTracks[0].lines[0].words[0].id
-        p.retimeWord(w, start: 7)
-        let word = p.lyricTracks[0].lines[0].words[0]
-        XCTAssertEqual(word.end, 6, accuracy: 1e-9)
-        XCTAssertEqual(word.start, 6 - p.frameDuration, accuracy: 1e-9)
+        p.retimeWord(w, start: 9.5)
+        let line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.words[0].start, p.quantize(9.5), accuracy: 1e-9)
+        XCTAssertEqual(line.end, p.quantize(9.5) + p.frameDuration, accuracy: 1e-9)
+        XCTAssertTrue(line.words.allSatisfy { $0.end == line.end })
     }
 
     func testRetimeLineEndOnlyKeepsStart() {
