@@ -187,6 +187,17 @@ struct LyricStyle: Codable, Equatable {
     var shadowDX: Double = 0
     var shadowDY: Double = 4   // +down
     var shadowColor = RGBA(r: 0, g: 0, b: 0, a: 0.8)
+    // Word animation. Optional storage so older projects load; nil means the default.
+    /// Fade-in / fade-out time in seconds (default: 3 frames).
+    var fadeInValue: Double?
+    var fadeOutValue: Double?
+    /// true = letters fade one after another; false = whole words fade.
+    var letterByLetterValue: Bool?
+    /// How much consecutive letter fades overlap (0 = one after another, 1 = all together).
+    var letterOverlapValue: Double?
+    var letterByLetter: Bool { get { letterByLetterValue ?? false } set { letterByLetterValue = newValue } }
+    var letterOverlap: Double { get { letterOverlapValue ?? 0.5 } set { letterOverlapValue = newValue } }
+
     /// Shadow density multiplier (1 = the color's own opacity). Optional so older projects load.
     var shadowStrengthValue: Double?
     var shadowStrength: Double {

@@ -23,6 +23,21 @@ struct LyricStyleView: View {
                     ColorPicker("Color", selection: color(\.color, "Lyric Color")).font(.system(size: 12))
                     row("Position", style.verticalPosition * 100, 5...95, format: "%.0f%%", reset: LyricStyle().verticalPosition * 100) { $0.verticalPosition = $1 / 100 }
                 }
+                InspectorSection(title: "Animation", icon: "sparkles") {
+                    Picker("", selection: Binding(get: { style.letterByLetter }, set: { v in update("Animation Mode") { $0.letterByLetter = v } })) {
+                        Text("Whole word").tag(false)
+                        Text("Letter by letter").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().controlSize(.small)
+                    let d = LyricAnimation.defaultFade(fps: editor.project.fps)
+                    row("Fade in", style.fadeInValue ?? d, 0...2, format: "%.2fs", reset: d) { $0.fadeInValue = $1 }
+                    row("Fade out", style.fadeOutValue ?? d, 0...2, format: "%.2fs", reset: d) { $0.fadeOutValue = $1 }
+                    if style.letterByLetter {
+                        row("Overlap", style.letterOverlap * 100, 0...100, format: "%.0f%%", reset: 50) { $0.letterOverlap = $1 / 100 }
+                    }
+                    Text(style.letterByLetter ? "Letters fade one after another and the whole word still appears within the fade time. Overlap: how much each letter overlaps the next." : "The same fades apply to every word.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 InspectorSection(title: "Drop Shadow", icon: "shadow", isOn: binding(\.shadowEnabled, "Drop Shadow")) {
                     row("Blur", style.shadowBlur, 0...40, format: "%.1f", reset: LyricStyle().shadowBlur) { $0.shadowBlur = $1 }
                     row("Strength", style.shadowStrength * 100, 0...400, format: "%.0f%%", reset: 100) { $0.shadowStrength = $1 / 100 }
