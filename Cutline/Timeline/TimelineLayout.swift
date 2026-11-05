@@ -24,7 +24,7 @@ struct TimelineLayout {
     static let rulerHeight: CGFloat = 26
     static let minRowHeight: CGFloat = 22      // title only
     static let maxRowHeight: CGFloat = 220
-    static let defaultHeights: [String: CGFloat] = ["audio": 76, "lyric": 66, "video": 60]
+    static let defaultHeights: [String: CGFloat] = ["audio": 76, "lyric": 66, "video": 66]
     static let edgeGrab: CGFloat = 7
 
     var pixelsPerSecond: CGFloat

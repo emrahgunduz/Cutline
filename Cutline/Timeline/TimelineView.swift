@@ -259,7 +259,10 @@ final class TimelineView: NSView {
             clipColor(selected).setFill()
             path.fill()
             guard let asset = project.asset(clip.assetID) else { continue }
-            let labelH: CGFloat = 14
+            let labelH: CGFloat = Self.titleBarHeight
+            // Title bar: a darker strip so the name is readable over any thumbnail.
+            NSColor.black.withAlphaComponent(0.25).setFill()
+            CGRect(x: r.minX, y: r.minY, width: r.width, height: min(labelH, r.height)).fill()
             if r.height > labelH + 8 {
                 NSGraphicsContext.saveGraphicsState()
                 NSBezierPath(rect: r.insetBy(dx: 1, dy: 1)).addClip()
@@ -272,14 +275,14 @@ final class TimelineView: NSView {
                 let text = "PROXY \(proxy.scale.label)" as NSString
                 let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.black]
                 let size = text.size(withAttributes: attrs)
-                let badge = CGRect(x: labelX, y: r.minY + 2, width: size.width + 8, height: 11)
+                let badge = CGRect(x: labelX, y: r.minY + 4, width: size.width + 8, height: 12)
                 NSColor.systemOrange.setFill()
                 NSBezierPath(roundedRect: badge, xRadius: 5.5, yRadius: 5.5).fill()
-                text.draw(at: CGPoint(x: badge.minX + 4, y: badge.minY - 0.5), withAttributes: attrs)
+                text.draw(at: CGPoint(x: badge.minX + 4, y: badge.minY), withAttributes: attrs)
                 labelX = badge.maxX + 5
             }
-            (asset.name as NSString).draw(in: CGRect(x: labelX, y: r.minY + 1, width: max(0, r.maxX - labelX - 5), height: 13),
-                                          withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor.white])
+            (asset.name as NSString).draw(in: CGRect(x: labelX, y: r.minY + 3, width: max(0, r.maxX - labelX - 5), height: 15),
+                                          withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white])
             if asset.proxy != nil {
                 NSColor.systemOrange.setFill()
                 CGRect(x: r.minX, y: r.maxY - 3, width: r.width, height: 3).fill()
@@ -363,7 +366,7 @@ final class TimelineView: NSView {
     struct LyricRowParts { var line: CGRect; var words: [CGRect] }
 
     static func lyricParts(_ rect: CGRect) -> LyricRowParts {
-        let lineH: CGFloat = min(15, max(12, rect.height - 4))
+        let lineH: CGFloat = min(Self.titleBarHeight, max(12, rect.height - 4))
         let line = CGRect(x: rect.minX, y: rect.minY + 2, width: rect.width, height: lineH)
         let remaining = rect.maxY - 3 - line.maxY - 2
         guard remaining >= 16 else { return LyricRowParts(line: line, words: []) }
@@ -372,6 +375,9 @@ final class TimelineView: NSView {
         let w1 = CGRect(x: rect.minX, y: w0.maxY + 2, width: rect.width, height: rowH)
         return LyricRowParts(line: line, words: [w0, w1])
     }
+
+    /// Height of the name bar on top of clips and lyric lines (easy to grab).
+    static let titleBarHeight: CGFloat = 20
 
     static let lineColor = NSColor(calibratedRed: 0.34, green: 0.22, blue: 0.46, alpha: 1)
     static let wordColor = NSColor(calibratedRed: 0.66, green: 0.52, blue: 0.86, alpha: 1)
@@ -397,8 +403,8 @@ final class TimelineView: NSView {
                 outline.stroke()
             }
             if bar.width > 30 {
-                (line.text as NSString).draw(in: bar.insetBy(dx: 4, dy: 0),
-                                             withAttributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.85)])
+                (line.text as NSString).draw(in: CGRect(x: bar.minX + 5, y: bar.minY + 3, width: bar.width - 10, height: 15),
+                                             withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.9)])
             }
             guard parts.words.count == 2 else { continue }
             for (i, wd) in line.words.enumerated() {
