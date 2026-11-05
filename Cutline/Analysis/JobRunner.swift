@@ -18,7 +18,7 @@ final class JobRunner: ObservableObject {
     /// Parent of the per-job scratch folders.
     let scratchRoot: URL
 
-    init(config: HelperConfig? = .bundled,
+    nonisolated init(config: HelperConfig? = .bundled,
          scratchRoot: URL = FileManager.default.temporaryDirectory.appendingPathComponent("cutline-jobs", isDirectory: true)) {
         self.config = config
         self.scratchRoot = scratchRoot

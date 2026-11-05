@@ -23,6 +23,7 @@ final class TimelineView: NSView {
     private enum Edge { case left, right, body }
     private enum Hit {
         case clip(UUID, Edge), line(UUID, Edge), word(UUID, Edge), audio
+        case sectionBoundary(Int), downbeat(Int)
         case ruler, empty(TimelineRow), marker(isStart: Bool)
         case headerButton(TimelineRow, HeaderButton), headerResize(TimelineRow), headerBody(TimelineRow)
     }
@@ -37,6 +38,7 @@ final class TimelineView: NSView {
         case marquee
         case marker(isStart: Bool, original: Project)
         case group(original: Project, clips: [UUID], lines: [UUID])
+        case beat(Hit, original: Project, analysis: AudioAnalysis)
     }
     private struct Drag { var kind: DragKind; var startPoint: CGPoint; var didEdit = false }
     private var drag: Drag?
@@ -58,6 +60,7 @@ final class TimelineView: NSView {
         editor.$revision.receive(on: RunLoop.main).sink { [weak self] _ in self?.clampToContent() }.store(in: &cancellables)
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
+        editor.audioAnalysis.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.transport.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
         playheadLayer.fillColor = NSColor.systemRed.cgColor
         playheadLayer.zPosition = 10
@@ -344,12 +347,33 @@ final class TimelineView: NSView {
         let path = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
         path.fill()
         if selected { NSColor.controlAccentColor.setStroke(); path.lineWidth = 2; path.stroke() }
-        guard r.height > 16, let wf = editor.waveforms.waveforms[audio.assetID],
-              let level = wf.level(secondsPerPixel: 1 / Double(l.pixelsPerSecond)) else { return }
-        let secondsPerBucket = Double(level.samplesPerBucket) / wf.sampleRate
-        let mid = r.midY, half = r.height / 2 - 2
         let x0 = max(r.minX, TimelineLayout.headerWidth), x1 = min(r.maxX, bounds.width)
         guard x1 > x0 else { return }
+        let store = editor.audioAnalysis
+        let showAnalysis = r.height >= 40
+        let wave = showAnalysis ? SectionLane.waveform(in: r) : r
+        if showAnalysis {
+            SectionLane.drawLoudness(store.loudness, audioStart: audio.start, in: wave, x: l.x(for:))
+            if let beats = editor.resolvedBeats {
+                SectionLane.drawSections(beats.sections, audioStart: audio.start, duration: audio.duration, in: r, visible: x0...x1, x: l.x(for:))
+                SectionLane.drawTicks(beats: beats.beats, downbeats: beats.downbeats, audioStart: audio.start, in: r,
+                                      visible: x0...x1, pixelsPerSecond: l.pixelsPerSecond, x: l.x(for:))
+            } else {
+                let note: String? = switch store.state {
+                case .running: "Analyzing song… (progress in the status bar)"
+                case .failed(let m): "Analysis failed: \(m)"
+                case .unavailable: "Song analysis is not in this build"
+                case .idle: nil
+                }
+                if let note {
+                    (note as NSString).draw(at: CGPoint(x: x0 + 6, y: r.minY), withAttributes: [.font: NSFont.systemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.75)])
+                }
+            }
+        }
+        guard wave.height > 16, let wf = editor.waveforms.waveforms[audio.assetID],
+              let level = wf.level(secondsPerPixel: 1 / Double(l.pixelsPerSecond)) else { return }
+        let secondsPerBucket = Double(level.samplesPerBucket) / wf.sampleRate
+        let mid = wave.midY, half = wave.height / 2 - 2
         let peak = NSBezierPath(), rmsPath = NSBezierPath()
         var x = x0
         while x < x1 {
@@ -551,7 +575,20 @@ final class TimelineView: NSView {
                 return .clip(c.id, edge(c.start, c.end))
             }
         case .audio:
-            if let a = project.audio, t >= a.start, t <= a.end { return .audio }
+            if let a = project.audio, t >= a.start, t <= a.end {
+                if let beats = editor.resolvedBeats, let f = l.frame(of: row) {
+                    let clipRect = CGRect(x: l.x(for: a.start), y: f.minY + 2, width: CGFloat(a.duration) * l.pixelsPerSecond, height: f.height - 5)
+                    if clipRect.height >= 40 {
+                        switch SectionLane.hit(p, clip: clipRect, sections: beats.sections, downbeats: beats.downbeats,
+                                               audioStart: a.start, pixelsPerSecond: l.pixelsPerSecond, x: l.x(for:)) {
+                        case .boundary(let i)?: return .sectionBoundary(i)
+                        case .downbeat(let i)?: return .downbeat(i)
+                        default: break
+                        }
+                    }
+                }
+                return .audio
+            }
         case .lyric(let ti):
             guard let frame = l.frame(of: row) else { break }
             for line in project.lyricTracks[ti].lines where t >= line.start - grab && t <= line.end + grab {
@@ -567,6 +604,14 @@ final class TimelineView: NSView {
         case .ruler: break
         }
         return .empty(row)
+    }
+
+    /// True when `p` is over the section lane at the top of the song.
+    private func isInSectionLane(_ p: CGPoint) -> Bool {
+        let l = layout
+        guard let a = project.audio, let f = l.frame(of: .audio) else { return false }
+        let clip = CGRect(x: l.x(for: a.start), y: f.minY + 2, width: CGFloat(a.duration) * l.pixelsPerSecond, height: f.height - 5)
+        return clip.height >= 40 && SectionLane.lane(in: clip).insetBy(dx: 0, dy: -1).contains(p)
     }
 
     // MARK: Cursors
@@ -592,7 +637,7 @@ final class TimelineView: NSView {
         case .clip(_, .body), .line(_, .body), .word(_, .body), .audio:
             NSCursor.openHand.set()
         case .headerResize: NSCursor.resizeUpDown.set()
-        case .marker: NSCursor.resizeLeftRight.set()
+        case .marker, .sectionBoundary, .downbeat: NSCursor.resizeLeftRight.set()
         case .headerButton: NSCursor.pointingHand.set()
         case .headerBody(let r) where r != .audio: NSCursor.openHand.set()
         default: NSCursor.arrow.set()
@@ -632,7 +677,16 @@ final class TimelineView: NSView {
         case .clip(let id, let e): editor.selection = .clip(id); if e == .body { NSCursor.closedHand.set() }
         case .line(let id, _): editor.selection = .lyricLine(id)
         case .word(let id, _): editor.selection = .lyricWord(id)
-        case .audio: editor.selection = .audio
+        case .audio:
+            editor.selection = .audio
+            if event.clickCount == 2, let a = editor.audioAnalysis.analysis, isInSectionLane(p) {
+                let t = layout.time(for: p.x) - (project.audio?.start ?? 0)
+                editor.edit("Add Section Boundary") { $0.addSectionBoundary(at: t, analysis: a) }
+                return
+            }
+        case .sectionBoundary, .downbeat:
+            guard let a = editor.audioAnalysis.analysis else { return }
+            drag = Drag(kind: .beat(h, original: editor.project, analysis: a), startPoint: p); return
         case .marker(let isStart):
             drag = Drag(kind: .marker(isStart: isStart, original: editor.project), startPoint: p); return
         case .ruler:
@@ -696,6 +750,19 @@ final class TimelineView: NSView {
             let t = max(0, snapped(l.time(for: p.x), excluding: [], event: event))
             if isStart { next.cinemascope.startMarker = next.quantize(min(t, original.cinemascope.endMarker)) }
             else { next.cinemascope.endMarker = next.quantize(max(t, original.cinemascope.startMarker)) }
+            editor.replaceWithoutUndo(next)
+            d.didEdit = true
+            drag = d
+            return
+        case .beat(let hit, let original, let analysis):
+            guard abs(p.x - d.startPoint.x) > 1 || d.didEdit else { return }
+            let t = l.time(for: p.x) - (original.audio?.start ?? 0)
+            var next = original
+            switch hit {
+            case .sectionBoundary(let i): next.moveSectionBoundary(i, to: t, analysis: analysis)
+            case .downbeat(let i): next.moveDownbeat(i, to: t, analysis: analysis)
+            default: return
+            }
             editor.replaceWithoutUndo(next)
             d.didEdit = true
             drag = d
@@ -776,6 +843,10 @@ final class TimelineView: NSView {
             let final = editor.project
             editor.replaceWithoutUndo(original)
             editor.edit("Move Cinemascope Marker") { $0 = final }
+        case .beat(let hit, let original, _) where d.didEdit:
+            let final = editor.project
+            editor.replaceWithoutUndo(original)
+            editor.edit(actionName(for: hit)) { $0 = final }
         case .group(let original, _, _) where d.didEdit:
             let final = editor.project
             editor.replaceWithoutUndo(original)
@@ -792,6 +863,8 @@ final class TimelineView: NSView {
         switch hit {
         case .clip(_, .body), .line(_, .body), .word(_, .body): "Move"
         case .audio: "Move Audio"
+        case .sectionBoundary: "Move Section Boundary"
+        case .downbeat: "Move Downbeat"
         default: "Trim"
         }
     }
@@ -911,7 +984,27 @@ final class TimelineView: NSView {
             if t > 0 { item("Move Up") { self.editor.edit("Move Track") { $0.moveLyricTrack(from: t, to: t - 1) } } }
             if t < project.lyricTracks.count - 1 { item("Move Down") { self.editor.edit("Move Track") { $0.moveLyricTrack(from: t, to: t + 1) } } }
         case .audio:
-            if project.audio != nil { item("Remove Audio") { self.headerAction(row, .remove) } }
+            if let audio = project.audio {
+                let store = editor.audioAnalysis
+                if let a = store.analysis {
+                    let t = layout.time(for: p.x) - audio.start
+                    if case .sectionBoundary(let i) = hit(at: p) {
+                        item("Remove Section Boundary") { self.editor.edit("Remove Section Boundary") { $0.removeSectionBoundary(i, analysis: a) } }
+                    } else if isInSectionLane(p) {
+                        item("Add Section Boundary Here") { self.editor.edit("Add Section Boundary") { $0.addSectionBoundary(at: t, analysis: a) } }
+                    }
+                    if project.beatCorrections?.audioHash == a.audioHash {
+                        item("Reset Beat and Section Fixes") { self.editor.edit("Reset Beat Fixes") { $0.beatCorrections = nil } }
+                    }
+                }
+                if store.state == .running {
+                    item("Cancel Song Analysis") { store.cancel() }
+                } else if store.state != .unavailable {
+                    item("Analyze Song Again") { store.ensure(for: self.project.asset(audio.assetID), force: true) }
+                }
+                menu.addItem(.separator())
+                item("Remove Audio") { self.headerAction(row, .remove) }
+            }
         case .ruler: break
         }
         menu.addItem(.separator())

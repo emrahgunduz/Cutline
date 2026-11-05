@@ -19,6 +19,8 @@ struct Project: Codable, Equatable {
     var lyricTracks: [LyricTrack] = [LyricTrack()]
     var lyricStyle = LyricStyle()
     var cinemascope = Cinemascope()
+    /// User fixes to the song's beats and sections (see AudioAnalysis).
+    var beatCorrections: BeatCorrections?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type

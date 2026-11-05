@@ -57,6 +57,45 @@ def versions(args: dict, output_dir: str, ch: Channel) -> dict:
     }
 
 
+@command("analyze_audio")
+def analyze_audio(args: dict, output_dir: str, ch: Channel) -> dict:
+    """Vocal stem, beats, downbeats, vocal onsets and sections for one song.
+
+    args: audio (path to a WAV/FLAC), stanza_starts (optional seconds, from lyrics).
+    Writes vocals.flac into the output dir.
+    """
+    import soundfile as sf
+    from . import audio, beats, sections, separate
+
+    path = args.get("audio")
+    if not isinstance(path, str) or not os.path.exists(path):
+        raise HelperError("bad_request", f"audio file not found: {path}")
+    ch.progress(0.01, "Reading audio")
+    mix, sr = audio.load(path)
+    duration = mix.shape[1] / sr
+
+    ch.progress(0.03, "Separating vocals")
+    stem, stem_sr = separate.vocals(mix, sr, lambda f: ch.progress(0.03 + 0.67 * f, "Separating vocals"))
+    sf.write(os.path.join(output_dir, "vocals.flac"), stem.T, stem_sr, subtype="PCM_16")
+
+    ch.progress(0.72, "Finding beats")
+    beat_times, downbeat_times = beats.beats(mix, sr)
+    ch.progress(0.88, "Finding vocal onsets")
+    onset_times = beats.onsets(stem, stem_sr)
+    ch.progress(0.93, "Finding sections")
+    secs = sections.sections(mix, sr, beat_times, downbeat_times, args.get("stanza_starts") or [])
+    ch.progress(1.0, "Done")
+    return {
+        "duration": round(duration, 4),
+        "tempo": round(beats.tempo(beat_times), 2),
+        "beats": beat_times,
+        "downbeats": downbeat_times,
+        "onsets": onset_times,
+        "sections": secs,
+        "vocals": "vocals.flac",
+    }
+
+
 def run(name: str, args: dict, output_dir: str, ch: Channel) -> dict:
     fn = COMMANDS.get(name)
     if fn is None:

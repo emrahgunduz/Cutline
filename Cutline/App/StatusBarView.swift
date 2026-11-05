@@ -18,6 +18,7 @@ struct StatusBarView: View {
                     divider
                     Label("\(proxyCount) proxied", systemImage: "bolt.horizontal").help("Videos playing from preview proxies")
                 }
+                JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis)
                 divider
                 Label(saveText, systemImage: editor.document?.isDocumentEdited == true ? "pencil.circle" : "checkmark.circle")
             }
@@ -92,5 +93,26 @@ struct StatusBarView: View {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
         return "Saved \(f.localizedString(for: date, relativeTo: Date()))"
+    }
+}
+
+/// The running analysis job with its progress and a cancel button.
+private struct JobStatusView: View {
+    @ObservedObject var jobs: JobRunner
+    @ObservedObject var analysis: AudioAnalysisStore
+
+    var body: some View {
+        if let job = jobs.active.first {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            HStack(spacing: 6) {
+                ProgressView(value: job.fraction).progressViewStyle(.linear).frame(width: 70).controlSize(.mini)
+                Text("\(job.message ?? job.title) \(Int((job.fraction * 100).rounded()))%").lineLimit(1)
+                Button { analysis.cancel() } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless).help("Cancel the analysis")
+            }
+        } else if case .failed(let message) = analysis.state {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Analysis failed", systemImage: "exclamationmark.triangle").foregroundStyle(.orange).help(message)
+        }
     }
 }
