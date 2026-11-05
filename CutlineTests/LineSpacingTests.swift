@@ -58,7 +58,7 @@ final class LineSpacingTests: XCTestCase {
         let r = LyricAlignment.Result(lines: [[.init(text: "A", start: 2, end: 3, confidence: 1, source: "a")],
                                              [.init(text: "B", start: 6, end: 7, confidence: 1, source: "a")],
                                              [.init(text: "C", start: 10, end: 10.5, confidence: 1, source: "a")]])
-        p.applyAlignment(r, lineIDs: ids, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(r, lineIDs: ids, audioStart: 0, keepEdits: false)
         XCTAssertEqual(p.lyricTracks[0].lines[0].end, 3)
         p.lyricStyle.leadOut = 0.5
         p.applyLeadIn()
