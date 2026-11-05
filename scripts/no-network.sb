@@ -1,0 +1,6 @@
+(version 1)
+(allow default)
+; Block all internet access; keep local IPC (unix sockets, loopback).
+(deny network-outbound)
+(allow network-outbound (remote unix-socket))
+(allow network-outbound (remote ip "localhost:*"))
