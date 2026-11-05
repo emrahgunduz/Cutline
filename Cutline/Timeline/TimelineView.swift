@@ -932,9 +932,9 @@ final class TimelineView: NSView {
             editor.replaceWithoutUndo(original)
             editor.edit("Move Items") { $0 = final }
         case .edit(let hit, let original) where d.didEdit:
-            var final = editor.project
-            // An edited word is confirmed; re-time the unconfirmed words around it (R25).
-            if case .word = hit { final.applyAnchorStretch(from: original) }
+            // Only the dragged item changes: an edited word is confirmed, but the words around
+            // it keep their times (tap mode is what re-times the words between taps).
+            let final = editor.project
             editor.replaceWithoutUndo(original)
             editor.edit(actionName(for: hit)) { $0 = final }
         default: break
