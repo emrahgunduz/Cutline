@@ -90,3 +90,18 @@ struct ValueRow: View {
         text = String(format: format, min(max(v, range.lowerBound), range.upperBound))
     }
 }
+
+/// Arrow-key nudging in the preview, with the step ⇧ + arrows use (one app-wide setting).
+struct NudgeSection: View {
+    let what: String
+    @AppStorage(NudgeStep.key) private var step = NudgeStep.defaultValue
+
+    var body: some View {
+        InspectorSection(title: "Nudge", icon: "arrow.up.and.down.and.arrow.left.and.right") {
+            ValueRow(label: "⇧ step", value: step, range: 1...200, step: 1, format: "%.0f px", defaultValue: NudgeStep.defaultValue,
+                     onChange: { step = $0.rounded() }, onCommit: {})
+            Text("After clicking the preview or this inspector, ← → ↑ ↓ move \(what) 1 px; with ⇧ they move it by the step.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
