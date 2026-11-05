@@ -168,6 +168,19 @@ final class AudioAnalysisTests: XCTestCase {
         XCTAssertEqual(Loudness.Envelope(bucket: 1, values: [0], loudLevel: 0, quietLevel: 0, peak: 0).displayGain(), 1)
     }
 
+    func testTheWaveformsHighestPeakFitsInsideTheRow() {
+        let wf = steppedWaveform()                       // highest peak 0.5
+        XCTAssertEqual(wf.peakFitGain, 2, accuracy: 1e-6)
+        let wave = CGRect(x: 0, y: 0, width: 100, height: 64)
+        let y = SectionLane.amplitudeY(wf.peakAmplitude, gain: wf.peakFitGain, in: wave)
+        XCTAssertEqual(y.top, wave.minY + SectionLane.wavePadding, accuracy: 1e-3, "touches the top margin, never past it")
+        XCTAssertEqual(y.bottom, wave.maxY - SectionLane.wavePadding, accuracy: 1e-3)
+        let full: [Float] = [0.99, 0.5]
+        let mastered = Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 1, mins: full.map { -$0 }, maxs: full, rms: [0.38, 0.2])])
+        XCTAssertLessThanOrEqual(mastered.peakFitGain * 0.99, 1.0001, "a loud master isn't pushed out of the row")
+        XCTAssertEqual(Waveform(sampleRate: 48000, levels: []).peakFitGain, 1)
+    }
+
     func testTheGainIsCappedAndSilenceIsLeftAlone() {
         let tiny: [Float] = [0.001, 0.002]
         XCTAssertEqual(Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 1, mins: tiny.map { -$0 }, maxs: tiny, rms: tiny)]).displayGain, 20)
