@@ -143,6 +143,14 @@ final class EditorModel: ObservableObject {
         document?.updateChangeCount(.changeDone)
     }
 
+    /// Remember the New Dummy sheet's choices for this project (saved, not undoable).
+    func rememberDummyDefaults(_ d: DummyDefaults) {
+        guard project.dummyDefaults != d else { return }
+        // Nothing on screen depends on it: no revision bump, so typing doesn't rebuild the preview.
+        project.dummyDefaults = d
+        document?.updateChangeCount(.changeDone)
+    }
+
     // MARK: Live edits (slider drags): many updates, one undo step.
 
     private var liveOriginal: Project?
@@ -178,8 +186,9 @@ final class EditorModel: ObservableObject {
     private func apply(_ next: Project, actionName: String) {
         let previous = project
         var next = next
-        // Export choices aren't part of undo: undoing an edit keeps the current ones.
+        // Export and New Dummy choices aren't part of undo: undoing an edit keeps the current ones.
         next.exportSettings = project.exportSettings
+        next.dummyDefaults = project.dummyDefaults
         project = next
         revision += 1
         if let um = undoManager {
