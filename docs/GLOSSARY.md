@@ -86,7 +86,8 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Snap groups** | The four toggles next to the snapping button: Sections, Downbeats, Beats, and Edges & Playhead. When several targets are in reach, sections win, then downbeats, then beats, then edges. Saved per project. |
 | **Beat anchor** | Cinemascope markers placed on (or near) a beat remember it, so they move when that downbeat is corrected or the song is moved. |
 | **Unsure word** | A lyric word whose timing confidence is below 60% and that you haven't confirmed. Drawn with an orange outline and bar on the timeline. |
-| **Confirmed word** | A word you've checked; alignment asks whether to keep its time. |
+| **Confirmed word** | A word you've checked (Return on an unsure word, tap mode, or dragging it); re-aligning asks whether to keep its time. |
+| **Hand-edited word** | A word whose time you changed by dragging its line, a line edge or a group on the timeline. Re-aligning lists confirmed and hand-edited words and asks: Keep My Changes (keeps their times, fits the rest between them) or Re-time All (clears them). |
 | **Lead-out** | Lyric inspector > Animation: aligned lines stay on screen this much longer after their last word (default 0 s), never into the next line on the same track. |
 | **Lead-in** | Lyric inspector > Animation: aligned words appear this much before they are sung (default 0.15 s). Changing it moves aligned words live; confirmed and hand-placed words stay put. |
 | **Next unsure word** | N (⇧N back): selects the next unsure, unconfirmed word in sung order and loops the song around it (±1.75 s, yellow band on the ruler). Return confirms it; Esc stops the loop. |
