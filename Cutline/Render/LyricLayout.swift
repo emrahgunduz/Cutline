@@ -128,6 +128,8 @@ struct LineRaster {
     var letterRects: [[CGRect]] = []
     /// Rows the line wrapped onto.
     var rows = 1
+    /// Where the letters are (glyph outlines, raster coordinates, y up).
+    var ink: CGRect = .null
 }
 
 enum LineRasterizer {
@@ -161,6 +163,7 @@ enum LineRasterizer {
         ctx.setAllowsFontSmoothing(false)
         var rects: [CGRect] = []
         var letters: [[CGRect]] = []
+        var ink = CGRect.null
         for (r, rowWords) in rows.enumerated() {
             let line = lines[r]
             // Row 0 is on top (y grows upwards).
@@ -168,6 +171,8 @@ enum LineRasterizer {
             let left = (size.width - pad * 2 - widths[r]) / 2
             ctx.textPosition = CGPoint(x: pad + left, y: pad + descent + bottom)
             CTLineDraw(line, ctx)
+            let glyphs = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+            if !glyphs.isEmpty { ink = ink.union(glyphs.offsetBy(dx: pad + left, dy: pad + descent + bottom)) }
             // Each row's band: from halfway into the padding below to halfway above (first and
             // last rows reach the raster's edges), so neighbouring rows never double up.
             let y0 = r == rows.count - 1 ? 0 : bottom + pad / 2
@@ -198,6 +203,7 @@ enum LineRasterizer {
         var raster = LineRaster(image: image, size: size, wordRects: rects)
         raster.letterRects = letters
         raster.rows = rows.count
+        raster.ink = ink.isNull ? CGRect(origin: .zero, size: size) : ink
         return raster
     }
 
