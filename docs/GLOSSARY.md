@@ -93,3 +93,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
 | **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
 | **Word timing** | Each word starts on its own time and ends with its line. Dragging a word's right edge moves the line's end for all its words. |
+| **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |

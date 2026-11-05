@@ -53,6 +53,10 @@ final class CutlineDocumentController: NSDocumentController {
         switch NewProjectPrompt.run() {
         case .none: return
         case .open: openDocument(nil)
+        case .openRecent(let url):
+            openDocument(withContentsOf: url, display: true) { _, _, error in
+                if let error { NSAlert(error: error).runModal() }
+            }
         case .create(let project):
             let doc = ProjectDocument(project: project)
             addDocument(doc)
