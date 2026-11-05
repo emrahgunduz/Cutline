@@ -62,12 +62,18 @@ struct ResolvedBeats: Equatable {
         if let c, c.audioHash == a.audioHash {
             for m in c.movedDownbeats where downs.indices.contains(m.index) {
                 let old = downs[m.index]
-                // The downbeat is also a beat: move that beat with it.
-                if let b = beats.indices.min(by: { abs(beats[$0] - old) < abs(beats[$1] - old) }), abs(beats[b] - old) < 0.05 { beats[b] = m.time }
+                // Landing on an existing beat re-marks that beat as the downbeat and leaves the
+                // beat grid alone. Landing between beats moves the downbeat's own beat with it.
+                let landsOnBeat = beats.contains { abs($0 - m.time) < 0.001 }
+                if !landsOnBeat, let b = beats.indices.min(by: { abs(beats[$0] - old) < abs(beats[$1] - old) }), abs(beats[b] - old) < 0.05 {
+                    beats[b] = m.time
+                }
                 downs[m.index] = m.time
             }
         }
-        self.beats = beats.sorted()
+        beats.sort()
+        // Never two beats at the same moment.
+        self.beats = beats.enumerated().filter { $0.offset == 0 || $0.element - beats[$0.offset - 1] > 0.001 }.map(\.element)
         self.downbeats = downs
         if let c, c.audioHash == a.audioHash, let s = c.sections { sections = s } else { sections = a.sections }
         onsets = a.onsets
@@ -85,8 +91,11 @@ extension Project {
         var c = corrections(for: a.audioHash)
         let lo = index > 0 ? ResolvedBeats(a, c).downbeats[index - 1] + 0.05 : 0
         let hi = index < a.downbeats.count - 1 ? ResolvedBeats(a, c).downbeats[index + 1] - 0.05 : a.duration
-        let t = min(max(time, lo), hi)
+        var t = min(max(time, lo), hi)
         c.movedDownbeats.removeAll { $0.index == index }
+        // Within 50 ms of a beat: land exactly on it (that beat becomes the downbeat).
+        let grid = ResolvedBeats(a, c).beats
+        if let near = grid.min(by: { abs($0 - t) < abs($1 - t) }), abs(near - t) < 0.05, near >= lo, near <= hi { t = near }
         if abs(t - a.downbeats[index]) > 1e-4 { c.movedDownbeats.append(.init(index: index, time: t)) }
         beatCorrections = c
         followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
@@ -115,7 +124,15 @@ extension Project {
         s.sort { $0.start < $1.start }
         c.sections = s
         beatCorrections = c
+        // Markers anchored to later sections keep pointing at the same section.
+        if let inserted = s.firstIndex(where: { $0.start == time }) { shiftSectionAnchors(from: inserted, by: 1) }
         followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
+    }
+
+    /// Section anchors at `index` or later move by `delta` after a boundary is added or removed.
+    private mutating func shiftSectionAnchors(from index: Int, by delta: Int) {
+        if var s = cinemascope.startAnchor, s.kind == .section, s.index >= index { s.index += delta; cinemascope.startAnchor = s }
+        if var e = cinemascope.endAnchor, e.kind == .section, e.index >= index { e.index += delta; cinemascope.endAnchor = e }
     }
 
     mutating func removeSectionBoundary(_ index: Int, analysis a: AudioAnalysis) {
@@ -125,7 +142,19 @@ extension Project {
         s.remove(at: index)
         c.sections = s
         beatCorrections = c
-        followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
+        // A marker on the removed boundary stays where it is, tied to the nearest beat now;
+        // markers on later sections keep pointing at the same section.
+        let resolved = ResolvedBeats(a, c)
+        if let audio {
+            if cinemascope.startAnchor?.kind == .section, cinemascope.startAnchor?.index == index {
+                cinemascope.startAnchor = resolved.anchor(at: cinemascope.startMarker - audio.start, hash: a.audioHash)
+            }
+            if cinemascope.endAnchor?.kind == .section, cinemascope.endAnchor?.index == index {
+                cinemascope.endAnchor = resolved.anchor(at: cinemascope.endMarker - audio.start, hash: a.audioHash)
+            }
+        }
+        shiftSectionAnchors(from: index + 1, by: -1)
+        followAnchors(resolved, hash: a.audioHash)
     }
 }
 

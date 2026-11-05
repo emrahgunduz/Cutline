@@ -96,3 +96,62 @@ final class SnappingTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(LayoutState.self, from: Data(#"{"assetsWidth":280,"inspectorWidth":300,"timelineHeight":320}"#.utf8)).snapGroups)
     }
 }
+
+final class BeatCorrectionAnchorTests: XCTestCase {
+    /// Beats every 0.5 s, downbeats every 2 s, sections at 0, 8 and 14 s; song at timeline 0.
+    private func song() -> (Project, AudioAnalysis) {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let asset = Asset(kind: .audio, name: "s", path: "/s", duration: 20)
+        p.assets = [asset]
+        p.setAudio(assetID: asset.id)
+        let a = AudioAnalysis(hash: "h", result: .init(duration: 20, tempo: 120, beats: stride(from: 0, to: 20, by: 0.5).map { $0 },
+                                                       downbeats: stride(from: 0, to: 20, by: 2).map { $0 }, onsets: [],
+                                                       sections: [.init(start: 0, label: "A"), .init(start: 8, label: "B"), .init(start: 14, label: "C")], vocals: ""))
+        return (p, a)
+    }
+
+    func testDownbeatMovedOntoTheNextBeatReMarksItAndKeepsTheGrid() {
+        var (p, a) = song()
+        p.moveDownbeat(2, to: 4.5, analysis: a)          // the downbeat at 4 s onto the beat at 4.5 s
+        let r = ResolvedBeats(a, p.beatCorrections)
+        XCTAssertEqual(r.downbeats[2], 4.5)
+        XCTAssertEqual(r.beats, a.beats, "no beat moved, none duplicated, none lost")
+    }
+
+    func testDownbeatDroppedNearABeatSnapsOntoIt() {
+        var (p, a) = song()
+        p.moveDownbeat(2, to: 4.53, analysis: a)
+        XCTAssertEqual(ResolvedBeats(a, p.beatCorrections).downbeats[2], 4.5)
+    }
+
+    func testDownbeatMovedBetweenBeatsCarriesItsBeat() {
+        var (p, a) = song()
+        p.moveDownbeat(2, to: 4.25, analysis: a)
+        let r = ResolvedBeats(a, p.beatCorrections)
+        XCTAssertTrue(r.beats.contains(4.25))
+        XCTAssertFalse(r.beats.contains(4))
+        XCTAssertEqual(r.beats.count, a.beats.count)
+    }
+
+    func testAddingABoundaryKeepsMarkersOnTheirSection() {
+        var (p, a) = song()
+        p.cinemascope.startMarker = 14; p.cinemascope.endMarker = 16
+        p.anchorMarkers(ResolvedBeats(a, nil), hash: "h")
+        XCTAssertEqual(p.cinemascope.startAnchor?.kind, .section)
+        p.addSectionBoundary(at: 4.25, analysis: a)       // a new section before the marker's
+        XCTAssertEqual(p.cinemascope.startMarker, 14, "the marker stays on section C")
+        XCTAssertEqual(p.cinemascope.startAnchor?.index, 3)
+    }
+
+    func testRemovingABoundaryKeepsOtherMarkersAndReanchorsItsOwn() {
+        var (p, a) = song()
+        p.cinemascope.startMarker = 8; p.cinemascope.endMarker = 14
+        p.anchorMarkers(ResolvedBeats(a, nil), hash: "h")
+        p.removeSectionBoundary(1, analysis: a)           // remove B (8 s), where the start marker sits
+        XCTAssertEqual(p.cinemascope.startMarker, 8, "the start marker stays put")
+        XCTAssertNotEqual(p.cinemascope.startAnchor?.kind, .section)
+        XCTAssertEqual(p.cinemascope.endMarker, 14, "the end marker stays on section C")
+        XCTAssertEqual(p.cinemascope.endAnchor?.index, 1)
+    }
+}
