@@ -1,15 +1,29 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Sections of the assets panel: dummies are images, but get their own section.
+enum AssetGroup: Hashable {
+    case video, image, dummy, audio, lyrics
+    init(_ a: Asset) {
+        switch a.kind {
+        case .video: self = .video
+        case .image: self = a.isDummy ? .dummy : .image
+        case .audio: self = .audio
+        case .lyrics: self = .lyrics
+        }
+    }
+}
+
 struct AssetsPanelView: View {
     @EnvironmentObject var editor: EditorModel
     @State private var errorText: String?
     @State private var lastClicked: UUID?
-    @State private var collapsed: Set<AssetKind> = []
+    @State private var collapsed: Set<AssetGroup> = []
 
     private let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
-    private static let groups: [(AssetKind, String, String)] = [
-        (.video, "Videos", "film"), (.image, "Images", "photo"), (.audio, "Audio", "waveform"), (.lyrics, "Lyrics", "text.quote"),
+    private static let groups: [(AssetGroup, String, String)] = [
+        (.video, "Videos", "film"), (.image, "Images", "photo"), (.dummy, "Dummies", "rectangle.dashed"),
+        (.audio, "Audio", "waveform"), (.lyrics, "Lyrics", "text.quote"),
     ]
 
     private var selection: Set<UUID> { editor.selectedAssets }
@@ -24,7 +38,7 @@ struct AssetsPanelView: View {
                     // Not lazy: a lazy stack keeps stale heights after a section collapses.
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(Self.groups, id: \.0) { kind, title, icon in
-                            let items = editor.project.assets.filter { $0.kind == kind }
+                            let items = editor.project.assets.filter { AssetGroup($0) == kind }
                             if !items.isEmpty { section(kind, title, icon, items) }
                         }
                         if editor.project.assets.isEmpty { emptyState }
@@ -92,7 +106,7 @@ struct AssetsPanelView: View {
 
     // MARK: Sections
 
-    private func section(_ kind: AssetKind, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
+    private func section(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(kind, title, icon, items)
             if !collapsed.contains(kind) {
@@ -106,7 +120,7 @@ struct AssetsPanelView: View {
         }
     }
 
-    private func sectionHeader(_ kind: AssetKind, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
+    private func sectionHeader(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
             Button {
                 if collapsed.contains(kind) { collapsed.remove(kind) } else { collapsed.insert(kind) }
             } label: {
@@ -125,11 +139,12 @@ struct AssetsPanelView: View {
             .padding(.horizontal, 6)
     }
 
-    /// Group colors match the timeline: video blue, image teal, audio green, lyrics purple.
-    static func groupColor(_ kind: AssetKind) -> Color {
+    /// Group colors match the timeline: video blue, image teal, dummy amber, audio green, lyrics purple.
+    static func groupColor(_ kind: AssetGroup) -> Color {
         switch kind {
         case .video: Color(red: 0.16, green: 0.24, blue: 0.40)
         case .image: Color(red: 0.12, green: 0.30, blue: 0.32)
+        case .dummy: Color(red: 0.36, green: 0.27, blue: 0.10)
         case .audio: Color(red: 0.12, green: 0.30, blue: 0.20)
         case .lyrics: Color(red: 0.28, green: 0.19, blue: 0.38)
         }

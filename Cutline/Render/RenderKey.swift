@@ -27,6 +27,7 @@ enum RenderKey {
         var track: Int; var asset: UUID; var path: String; var media: String
         var start: Double; var duration: Double; var sourceIn: Double
         var transform: ClipTransform; var filters: FilterSettings
+        var dummy: DummyCard?
     }
     private struct LineSig: Encodable { var id: UUID; var track: Int; var text: String; var x: Double?; var y: Double?; var layout: LineLayout; var drawn: [Double] }
     private struct WordSig: Encodable { var line: UUID; var text: String; var start: Double; var end: Double }
@@ -48,7 +49,8 @@ enum RenderKey {
             for c in track.clips where c.start < end && c.end > start {
                 let asset = p.asset(c.assetID)
                 sig.clips.append(ClipSig(track: t, asset: c.assetID, path: asset?.path ?? "", media: mediaStamp(asset),
-                                         start: c.start, duration: c.duration, sourceIn: c.sourceIn, transform: c.transform, filters: c.filters))
+                                         start: c.start, duration: c.duration, sourceIn: c.sourceIn, transform: c.transform, filters: c.filters,
+                                         dummy: asset?.dummy))
             }
         }
         if proxies {
@@ -83,6 +85,7 @@ enum RenderKey {
     /// Looked up at most once a second per file (keys are computed per frame and per drag).
     private static func mediaStamp(_ asset: Asset?) -> String {
         guard let asset else { return "" }
+        if asset.isDummy { return "dummy" }       // drawn by Cutline; its card is in the key
         let now = Date()
         stampLock.lock()
         if let c = stamps[asset.path], now.timeIntervalSince(c.at) < 1 { stampLock.unlock(); return c.stamp }

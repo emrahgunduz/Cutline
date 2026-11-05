@@ -31,6 +31,8 @@ struct Project: Codable, Equatable {
     var platformOverlays: [String]?
     /// The last export choices (rate mode, bitrate, size target...), reused by the next export.
     var exportSettings: ExportSettings?
+    /// The New Dummy sheet's last choices (font, title, length, color), for this project.
+    var dummyDefaults: DummyDefaults?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type
@@ -88,6 +90,9 @@ struct Asset: Codable, Equatable, Identifiable {
     var duration: Double?
     var frameRate: Double?
     var proxy: ProxyInfo?
+    /// A dummy: a placeholder card drawn by Cutline (no file), at the project's size.
+    var dummy: DummyCard?
+    var isDummy: Bool { dummy != nil }
 
     var url: URL {
         if let bookmark {
