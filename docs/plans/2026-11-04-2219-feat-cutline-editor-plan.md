@@ -70,6 +70,7 @@ The user edits their own music videos and used After Effects for the sample proj
 - R13. One audio track holds the song, which can be dropped in, replaced or removed. It shows the waveform, beat and downbeat ticks, and loud/quiet regions.
 - R14. A section lane above the waveform shows detected song sections (for example verse and chorus), and the user can adjust section boundaries and individual downbeats.
 - R15. Clip edges, cuts, lyric lines and words, and the cinemascope markers snap to beats, downbeats and section edges. A modifier key disables snapping. Markers keep their musical position when the analysis is corrected.
+- R41. The timeline button bar has a master snapping toggle plus separate toggles for each snap-target group: beats, downbeats, sections, and edges & playhead. The toggles are saved per project, and ⌘ while dragging bypasses all of them.
 - R16. Video tracks can be added and removed. Each holds multiple clips (video or image) shown with thumbnails. Clips can be moved, trimmed at either end, split at the playhead and deleted.
 - R17. Lyric tracks can be added and removed. Each holds line items, and each line contains word items.
 - R18. Lyric lines can be moved between lyric tracks. Lines on different tracks that overlap in time are shown at the same time, stacked in the tracks' vertical order.
@@ -372,14 +373,16 @@ Waits on: PR 1 merged.
 ### U9. Snapping
 
 **Goal:** Snap edges, lines, words and markers to beats, downbeats and section edges, with a modifier to bypass.
-**Requirements:** R15
+**Requirements:** R15, R41
 **Dependencies:** U8
 **Files:** `Cutline/Timeline/Snapping.swift`, `CutlineTests/SnappingTests.swift`
-**Approach:** The snap radius is fixed in pixels, so it scales with zoom. Priority is section edge, then downbeat, then beat, then other clip edges. Markers store a beat index plus an offset (KTD6).
+**Approach:** The snap radius is fixed in pixels, so it scales with zoom. Priority is section edge, then downbeat, then beat, then other clip edges. Markers store a beat index plus an offset (KTD6). Each target group is filtered by its toggle (R41). The toggles sit next to the existing snapping button in `Cutline/Timeline/TimelineContainer.swift` and are stored in the project layout.
 **Test scenarios:**
 - A drag within the radius of a downbeat lands exactly on it.
 - With the modifier held, it lands on the raw position.
 - After a downbeat is corrected, a marker anchored to it moves with it.
+- With Beats off but Downbeats on, a drag near a plain beat doesn't snap, and a drag near a downbeat does.
+- With the master toggle off, nothing snaps whatever the group toggles say.
 **Verification:** Cuts on the sample land on beats without frame-level zoom.
 
 ### U10. Lyric generation and alignment
