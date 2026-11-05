@@ -38,7 +38,7 @@ fi
 out=build/Release
 if (( clean )); then
   echo "==> Clean build"
-  rm -rf build/DerivedData $out
+  rm -rf build/DerivedData  # build/Release is updated in place below, which keeps Finder aliases working
 fi
 
 echo "==> Python runtime (build/ml/python)"
