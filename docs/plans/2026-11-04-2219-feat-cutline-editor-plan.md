@@ -105,6 +105,7 @@ The user edits their own music videos and used After Effects for the sample proj
 - R32. Preview and export share one cache keying and invalidation scheme. Preview keeps rendered frames and export keeps encoded segments, and an edit invalidates only the time ranges whose output it changes.
 - R33. The timeline shows a cache strip marking valid, stale and uncached ranges.
 - R34. Re-exporting after a small edit re-renders only the changed ranges, and a cancelled export can resume.
+- R42. A **Clear Cache** button in the window toolbar (and a matching menu item) empties the render cache: preview frames in memory and the encoded export segments on disk. Proxies, thumbnails, waveforms and music analysis are kept. The button shows how much space is used and how much was freed.
 
 **Limits and export**
 
@@ -450,10 +451,10 @@ Waits on: PR 2 merged.
 ### U14. Render cache, stale strip and segment reuse
 
 **Goal:** Exact range-level caching shared by preview and export, a visible cache strip, and resumable segment export.
-**Requirements:** R32, R33, R34
+**Requirements:** R32, R33, R34, R42
 **Dependencies:** U6, U12
 **Files:** `Cutline/Render/RenderKey.swift`, `Cutline/Render/FrameCache.swift`, `Cutline/Export/SegmentExporter.swift`, `Cutline/Timeline/CacheStrip.swift`, `CutlineTests/RenderKeyTests.swift`, `CutlineTests/SegmentExporterTests.swift`
-**Approach:** KTD11. Start with a spike: encode two segments with identical settings, join them by passthrough, and check for a single format description and clean playback. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
+**Approach:** KTD11. The Clear Cache toolbar item (R42) lives in `Cutline/App/WindowToolbar.swift`, calls the cache's clear method, and the cache strip turns fully uncached afterwards. Start with a spike: encode two segments with identical settings, join them by passthrough, and check for a single format description and clean playback. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
 **Test scenarios:**
 - Changing one clip's brightness changes keys only within that clip's range.
 - Moving a lyric word changes keys only where that word was or now is visible.
@@ -461,6 +462,7 @@ Waits on: PR 2 merged.
 - The concatenated output plays without glitches at segment joins.
 - Resume after cancel encodes only the missing segments.
 - Changing the export bitrate re-encodes every segment.
+- Clear Cache empties `cache/segments/` and the memory cache, leaves `proxies/`, `thumbnails/` and `analysis/` untouched, and the next export re-encodes everything.
 **Verification:** After a one-word fix, re-exporting the full sample song takes a small fraction of the first export.
 
 ### U15. Import from another project
