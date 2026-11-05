@@ -15,7 +15,7 @@ final class LyricRenderer {
     }
 
     /// Lyrics are placed independently of the cinemascope bars: the animation never moves them.
-    /// Portrait projects keep automatically placed lines clear of the platform overlays switched on.
+    /// Portrait projects keep automatically placed lines clear of every platform's UI.
     private let platformSafeArea: CGRect?
     func safeArea(_ t: Double) -> CGRect? { platformSafeArea }
 
@@ -28,21 +28,32 @@ final class LyricRenderer {
         let lines = drawnLines(at: t)
         guard !lines.isEmpty else { return [] }
         let fontSize = LyricLayout.fontSize(style, canvas: canvas)
-        let auto = lines.filter { !$0.hasPosition }
-        let origins = LyricLayout.stackOrigins(count: auto.count, style: style, canvas: canvas, safeArea: safeArea(t))
         let safe = safeArea(t)
         let maxWidth = (safe?.width ?? CGFloat(canvas.width)) * 0.92
         let centerX = safe?.midX ?? CGFloat(canvas.width) / 2
+        // Long lines wrap onto more rows at the same font size; they take more room in the stack.
+        let rasters = lines.map { raster(for: $0, style: style, fontSize: fontSize, maxWidth: $0.hasPosition ? CGFloat(canvas.width) * 0.92 : maxWidth) }
+        let pad = ceil(fontSize * 0.15)
+        var heights: [CGFloat] = []
+        for (line, r) in zip(lines, rasters) where !line.hasPosition {
+            let rows = r?.rows ?? 1
+            let rowStep = r.map { ($0.size.height - pad) / CGFloat(rows) } ?? 0
+            heights.append(LyricLayout.stackHeight(rows: rows, rowStep: rowStep, style: style, canvas: canvas))
+        }
+        let origins = LyricLayout.stackOrigins(heights: heights, style: style, canvas: canvas, safeArea: safe)
         var autoIndex = 0
         var out: [PlacedLine] = []
-        for line in lines {
-            guard let raster = raster(for: line, style: style, fontSize: fontSize) else { continue }
-            let fit = min(1, maxWidth / raster.size.width)
+        for (line, r) in zip(lines, rasters) {
+            guard let raster = r else { if !line.hasPosition { autoIndex += 1 }; continue }
+            // Only a single word wider than the frame is scaled down.
+            let limit = line.hasPosition ? CGFloat(canvas.width) * 0.92 : maxWidth
+            let fit = min(1, limit / raster.size.width)
             let size = CGSize(width: raster.size.width * fit, height: raster.size.height * fit)
             let origin: CGPoint
             if let cx = line.centerX, let cy = line.centerY {
                 origin = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
             } else {
+                // The raster's bottom sits at the bottom of its slot (wrapped lines get taller slots).
                 origin = CGPoint(x: centerX - size.width / 2, y: origins[autoIndex])
                 autoIndex += 1
             }
@@ -54,8 +65,9 @@ final class LyricRenderer {
     /// Canvas size of a line's text block (for alignment).
     func size(of line: LyricLine) -> CGSize? {
         let style = project.lyricStyle
-        guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas)) else { return nil }
-        let fit = min(1, CGFloat(project.canvas.width) * 0.92 / r.size.width)
+        let maxWidth = CGFloat(project.canvas.width) * 0.92
+        guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas), maxWidth: maxWidth) else { return nil }
+        let fit = min(1, maxWidth / r.size.width)
         return CGSize(width: r.size.width * fit, height: r.size.height * fit)
     }
 
@@ -109,10 +121,10 @@ final class LyricRenderer {
 
     var animation: LyricAnimation { LyricAnimation(style: project.lyricStyle, fps: project.fps) }
 
-    private func raster(for line: LyricLine, style: LyricStyle, fontSize: CGFloat) -> LineRaster? {
-        let key = "\(line.words.map(\.text).joined(separator: "\u{1}"))|\(style.fontName)|\(fontSize)|\(style.color.r),\(style.color.g),\(style.color.b),\(style.color.a)" as NSString
+    private func raster(for line: LyricLine, style: LyricStyle, fontSize: CGFloat, maxWidth: CGFloat) -> LineRaster? {
+        let key = "\(line.words.map(\.text).joined(separator: "\u{1}"))|\(style.fontName)|\(fontSize)|\(Int(maxWidth))|\(style.color.r),\(style.color.g),\(style.color.b),\(style.color.a)" as NSString
         if let box = Self.cache.object(forKey: key) { return box.raster }
-        guard let r = LineRasterizer.rasterize(words: line.words.map(\.text), style: style, fontSize: fontSize) else { return nil }
+        guard let r = LineRasterizer.rasterize(words: line.words.map(\.text), style: style, fontSize: fontSize, maxWidth: maxWidth) else { return nil }
         Self.cache.setObject(RasterBox(r), forKey: key)
         return r
     }

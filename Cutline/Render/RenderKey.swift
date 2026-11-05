@@ -20,7 +20,6 @@ enum RenderKey {
         var words: [WordSig] = []
         var style: LyricStyle
         var letterbox: String
-        var overlays: [String]?
         var encoder: EncoderSig?
         var proxies: [String]?
     }
@@ -44,7 +43,7 @@ enum RenderKey {
     ///   - proxies: preview frames rendered from proxies include the proxy files used.
     static func key(project p: Project, start: Double, end: Double, encoder: EncoderSig? = nil, proxies: Bool = false) -> String {
         var sig = Signature(canvas: p.canvas, fps: p.fps, range: [start, end], style: p.lyricStyle,
-                            letterbox: letterbox(p, start, end), overlays: p.type.isPortrait ? p.platformOverlays : nil, encoder: encoder)
+                            letterbox: letterbox(p, start, end), encoder: encoder)
         for (t, track) in p.videoTracks.enumerated() {
             for c in track.clips where c.start < end && c.end > start {
                 let asset = p.asset(c.assetID)

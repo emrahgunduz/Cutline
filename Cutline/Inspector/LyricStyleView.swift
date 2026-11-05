@@ -39,6 +39,10 @@ struct LyricStyleView: View {
                              onChange: { v in editor.liveEdit { $0.lyricStyle.leadIn = v; $0.applyLeadIn() } },
                              onCommit: { editor.endLiveEdit("Lyric Lead-in") })
                         .help("Aligned words appear this much before they are sung. Confirmed and hand-placed words don't move.")
+                    ValueRow(label: "Lead-out", value: style.leadOut, range: 0...2, step: 0.05, format: "%.2fs", defaultValue: 0,
+                             onChange: { v in editor.liveEdit { $0.lyricStyle.leadOut = v; $0.applyLeadIn() } },
+                             onCommit: { editor.endLiveEdit("Lyric Lead-out") })
+                        .help("Aligned lines stay on screen this much after their last word is sung (never into the next line on the track).")
                     Text(style.letterByLetter ? "Letters fade one after another and the whole word still appears within the fade time. Overlap: how much each letter overlaps the next." : "The same fades apply to every word.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }

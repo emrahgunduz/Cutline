@@ -227,6 +227,10 @@ struct LyricStyle: Codable, Equatable {
     /// Aligned words are shown this many seconds early (they read better slightly ahead of the voice).
     var leadInValue: Double?
     var leadIn: Double { get { leadInValue ?? 0.15 } set { leadInValue = newValue } }
+    /// Aligned lines stay on screen this many seconds longer after their last word (on top of
+    /// where the lead-in puts their end).
+    var leadOutValue: Double?
+    var leadOut: Double { get { leadOutValue ?? 0 } set { leadOutValue = newValue } }
     var letterByLetter: Bool { get { letterByLetterValue ?? false } set { letterByLetterValue = newValue } }
     var letterOverlap: Double { get { letterOverlapValue ?? 0.5 } set { letterOverlapValue = newValue } }
 

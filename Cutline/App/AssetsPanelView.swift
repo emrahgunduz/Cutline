@@ -3,7 +3,6 @@ import UniformTypeIdentifiers
 
 struct AssetsPanelView: View {
     @EnvironmentObject var editor: EditorModel
-    @State private var proxyProgress: [UUID: Double] = [:]
     @State private var errorText: String?
     @State private var lastClicked: UUID?
     @State private var collapsed: Set<AssetKind> = []
@@ -137,7 +136,7 @@ struct AssetsPanelView: View {
     }
 
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
-        AssetTile(asset: asset, thumbnails: editor.thumbnails, progress: proxyProgress[asset.id],
+        AssetTile(asset: asset, thumbnails: editor.thumbnails, progress: editor.proxyProgress[asset.id],
                   selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id))
             .id(asset.id)
             .contentShape(Rectangle())
@@ -183,33 +182,15 @@ struct AssetsPanelView: View {
     }
 
     private func makeProxies(_ videos: [Asset], _ scale: ProxyScale) {
-        for v in videos { proxyProgress[v.id] = 0 }
+        for v in videos where editor.proxyProgress[v.id] == nil { editor.proxyProgress[v.id] = 0 }
         Task { @MainActor in
             for v in videos {   // one at a time: the media engine is shared
-                do {
-                    try await editor.createProxy(assetID: v.id, scale: scale) { p in
-                        Task { @MainActor in proxyProgress[v.id] = p }
-                    }
-                } catch { errorText = error.localizedDescription }
-                proxyProgress[v.id] = nil
+                do { try await editor.createProxy(assetID: v.id, scale: scale) } catch { errorText = error.localizedDescription }
             }
         }
     }
 
-    private func confirmDelete(_ ids: Set<UUID>) {
-        guard !ids.isEmpty else { return }
-        let used = ids.filter { editor.project.usageCount(of: $0) > 0 }
-        guard !used.isEmpty else { editor.deleteAssets(ids); return }
-        let uses = used.map { editor.project.usageCount(of: $0) }.reduce(0, +)
-        let alert = NSAlert()
-        alert.messageText = ids.count == 1 ? "Delete this asset?" : "Delete \(ids.count) assets?"
-        alert.informativeText = "\(used.count == ids.count && ids.count == 1 ? "It is" : "\(used.count) of them are") used in the timeline (\(uses) placement\(uses == 1 ? "" : "s")). Their clips will be removed too. You can undo this."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
-        let handle: (NSApplication.ModalResponse) -> Void = { if $0 == .alertFirstButtonReturn { editor.deleteAssets(ids) } }
-        if let w = NSApp.keyWindow { alert.beginSheetModal(for: w, completionHandler: handle) } else { handle(alert.runModal()) }
-    }
+    private func confirmDelete(_ ids: Set<UUID>) { editor.confirmDeleteAssets(ids, window: NSApp.keyWindow) }
 
     private func dropFiles(_ providers: [NSItemProvider]) -> Bool {
         Task { @MainActor in
@@ -251,7 +232,7 @@ private struct AssetTile: View {
             .frame(height: 62)
             .background(Color.black.opacity(0.35))
             .overlay(alignment: .topTrailing) {
-                if let proxy = asset.proxy {
+                if let proxy = asset.proxy, progress == nil {
                     Text("PROXY \(proxy.scale.label)").font(.system(size: 8, weight: .bold)).foregroundStyle(.black)
                         .padding(.horizontal, 4).padding(.vertical, 1).background(.orange).clipShape(Capsule()).padding(3)
                 }
