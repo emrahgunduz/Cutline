@@ -67,6 +67,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 |---|---|
 | **Project type** | Music video, Portrait social or Portrait ad. Each has its own size, length limit and codec. |
 | **Transform** | A clip's scale and X/Y position. |
+| **Flip horizontal** | Clip inspector > Size & Position: mirrors a video or image left to right in place (same position and size). Not offered for dummies. |
 | **Filter** | A per-clip effect (Color, Fade) with an on/off switch. |
 | **Placement** | Inspector section for lyric lines: align left/center/right, top/middle/bottom with **padding**; several lines stack with a **line gap**. **Auto Position** returns a line to the automatic stack. |
 | **Animation** | Lyric inspector section: fade in / fade out times for all words, Whole word or **Letter by letter** (letters fade in turn within the fade time, with **Overlap**). |
