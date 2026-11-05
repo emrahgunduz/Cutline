@@ -116,6 +116,10 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
                 default: break
                 }
             }
+            // With the preview focused (clicked last), arrows nudge the selected clip or lines.
+            if let canvas = self.window?.firstResponder as? PreviewCanvasView,
+               let (dx, dy) = PreviewCanvasView.nudgeDelta(keyCode: event.keyCode, flags: event.modifierFlags),
+               canvas.nudge(dx: dx, dy: dy) { return nil }
             switch (event.keyCode, flags) {
             case (49, []): editor.togglePlay()
             case (53, []): editor.clearLoop()
