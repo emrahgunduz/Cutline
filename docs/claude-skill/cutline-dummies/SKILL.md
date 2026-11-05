@@ -33,29 +33,38 @@ Check before sending: every end is after its start, scenes are in order and don'
    `cutline-ctl hello --client Claude --purpose "Place N dummies from <document name>"` (it waits for the user's answer; give the Bash call a 5-minute timeout).
    `denied`: stop and tell the user. Otherwise keep the printed `session` value (pid:token) for every later command.
 3. Projects are in the welcome. One: use it. Several: ask the user which (by name), with AskUserQuestion. Then `cutline-ctl use --session S --project ID`.
-4. `cutline-ctl tools --session S`: check `add_dummies` is there and read its arguments (they win over this file if they differ).
+4. `cutline-ctl tools --session S`: check the tools below are there and read their arguments (they win over this file if they differ).
 
-## 3. Place the dummies
+## 3. Choose the track
+
+`cutline-ctl call --session S --tool list_video_tracks` lists every video track (index 0 = bottom layer; the highest index is drawn on top) with its id, name, hidden flag, and items (name, kind video/image/dummy, start, end in timeline seconds).
+
+- The user named a track ("put them on Video 3", "on the Storyboard track"): use it (by its `id`).
+- Otherwise: a track whose items are all dummies and that the user hasn't said to keep (usually "Dummies") can be reused with `replace: true`. If none fits, or the scenes would land on videos or images, create one: `cutline-ctl call --session S --tool create_video_track --args '{"name": "<short document name>", "position": "top"}'` and use the `id` it returns.
+- Never put dummies where they'd overlap a video or image: Cutline refuses the whole call ("overlaps …"), changes nothing, and tells you what is in the way; then pick another track or create one.
+- Tracks can't be deleted (there is no tool for it); don't create more than you need.
+
+## 4. Place the dummies
 
 Write the arguments to a JSON file in your scratchpad (not the user's folders) and send it:
 
 ```json
 {"scenes": [{"title": "Scene 1 — Dawn", "description": "Empty street at dawn. The singer walks in from the left.", "start": 0, "end": 12.5}],
- "time_base": "song", "replace": true}
+ "track": "<track id>", "time_base": "song", "replace": true}
 ```
 
 `cutline-ctl call --session S --tool add_dummies --args-file /path/to/scenes.json`
 
-`replace: true` (default) first removes what an earlier run put on the Dummies track; use `false` only if the user asks to add to the existing dummies. Colors: leave them out (the project's dummy color is used) unless the user asks; then `"color": "#RRGGBB"` per scene.
+Leave `track` out to use the track named "Dummies" (made on top if missing). `replace: true` (default) first removes the dummies already on that track (only dummies; videos and images stay); use `false` only to add to them. Colors: leave them out (the project's dummy color is used) unless the user asks; then `"color": "#RRGGBB"` per scene.
 
-Then `cutline-ctl call --session S --tool project_info` and check the `dummies` list matches what you sent (count and times). Finally always `cutline-ctl bye --session S`, also after an error.
+Then `list_video_tracks` again and check the track's dummies match what you sent (count and times). Finally always `cutline-ctl bye --session S`, also after an error.
 
-## 4. Tell the user
+## 5. Tell the user
 
-How many dummies were placed, on which project, on the "Dummies" video track, from when to when; that it's one undo step in Cutline (Edit > Undo Place Dummies); and any scene you skipped or changed and why. Keep it short.
+How many dummies were placed, on which project and track (and whether you created it), from when to when; that it's one undo step in Cutline (Edit > Undo Place Dummies); and any scene you skipped or changed and why. Keep it short.
 
 ## Rules
 
-- Only `project_info`, `add_dummies`, `remove_dummies`. Never anything that would touch audio or lyrics.
+- Only the tools Cutline lists (`project_info`, `list_video_tracks`, `create_video_track`, `add_dummies`, `remove_dummies`). They never touch audio or lyrics, and nothing deletes a track.
 - Approval is the user's, in Cutline. Never try to get around a denial or a closed session: say hello again only if the user asks.
 - Don't keep the session open: bye when done.

@@ -20,9 +20,9 @@ final class PlaceDummiesTests: XCTestCase {
     private let scenes = [PlacedScene(title: "Opening", description: "Dawn.", start: 0, end: 12.5, color: nil),
                           PlacedScene(title: "", description: "Verse", start: 12.5, end: 31, color: RGBA(r: 1, g: 0, b: 0, a: 1))]
 
-    func testScenesBecomeDummiesAtTheirTimesOnTheDummiesTrack() {
+    func testScenesBecomeDummiesAtTheirTimesOnTheDummiesTrack() throws {
         var p = project()
-        let placed = p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
+        let placed = try p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
         XCTAssertEqual(placed.map(\.start), [0, 12.5])
         XCTAssertEqual(placed.map(\.end), [12.5, 31])
         let t = p.videoTracks.firstIndex { $0.name == "Dummies" }!
@@ -36,46 +36,46 @@ final class PlaceDummiesTests: XCTestCase {
         XCTAssertEqual(cards.map(\.length), [12.5, 18.5], "each card says how long its scene is")
     }
 
-    func testSongTimesFollowWhereTheSongStarts() {
+    func testSongTimesFollowWhereTheSongStarts() throws {
         var p = project(songStart: 2)
-        let placed = p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
+        let placed = try p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
         XCTAssertEqual(placed.map(\.start), [2, 14.5])
         var q = project(songStart: 2)
-        XCTAssertEqual(q.placeDummies(scenes, songTime: false, replace: true, defaults: DummyDefaults()).map(\.start), [0, 12.5], "timeline times as given")
+        XCTAssertEqual(try q.placeDummies(scenes, songTime: false, replace: true, defaults: DummyDefaults()).map(\.start), [0, 12.5], "timeline times as given")
     }
 
-    func testTimesLandOnFrames() {
+    func testTimesLandOnFrames() throws {
         var p = project()
-        let placed = p.placeDummies([PlacedScene(title: "x", description: "", start: 1.01, end: 2.03, color: nil)], songTime: true, replace: true, defaults: DummyDefaults())
+        let placed = try p.placeDummies([PlacedScene(title: "x", description: "", start: 1.01, end: 2.03, color: nil)], songTime: true, replace: true, defaults: DummyDefaults())
         XCTAssertEqual(placed[0].start, p.quantize(1.01))
         XCTAssertEqual(placed[0].end, p.quantize(2.03))
     }
 
-    func testAudioLyricsAndOtherClipsAreNeverTouched() {
+    func testAudioLyricsAndOtherClipsAreNeverTouched() throws {
         let before = project()
         var p = before
-        p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
+        try p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
         p.clearDummiesTrack()
         XCTAssertEqual(p.audio, before.audio)
         XCTAssertEqual(p.lyricTracks, before.lyricTracks)
         XCTAssertEqual(p.videoTracks[0], before.videoTracks[0])
     }
 
-    func testRunningAgainReplacesTheEarlierDummies() {
+    func testRunningAgainReplacesTheEarlierDummies() throws {
         var p = project()
-        p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
-        p.placeDummies([scenes[0]], songTime: true, replace: true, defaults: DummyDefaults())
+        try p.placeDummies(scenes, songTime: true, replace: true, defaults: DummyDefaults())
+        try p.placeDummies([scenes[0]], songTime: true, replace: true, defaults: DummyDefaults())
         let t = p.videoTracks.firstIndex { $0.name == "Dummies" }!
         XCTAssertEqual(p.videoTracks[t].clips.count, 1)
         XCTAssertEqual(p.assets.filter(\.isDummy).count, 1, "the replaced cards are gone from the assets too")
         XCTAssertEqual(p.videoTracks.filter { $0.name == "Dummies" }.count, 1, "the same track is reused")
-        p.placeDummies([scenes[1]], songTime: true, replace: false, defaults: DummyDefaults())
+        try p.placeDummies([scenes[1]], songTime: true, replace: false, defaults: DummyDefaults())
         XCTAssertEqual(p.videoTracks[t].clips.count, 2, "replace: false adds")
     }
 
-    func testClearingKeepsDummiesUsedElsewhere() {
+    func testClearingKeepsDummiesUsedElsewhere() throws {
         var p = project()
-        p.placeDummies([scenes[0]], songTime: true, replace: true, defaults: DummyDefaults())
+        try p.placeDummies([scenes[0]], songTime: true, replace: true, defaults: DummyDefaults())
         let card = p.assets.first(where: \.isDummy)!
         p.videoTracks[0].clips.append(Clip(assetID: card.id, start: 100, duration: 5))
         XCTAssertEqual(p.clearDummiesTrack(), 1)
@@ -91,6 +91,136 @@ final class PlaceDummiesTests: XCTestCase {
         XCTAssertThrowsError(try args(#"{"scenes":[{"start":"1","end":2}]}"#), "times are numbers")
         XCTAssertThrowsError(try args(#"{"scenes":[{"start":1,"end":2,"color":"red"}]}"#))
         XCTAssertThrowsError(try args(#"{"nothing":1}"#))
+    }
+}
+
+// MARK: - Tracks
+
+final class ControlTrackTests: XCTestCase {
+    /// Video 1 has footage at 0-20 s and 40-60 s; an image on Video 2 at 10-15 s.
+    private func project() -> Project {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let v = Asset(kind: .video, name: "a.mp4", path: "/a", pixelSize: .init(width: 1920, height: 1080), duration: 60, frameRate: 24)
+        let i = Asset(kind: .image, name: "logo.png", path: "/l.png", pixelSize: .init(width: 400, height: 400))
+        p.assets = [v, i]
+        p.videoTracks = [VideoTrack(clips: [Clip(assetID: v.id, start: 0, duration: 20), Clip(assetID: v.id, start: 40, duration: 20)]),
+                         VideoTrack(clips: [Clip(assetID: i.id, start: 10, duration: 5)])]
+        return p
+    }
+
+    private func scene(_ s: Double, _ e: Double, _ t: String = "") -> PlacedScene { PlacedScene(title: t, description: "", start: s, end: e, color: nil) }
+
+    func testTracksAreListedBottomFirstWithWhatIsOnThem() throws {
+        var p = project()
+        try p.placeDummies([scene(70, 80, "Outro")], songTime: false, replace: true, defaults: DummyDefaults())
+        let tracks = try XCTUnwrap(p.videoTrackListing.array)
+        XCTAssertEqual(tracks.count, 3)
+        XCTAssertEqual(tracks.map { $0["name"]?.string }, ["Video 1", "Video 2", "Dummies"])
+        XCTAssertEqual(tracks.map { $0["index"]?.number }, [0, 1, 2])
+        XCTAssertEqual(tracks[0]["id"]?.string, p.videoTracks[0].id.uuidString.lowercased())
+        let items = try XCTUnwrap(tracks[0]["items"]?.array)
+        XCTAssertEqual(items.map { $0["kind"]?.string }, ["video", "video"])
+        XCTAssertEqual(items.map { $0["start"]?.number }, [0, 40])
+        XCTAssertEqual(items.map { $0["end"]?.number }, [20, 60])
+        XCTAssertEqual(items[0]["name"]?.string, "a.mp4")
+        XCTAssertEqual(tracks[1]["items"]?.array?.first?["kind"]?.string, "image")
+        XCTAssertEqual(tracks[2]["items"]?.array?.first?["kind"]?.string, "dummy")
+        XCTAssertEqual(tracks[2]["items"]?.array?.first?["name"]?.string, "Outro")
+    }
+
+    func testTracksCanBeCreatedAnywhere() {
+        var p = project()
+        XCTAssertEqual(p.createVideoTrack(name: "Scenes", above: nil), 2, "top by default")
+        XCTAssertEqual(p.videoTracks[2].name, "Scenes")
+        XCTAssertEqual(p.createVideoTrack(name: nil, above: -1), 0, "bottom")
+        XCTAssertNil(p.videoTracks[0].name)
+        XCTAssertEqual(p.createVideoTrack(name: "  ", above: 1), 2, "right above track 1; a blank name is no name")
+        XCTAssertNil(p.videoTracks[2].name)
+        XCTAssertEqual(p.videoTracks.count, 5)
+    }
+
+    func testDummiesGoOnTheChosenTrackInTheGaps() throws {
+        var p = project()
+        let placed = try p.placeDummies([scene(20, 40, "Bridge"), scene(60, 70)], track: 0, songTime: false, replace: true, defaults: DummyDefaults())
+        XCTAssertEqual(placed.map(\.start), [20, 60])
+        XCTAssertEqual(p.videoTracks[0].clips.map(\.start), [0, 20, 40, 60], "fitted between the footage, in time order")
+        XCTAssertNil(p.videoTracks.first { $0.name == "Dummies" }, "no Dummies track made when a track is chosen")
+    }
+
+    func testAnOverlapRefusesTheWholeCallAndChangesNothing() {
+        var p = project()
+        let before = p
+        XCTAssertThrowsError(try p.placeDummies([scene(20, 30), scene(35, 45)], track: 0, songTime: false, replace: true, defaults: DummyDefaults())) { e in
+            XCTAssertTrue(e.localizedDescription.contains("a.mp4"), e.localizedDescription)
+        }
+        XCTAssertEqual(p, before, "not even the first scene was placed")
+        XCTAssertThrowsError(try p.placeDummies([scene(11, 12)], track: 1, songTime: false, replace: true, defaults: DummyDefaults()), "images count too")
+    }
+
+    func testReplacingAndRemovingOnlyEverTouchDummies() throws {
+        var p = project()
+        try p.placeDummies([scene(20, 40)], track: 0, songTime: false, replace: true, defaults: DummyDefaults())
+        try p.placeDummies([scene(25, 35)], track: 0, songTime: false, replace: true, defaults: DummyDefaults())
+        XCTAssertEqual(p.videoTracks[0].clips.map(\.start), [0, 25, 40], "the earlier dummy is replaced, the footage stays")
+        XCTAssertEqual(p.clearDummies(onTrack: 0), 1)
+        XCTAssertEqual(p.videoTracks[0].clips.count, 2)
+        XCTAssertEqual(p.assets.filter(\.isDummy).count, 0)
+        // Without replace, an earlier dummy in the way is an overlap.
+        try p.placeDummies([scene(20, 30)], track: 0, songTime: false, replace: true, defaults: DummyDefaults())
+        XCTAssertThrowsError(try p.placeDummies([scene(25, 35)], track: 0, songTime: false, replace: false, defaults: DummyDefaults()))
+    }
+
+    func testTracksAreFoundByIndexOrId() throws {
+        let p = project()
+        XCTAssertEqual(try p.videoTrackIndex(.number(1)), 1)
+        XCTAssertEqual(try p.videoTrackIndex(.string(p.videoTracks[1].id.uuidString.lowercased())), 1)
+        XCTAssertEqual(try p.videoTrackIndex(.string(p.videoTracks[1].id.uuidString)), 1, "any case")
+        XCTAssertNil(try p.videoTrackIndex(nil))
+        XCTAssertThrowsError(try p.videoTrackIndex(.number(5)))
+        XCTAssertThrowsError(try p.videoTrackIndex(.number(0.5)))
+        XCTAssertThrowsError(try p.videoTrackIndex(.string("nope")))
+        XCTAssertThrowsError(try p.videoTrackIndex(.bool(true)))
+    }
+}
+
+@MainActor
+final class ControlTrackToolTests: XCTestCase {
+    func testClaudesWorkflow() async throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let v = Asset(kind: .video, name: "a.mp4", path: "/a", pixelSize: .init(width: 1920, height: 1080), duration: 60, frameRate: 24)
+        p.assets = [v]
+        p.videoTracks[0].clips = [Clip(assetID: v.id, start: 0, duration: 30)]
+        let doc = ProjectDocument(project: p)
+        let s = ControlService()
+        s.approve = { _, _ in true }
+        s.documents = { [doc] }
+        let token = await s.handle(ControlRequest(type: "hello", client: "Claude")).token!
+        _ = await s.handle(ControlRequest(type: "use", token: token, project: doc.controlID))
+        // 1. Look at the tracks: Video 1 has footage at 0-30 s, so it isn't usable for 0-60 s scenes.
+        let list = await s.handle(ControlRequest(type: "call", token: token, tool: "list_video_tracks"))
+        XCTAssertEqual(list.result?["tracks"]?.array?.count, 1)
+        // 2. Placing there is refused with the reason.
+        let scenes = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"scenes":[{"title":"A","start":0,"end":20},{"title":"B","start":20,"end":60}],"track":0}"#.utf8))
+        let refused = await s.handle(ControlRequest(type: "call", token: token, tool: "add_dummies", args: scenes))
+        XCTAssertEqual(refused.type, "error")
+        // 3. Create a track of its own and fill it.
+        let made = await s.handle(ControlRequest(type: "call", token: token, tool: "create_video_track",
+                                                 args: .object(["name": .string("Treatment v2")])))
+        let id = try XCTUnwrap(made.result?["id"]?.string)
+        XCTAssertEqual(made.result?["index"]?.number, 1)
+        var a = scenes
+        if case .object(var o) = a { o["track"] = .string(id); a = .object(o) }
+        let ok = await s.handle(ControlRequest(type: "call", token: token, tool: "add_dummies", args: a))
+        XCTAssertEqual(ok.type, "result", ok.message ?? "")
+        XCTAssertEqual(ok.result?["track"]?["name"]?.string, "Treatment v2")
+        XCTAssertEqual(doc.editor.project.videoTracks[1].clips.count, 2)
+        XCTAssertEqual(doc.editor.project.videoTracks[0].clips.count, 1, "the footage track is untouched")
+        // 4. There is no way to delete a track.
+        let del = await s.handle(ControlRequest(type: "call", token: token, tool: "delete_video_track", args: .object(["track": .number(1)])))
+        XCTAssertEqual(del.type, "error")
+        XCTAssertEqual(doc.editor.project.videoTracks.count, 2)
     }
 }
 
@@ -145,7 +275,7 @@ final class ControlHandshakeTests: XCTestCase {
         XCTAssertEqual(use.type, "ok")
         XCTAssertEqual(use.project?.width, 1920)
         let tools = await s.handle(ControlRequest(type: "tools", token: token))
-        XCTAssertEqual(tools.tools?.map(\.name), ["project_info", "add_dummies", "remove_dummies"])
+        XCTAssertEqual(tools.tools?.map(\.name), ["project_info", "list_video_tracks", "create_video_track", "add_dummies", "remove_dummies"])
         let args = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"scenes":[{"title":"Intro","description":"Dawn","start":0,"end":4}]}"#.utf8))
         let call = await s.handle(ControlRequest(type: "call", token: token, tool: "add_dummies", args: args))
         XCTAssertEqual(call.type, "result")
