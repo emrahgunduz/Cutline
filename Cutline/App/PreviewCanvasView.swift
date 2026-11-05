@@ -195,7 +195,8 @@ final class PreviewCanvasView: NSView {
         if !editor.isSelected(.lyricLine(line.id)) { editor.selection = .lyricLine(line.id) }
         let placed = lyricRenderer().placedLines(at: editor.playhead)
         var starts: [UUID: CGPoint] = [:]
-        for pl in placed where editor.isSelected(.lyricLine(pl.line.id)) { starts[pl.line.id] = CGPoint(x: pl.rect.midX, y: pl.rect.midY) }
+        // Drags move each line's anchor (x by its text alignment, y the box middle).
+        for pl in placed where editor.isSelected(.lyricLine(pl.line.id)) { starts[pl.line.id] = CGPoint(x: LyricRenderer.anchor(of: pl.line, rect: pl.rect), y: pl.rect.midY) }
         drag = (.moveLines(starts), p, editor.project, nil, controller.pan)
         NSCursor.closedHand.set()
     }
@@ -349,7 +350,7 @@ final class PreviewCanvasView: NSView {
         let lines = editor.selectedLineIDs
         if !lines.isEmpty, case .lyricLine = editor.selection {
             let placed = lyricRenderer().placedLines(at: editor.playhead)
-            let drawn = Dictionary(placed.map { ($0.line.id, CGPoint(x: $0.rect.midX, y: $0.rect.midY)) }, uniquingKeysWith: { a, _ in a })
+            let drawn = Dictionary(placed.map { ($0.line.id, CGPoint(x: LyricRenderer.anchor(of: $0.line, rect: $0.rect), y: $0.rect.midY)) }, uniquingKeysWith: { a, _ in a })
             editor.edit(lines.count > 1 ? "Nudge Lyrics" : "Nudge Lyric Line") { p in
                 for id in lines {
                     guard let loc = p.lineLocation(id) else { continue }

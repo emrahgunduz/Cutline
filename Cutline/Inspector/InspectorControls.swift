@@ -35,6 +35,8 @@ struct ValueRow: View {
     var format: String = "%.2f"
     /// When set, a reset arrow appears while the value differs from it.
     var defaultValue: Double? = nil
+    /// Values the text field accepts, when wider than the slider's range (nil = the range).
+    var typedRange: ClosedRange<Double>? = nil
     let onChange: (Double) -> Void
     let onCommit: () -> Void
 
@@ -49,7 +51,7 @@ struct ValueRow: View {
                 if focused { focused = false }
                 onChange(quantized(v))
                 text = String(format: format, quantized(v))
-            }), in: range) { editing in
+            }), in: range.lowerBound...max(range.upperBound, value)) { editing in
                 if editing { focused = false } else { onCommit() }
             }
             .controlSize(.small)
@@ -85,9 +87,11 @@ struct ValueRow: View {
         // Accept "0,5", "12°", "0.50s" or "40%": keep digits, sign and decimal point.
         let cleaned = String(text.replacingOccurrences(of: ",", with: ".").filter { "0123456789.-".contains($0) })
         guard let v = Double(cleaned) else { text = String(format: format, value); return }
-        onChange(min(max(v, range.lowerBound), range.upperBound))
+        let limits = typedRange ?? range
+        let clamped = min(max(v, limits.lowerBound), limits.upperBound)
+        onChange(clamped)
         onCommit()
-        text = String(format: format, min(max(v, range.lowerBound), range.upperBound))
+        text = String(format: format, clamped)
     }
 }
 
