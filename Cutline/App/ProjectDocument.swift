@@ -112,6 +112,12 @@ final class ProjectDocument: NSDocument {
         }
     }
 
+    /// Closing the project stops its analysis and alignment jobs (and their helper processes).
+    override func close() {
+        MainActor.assumeIsolated { editor.cancelJobs() }
+        super.close()
+    }
+
     override func read(from url: URL, ofType typeName: String) throws {
         let (project, layout) = try Self.load(from: url)
         self.layout = layout

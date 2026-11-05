@@ -117,6 +117,9 @@ extension EditorModel {
                       let vocals = self.audioAnalysis.vocalsURL(a.audioHash), FileManager.default.fileExists(atPath: vocals.path) else {
                     throw AlignmentError.noAnalysis
                 }
+                // The song the result belongs to: if it moves or changes during the job, the
+                // result is stale (word times are relative to where the song sits).
+                let songAtStart = (asset: audio.assetID, start: audio.start, hash: a.audioHash)
                 let order = self.project.lyricLineOrder()
                 let ids = order.map(\.id)
                 let lines = order.map { $0.words.map(\.text) }
@@ -128,6 +131,8 @@ extension EditorModel {
                 // Apply only if the words didn't change while the job ran.
                 let now = Dictionary(uniqueKeysWithValues: self.project.lyricTracks.flatMap(\.lines).map { ($0.id, $0.words.map(\.text)) })
                 guard zip(ids, lines).allSatisfy({ now[$0.0] == $0.1 }) else { throw AlignmentError.lyricsChanged }
+                guard let audioNow = self.project.audio, audioNow.assetID == songAtStart.asset, audioNow.start == songAtStart.start,
+                      self.audioAnalysis.analysis?.audioHash == songAtStart.hash else { throw AlignmentError.songChanged }
                 self.edit("Align Lyrics") { p in
                     p.applyAlignment(result, lineIDs: ids, audioStart: audio.start, keepConfirmed: keepConfirmed)
                     // Newly aligned words never overlap the confirmed words that were kept.
@@ -150,11 +155,12 @@ extension EditorModel {
 }
 
 enum AlignmentError: LocalizedError {
-    case noAnalysis, lyricsChanged
+    case noAnalysis, lyricsChanged, songChanged
     var errorDescription: String? {
         switch self {
         case .noAnalysis: "Add the song and let its analysis finish first: alignment listens to the separated vocals."
         case .lyricsChanged: "The lyrics changed while they were being aligned, so the result was not applied. Run Align Words to Song again."
+        case .songChanged: "The song was moved or replaced while the lyrics were being aligned, so the result was not applied. Run Align Words to Song again."
         }
     }
 }
