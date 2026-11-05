@@ -16,13 +16,17 @@ struct ClipInspectorView: View {
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
                     InspectorSection(title: "Size & Position", icon: "arrow.up.left.and.arrow.down.right") {
-                        row("Scale", clip.transform.scale, 0.05...4, step: 0.01, reset: 1) { $0.transform.scale = $1 }
+                        let fill = editor.project.asset(clip.assetID).map { Project.fillScale(for: $0, canvas: editor.project.canvas) } ?? 1
+                        row("Scale", clip.transform.scale, 0.05...max(4, fill * 1.5), step: 0.01, reset: fill) { $0.transform.scale = $1 }
                         row("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetX = $1 }
                         row("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetY = $1 }
                         HStack {
                             Spacer()
-                            Button("Reset Scale") { editor.edit("Reset Scale") { $0.updateClip(clipID) { $0.transform.scale = 1 } } }
-                                .controlSize(.small).disabled(clip.transform.scale == 1)
+                            // Fill covers the whole frame (cropping the overflow); Fit shows the whole picture.
+                            Button("Fill") { editor.edit("Fill Frame") { $0.updateClip(clipID) { $0.transform.scale = fill; $0.transform.offsetX = 0; $0.transform.offsetY = 0 } } }
+                                .controlSize(.small).help("Scale to cover the whole frame, centred (the overflow is cropped)")
+                            Button("Fit") { editor.edit("Fit Frame") { $0.updateClip(clipID) { $0.transform.scale = 1; $0.transform.offsetX = 0; $0.transform.offsetY = 0 } } }
+                                .controlSize(.small).help("Scale to show the whole picture, centred")
                             Button("Reset Position") { editor.edit("Reset Position") { $0.updateClip(clipID) { $0.transform.offsetX = 0; $0.transform.offsetY = 0 } } }
                                 .controlSize(.small).disabled(clip.transform.offsetX == 0 && clip.transform.offsetY == 0)
                         }

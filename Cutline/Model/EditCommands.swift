@@ -77,10 +77,15 @@ extension Project {
         return clip.id
     }
 
-    /// Video in a horizontal project fills the frame (no black bars; the overflow is cropped).
-    /// Images and portrait projects start fitted, since there the whole picture usually matters.
+    /// Video fills the frame (no black bars; the overflow is cropped), in every project type.
+    /// Images start fitted, since there the whole picture (a logo, a PNG overlay) usually matters.
     func defaultScale(for asset: Asset) -> Double {
-        guard !type.isPortrait, asset.kind == .video, let px = asset.pixelSize, px.width > 0, px.height > 0 else { return 1 }
+        Self.fillScale(for: asset, canvas: canvas)
+    }
+
+    /// The clip scale at which `asset` fills `canvas` (1 = fitted); 1 for images.
+    static func fillScale(for asset: Asset, canvas: CanvasSize) -> Double {
+        guard asset.kind == .video, let px = asset.pixelSize, px.width > 0, px.height > 0 else { return 1 }
         let sx = Double(canvas.width) / Double(px.width), sy = Double(canvas.height) / Double(px.height)
         return max(sx, sy) / min(sx, sy)
     }

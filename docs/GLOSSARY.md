@@ -109,3 +109,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Line spacing** | Lines on one lyric track never overlap (put lines meant to be on screen together on different tracks). A dragged line stops against its neighbour and jumps past it once the pointer is closer to the other side; edges and words stop at the neighbours. |
 | **Wrapped lines** | A lyric line too wide for the frame (or the portrait safe area) wraps onto balanced rows at the same font size instead of shrinking. |
 | **Group drag** | Dragging several selected items: the earliest one snaps, the rest keep their distance from it. |
+| **Fill / Fit** | Clip inspector > Size & Position: Fill scales the clip to cover the whole frame (centred, overflow cropped); Fit shows the whole picture. New video clips start filled in every project type; images start fitted. |
