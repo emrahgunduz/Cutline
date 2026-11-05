@@ -860,7 +860,10 @@ final class TimelineView: NSView {
                 }
             case .audio:
                 guard let a = original.audio else { return }
-                next.moveAudio(start: snappedMove(start: a.start + dt, duration: a.duration, excluding: [], event: event))
+                let alone = event.modifierFlags.contains(.option)
+                // When everything moves with the song, only the playhead and project start are fixed targets.
+                let moving: Set<UUID> = alone ? [] : Set(original.videoTracks.flatMap(\.clips).map(\.id) + original.lyricTracks.flatMap(\.lines).flatMap { [$0.id] + $0.words.map(\.id) })
+                next.moveAudio(start: snappedMove(start: a.start + dt, duration: a.duration, excluding: moving, event: event), alone: alone)
             default: return
             }
             // Live preview of the drag; committed as one undo step on mouse up.
