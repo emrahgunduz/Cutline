@@ -45,7 +45,21 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         }
         vertical.setHoldingPriority(.init(250), forSubviewAt: 0)
         vertical.setHoldingPriority(.init(260), forSubviewAt: 1)
-        window?.contentView = vertical
+        // Status bar under everything; the split view fills the rest.
+        let root = NSView()
+        let status = NSHostingView(rootView: StatusBarView().environmentObject(editor))
+        for v in [vertical, status] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(v) }
+        NSLayoutConstraint.activate([
+            vertical.topAnchor.constraint(equalTo: root.topAnchor),
+            vertical.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            vertical.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            vertical.bottomAnchor.constraint(equalTo: status.topAnchor),
+            status.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            status.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            status.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            status.heightAnchor.constraint(equalToConstant: 26),
+        ])
+        window?.contentView = root
         installTransportKeys()
         editor.warmCaches()
         toolbar = WindowToolbar(editor: editor, windowController: self)
