@@ -65,13 +65,14 @@ struct NewDummyView: View {
             preview
 
             VStack(alignment: .leading, spacing: 12) {
-                field("Title") {
+                field("Title", alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
                         TextField(autoName, text: $d.title).textFieldStyle(.roundedBorder)
                         Text("If left empty, it will be named \(autoName).").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                field("Scene") {
+                // The text box draws its first line 5 pt below its top edge.
+                field("Scene", alignment: .top, labelTop: 5) {
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $sceneDescription)
                             .font(.body).scrollContentBackground(.hidden)
@@ -129,8 +130,8 @@ struct NewDummyView: View {
                     .help("Add to Assets (⌘↩)")
             }
         }
-        .padding(24)
-        .frame(width: 520)
+        .padding(Self.sheetPadding)
+        .frame(width: Self.sheetWidth)
         // Remembered for this project as soon as it changes (font, title, length, color).
         .onChange(of: d) { _, v in editor.rememberDummyDefaults(Self.normalize(v)) }
     }
@@ -144,30 +145,36 @@ struct NewDummyView: View {
         return n
     }
 
+    /// The card at the sheet's full inner width (portrait projects: centred), exactly as wide
+    /// as the form box under it.
     private var preview: some View {
         let aspect = canvas.width / max(1, canvas.height)
-        let h: CGFloat = aspect >= 1 ? 472 / aspect : 220
+        let h: CGFloat = aspect >= 1 ? Self.contentWidth / aspect : 220
         let w = h * aspect
-        return HStack {
-            Spacer()
-            Group {
-                if let img = DummyRenderer.image(card, size: CGSize(width: w * 2, height: h * 2)) {
-                    Image(decorative: img, scale: 2).resizable().aspectRatio(contentMode: .fit)
-                } else {
-                    Color(cgColor: d.color.cgColor)
-                }
+        return Group {
+            if let img = DummyRenderer.image(card, size: CGSize(width: w * 2, height: h * 2)) {
+                Image(decorative: img, scale: 2).resizable().aspectRatio(contentMode: .fit)
+            } else {
+                Color(cgColor: d.color.cgColor)
             }
-            .frame(width: w, height: h)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.15)))
-            .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
-            Spacer()
         }
+        .frame(width: w, height: h)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.15)))
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        .frame(maxWidth: .infinity)
     }
 
-    private func field<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label).frame(width: 60, alignment: .leading)
+    static let sheetWidth: CGFloat = 520
+    static let sheetPadding: CGFloat = 24
+    static var contentWidth: CGFloat { sheetWidth - sheetPadding * 2 }
+
+    /// A labelled row. Single-line controls are centred on the label; a taller control
+    /// (the scene text) lines its first line up with the label.
+    private func field<C: View>(_ label: String, alignment: VerticalAlignment = .center, labelTop: CGFloat = 0,
+                                @ViewBuilder content: () -> C) -> some View {
+        HStack(alignment: alignment, spacing: 12) {
+            Text(label).frame(width: 60, alignment: .leading).padding(.top, labelTop)
             content()
             Spacer(minLength: 0)
         }
