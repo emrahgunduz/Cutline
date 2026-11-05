@@ -11,6 +11,21 @@ settings:
     ENABLE_HARDENED_RUNTIME: NO
     CODE_SIGN_IDENTITY: "-"
     CODE_SIGN_STYLE: Manual
+  configs:
+    # Release is the day-to-day app: everything for speed, size doesn't matter.
+    Release:
+      SWIFT_OPTIMIZATION_LEVEL: "-O"            # speed (not -Osize)
+      SWIFT_COMPILATION_MODE: wholemodule       # optimise across the whole app at once
+      # Tune for Apple Silicon (M1 and later only): schedule and pick instructions for it.
+      OTHER_SWIFT_FLAGS: "$(inherited) -target-cpu apple-m1"
+      OTHER_CFLAGS: "$(inherited) -mcpu=apple-m1"
+      GCC_OPTIMIZATION_LEVEL: "3"
+      LLVM_LTO: YES_THIN
+      ONLY_ACTIVE_ARCH: YES
+      ENABLE_TESTABILITY: NO                    # no testability hooks blocking optimisations
+      ENABLE_NS_ASSERTIONS: NO
+      DEAD_CODE_STRIPPING: YES
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym # symbols stay in a separate dSYM, not the app
 targets:
   Cutline:
     type: application
