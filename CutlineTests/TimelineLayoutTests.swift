@@ -98,3 +98,21 @@ final class LyricRowTests: XCTestCase {
         XCTAssertTrue(TimelineView.lyricParts(CGRect(x: 0, y: 0, width: 500, height: 22), wordCount: 3).words.isEmpty)
     }
 }
+
+final class WheelZoomTests: XCTestCase {
+    func testAMouseWheelZoomsAtThePointer() {
+        XCTAssertEqual(TimelineView.wheelAction(dx: 0, dy: 1, precise: false, flags: [], overHeader: false), .zoom(1.15))
+        guard case .zoom(let out) = TimelineView.wheelAction(dx: 0, dy: -2, precise: false, flags: [], overHeader: false) else { return XCTFail() }
+        XCTAssertLessThan(out, 1, "wheel down zooms out")
+    }
+
+    func testShiftWheelAndTheHeaderScroll() {
+        XCTAssertEqual(TimelineView.wheelAction(dx: 0, dy: 1, precise: false, flags: [.shift], overHeader: false), .pan(dx: 8, dy: 0))
+        XCTAssertEqual(TimelineView.wheelAction(dx: 0, dy: 1, precise: false, flags: [], overHeader: true), .pan(dx: 0, dy: 8))
+    }
+
+    func testTrackpadScrollingStillPans() {
+        XCTAssertEqual(TimelineView.wheelAction(dx: 3, dy: 4, precise: true, flags: [], overHeader: false), .pan(dx: 3, dy: 4))
+        XCTAssertEqual(TimelineView.wheelAction(dx: 0, dy: 10, precise: true, flags: [.option], overHeader: false), .zoom(1.1))
+    }
+}
