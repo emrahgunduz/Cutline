@@ -15,6 +15,8 @@ final class PreviewController: ObservableObject {
     private var seeking = false
     private var pendingSeek: Double?
     private var settingPlayheadFromPlayer = false
+    /// A loop jump back to the start of the loop is in flight; ignore ticks until it lands.
+    private var loopJumping = false
     var useProxies = true
     /// Viewport zoom (canvas pixels → view points); nil fits the canvas to the view.
     @Published var zoom: CGFloat?
@@ -48,13 +50,13 @@ final class PreviewController: ObservableObject {
             return t.isFinite ? t : self.editor.playhead
         }
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 60), queue: .main) { [weak self] time in
-            guard let self, self.player.rate != 0 else { return }
+            guard let self, self.player.rate != 0, !self.loopJumping else { return }
             if let stop = self.editor.transport.stopAt, time.seconds >= stop {
                 self.editor.reachedStopPoint()
                 return
             }
             if let loop = self.editor.transport.loop, time.seconds >= loop.upperBound {
-                self.player.seek(to: CompositionBuilder.time(loop.lowerBound), toleranceBefore: .zero, toleranceAfter: .zero)
+                self.jumpToLoopStart(loop.lowerBound)
                 return
             }
             self.settingPlayheadFromPlayer = true
@@ -126,9 +128,22 @@ final class PreviewController: ObservableObject {
         }
     }
 
+    /// The playhead was moved by the user or a command (not by playback): follow it, also
+    /// while playing (e.g. jumping to the next unsure word keeps playing from there).
     private func playheadChanged(_ t: Double) {
-        guard !settingPlayheadFromPlayer, player.rate == 0 else { return }
+        guard !settingPlayheadFromPlayer else { return }
         seek(to: t)
+    }
+
+    /// Back to the start of the loop: one seek at a time, and the playhead follows at once.
+    private func jumpToLoopStart(_ t: Double) {
+        loopJumping = true
+        settingPlayheadFromPlayer = true
+        editor.playhead = t
+        settingPlayheadFromPlayer = false
+        player.seek(to: CompositionBuilder.time(t), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            DispatchQueue.main.async { self?.loopJumping = false }
+        }
     }
 
     /// Frame-exact seek; requests arriving mid-seek are coalesced to the latest one.
@@ -152,7 +167,11 @@ final class PreviewController: ObservableObject {
             player.play()
         } else {
             player.pause()
-            editor.setPlayhead(editor.playhead)
+            // Stop where the player actually is (the 60 Hz playhead can lag a frame).
+            let now = player.currentTime().seconds
+            settingPlayheadFromPlayer = true
+            editor.setPlayhead(now.isFinite ? now : editor.playhead)
+            settingPlayheadFromPlayer = false
             seek(to: editor.playhead)
         }
     }

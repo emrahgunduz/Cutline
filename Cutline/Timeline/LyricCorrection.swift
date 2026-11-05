@@ -4,7 +4,7 @@ import Foundation
 /// confirm words, and tap words in time while the song plays.
 extension EditorModel {
     /// Seconds of song played before and after an unsure word while it loops.
-    static let loopPadding = 0.75
+    static let loopPadding = 1.75
     /// A tap snaps to a vocal onset this close.
     static let tapSnapWindow = 0.04
     static let tapRates: [Float] = [1, 0.75, 0.5]
