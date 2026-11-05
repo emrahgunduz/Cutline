@@ -118,6 +118,42 @@ final class MoveAudioTests: XCTestCase {
         XCTAssertEqual(p.audio?.start, 0)
         XCTAssertEqual(p.lyricTracks[0].lines[0].start, 10)
     }
+
+    private func laidOut() -> Project {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let song = Asset(kind: .audio, name: "a", path: "/a", duration: 100)
+        let img = Asset(kind: .image, name: "i", path: "/i")
+        p.assets = [song, img]
+        p.setAudio(assetID: song.id)
+        p.moveAudio(start: 4, alone: true)
+        _ = p.addClip(assetID: img.id, track: 0, at: 3)
+        p.cinemascope.startMarker = 20; p.cinemascope.endMarker = 24
+        return p
+    }
+
+    func testMovingAudioCarriesClipsAndMarkers() {
+        var p = laidOut()
+        p.moveAudio(start: 6)
+        XCTAssertEqual(p.videoTracks[0].clips[0].start, 5)
+        XCTAssertEqual(p.cinemascope.startMarker, 22)
+        XCTAssertEqual(p.cinemascope.endMarker, 26)
+    }
+
+    func testMovingLeftStopsWhenTheEarliestItemReachesZero() {
+        var p = laidOut()
+        p.moveAudio(start: 0)            // the clip at 3 s can only go 3 s left
+        XCTAssertEqual(p.audio?.start, 1)
+        XCTAssertEqual(p.videoTracks[0].clips[0].start, 0)
+    }
+
+    func testOptionMoveLeavesClipsAndUnanchoredMarkers() {
+        var p = laidOut()
+        p.moveAudio(start: 10, alone: true)
+        XCTAssertEqual(p.audio?.start, 10)
+        XCTAssertEqual(p.videoTracks[0].clips[0].start, 3)
+        XCTAssertEqual(p.cinemascope.startMarker, 20)
+    }
 }
 
 @MainActor

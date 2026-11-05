@@ -23,6 +23,8 @@ enum Shortcuts {
             ("⌘Z / ⇧⌘Z", "Undo / redo"),
             ("⌘-click", "Add to / remove from selection"),
             ("⇧-drag", "Selection box on empty timeline"),
+            ("Drag song", "Moves clips, lyrics and markers with it"),
+            ("⌥-drag song", "Move the song alone"),
         ]),
         ShortcutGroup(section: "Timeline", icon: "rectangle.split.3x1", items: [
             ("S", "Snapping on / off"),

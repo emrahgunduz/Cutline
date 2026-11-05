@@ -168,17 +168,32 @@ extension Project {
 
     mutating func removeAudio() { audio = nil }
 
-    /// Move the song in time (length unchanged). Lyrics are timed to the song, so they move too.
-    mutating func moveAudio(start: Double) {
+    /// Move the song in time (length unchanged). Everything is laid out against the song, so
+    /// lyrics, video and image clips and the cinemascope markers move with it, unless `alone`
+    /// (⌥-drag). Nothing is pushed before 0: the move stops where the earliest item hits it.
+    mutating func moveAudio(start: Double, alone: Bool = false) {
         guard var a = audio else { return }
-        let newStart = quantize(max(0, start))
+        var newStart = quantize(max(0, start))
+        if !alone, newStart < a.start {
+            // How far left everything can go before the earliest item reaches 0.
+            let earliest = ([a.start] + videoTracks.flatMap(\.clips).map(\.start) + lyricTracks.flatMap(\.lines).map(\.start)).min() ?? a.start
+            newStart = max(newStart, a.start - earliest)
+        }
         let delta = newStart - a.start
         guard delta != 0 else { return }
         a.start = newStart
         audio = a
-        // Markers tied to the song's beats move with it.
-        if cinemascope.startAnchor != nil { cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta)) }
-        if cinemascope.endAnchor != nil { cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta)) }
+        if alone {
+            // Only markers tied to the song's beats follow the song.
+            if cinemascope.startAnchor != nil { cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta)) }
+            if cinemascope.endAnchor != nil { cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta)) }
+            return
+        }
+        cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta))
+        cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta))
+        for t in videoTracks.indices {
+            for c in videoTracks[t].clips.indices { videoTracks[t].clips[c].start = quantize(videoTracks[t].clips[c].start + delta) }
+        }
         for t in lyricTracks.indices {
             for l in lyricTracks[t].lines.indices {
                 lyricTracks[t].lines[l].start += delta
