@@ -158,6 +158,9 @@ struct ClipTransform: Codable, Equatable {
     /// Center offset from canvas center, in canvas pixels.
     var offsetX: Double = 0
     var offsetY: Double = 0
+    /// Mirrored left to right (nil = not flipped).
+    var flipH: Bool?
+    var isFlippedH: Bool { flipH == true }
 }
 
 struct FilterSettings: Codable, Equatable {
