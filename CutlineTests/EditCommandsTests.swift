@@ -251,12 +251,41 @@ final class EditCommandBranchTests: XCTestCase {
         XCTAssertTrue(line.words.allSatisfy { $0.end == line.end })
     }
 
-    func testRetimeLineEndOnlyKeepsStart() {
+    /// Words: "one" at 5 (0 s from the start), "two" at 6.2 (1.2 s); the line ends at 9.
+    func testDraggingTheLineStartCarriesWordsAtTheirOffsets() {
+        var p = lyricProject()
+        let id = p.lyricTracks[0].lines[0].id
+        p.retimeLine(id, start: 4)
+        let line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.start, 4)
+        XCTAssertEqual(line.words.map(\.start), [4, 5.2])
+        XCTAssertEqual(line.end, 9, "the end stays")
+        XCTAssertTrue(line.words.allSatisfy { $0.end == 9 }, "words stretch to the line end")
+    }
+
+    func testDraggingTheLineEndCarriesWordsAtTheirDistanceFromTheEnd() {
         var p = lyricProject()
         let id = p.lyricTracks[0].lines[0].id
         p.retimeLine(id, end: 9.6)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].start, 5)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 9.6, accuracy: 1e-9)
+        let line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.start, 5, "the start stays")
+        XCTAssertEqual(line.end, 9.6, accuracy: 1e-9)
+        XCTAssertEqual(line.words[0].start, 5.6, accuracy: 1e-9)
+        XCTAssertEqual(line.words[1].start, 6.8, accuracy: 1e-9)
+    }
+
+    func testWordsNeverCrossTheFixedEdge() {
+        var p = lyricProject()
+        let id = p.lyricTracks[0].lines[0].id
+        p.retimeLine(id, start: 8.5)            // "two" (1.2 s in) would pass the end at 9
+        var line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.words[1].start, 9 - p.frameDuration, accuracy: 1e-9)
+        XCTAssertEqual(line.words[1].start - line.words[0].start, 1.2, accuracy: 1e-9, "offsets are kept")
+        p = lyricProject()
+        p.retimeLine(id, end: 6)                // "one" can't move before the start at 5
+        line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.words[0].start, 5, accuracy: 1e-9)
+        XCTAssertEqual(line.end, 9, accuracy: 1e-9)
     }
 
     func testDeletingLastWordRemovesLineButNotOthers() {
