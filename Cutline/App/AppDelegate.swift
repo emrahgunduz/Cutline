@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The control channel (Claude and other local programs, with the user's approval).
         let server = ControlServer { request in await ControlService.shared.handle(request) }
         do { try server.start(); controlServer = server } catch { NSLog("Cutline control channel unavailable: \(error)") }
+        do { try ControlClientLink.publish() } catch { NSLog("Cutline: couldn't link cutline-ctl: \(error)") }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             if NSDocumentController.shared.documents.isEmpty { NSDocumentController.shared.newDocument(nil) }
         }

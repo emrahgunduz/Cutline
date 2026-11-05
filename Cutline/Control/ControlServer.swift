@@ -115,3 +115,27 @@ final class ControlServer {
         }
     }
 }
+
+/// Keeps ControlProtocol.clientLink pointing at this app's bundled cutline-ctl.
+enum ControlClientLink {
+    static var bundledClient: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/cutline-ctl") }
+
+    /// Points `link` at `client` (replacing a link to another copy of Cutline). Does nothing if
+    /// this build has no client, or if something other than a link is already there.
+    static func publish(client: URL = bundledClient, at link: URL = ControlProtocol.clientLink) throws {
+        let fm = FileManager.default
+        guard fm.isExecutableFile(atPath: client.path) else { return }
+        if let attrs = try? fm.attributesOfItem(atPath: link.path), attrs[.type] as? FileAttributeType != .typeSymbolicLink { return }
+        if (try? fm.destinationOfSymbolicLink(atPath: link.path)) == client.path { return }
+        try fm.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Make the new link beside it and rename it over the old one, so the path never goes missing.
+        let tmp = link.deletingLastPathComponent().appendingPathComponent(".cutline-ctl-\(getpid())")
+        unlink(tmp.path)
+        try fm.createSymbolicLink(atPath: tmp.path, withDestinationPath: client.path)
+        guard rename(tmp.path, link.path) == 0 else {
+            let e = errno
+            unlink(tmp.path)
+            throw POSIXError(POSIXErrorCode(rawValue: e) ?? .EIO)
+        }
+    }
+}
