@@ -8,7 +8,7 @@ xcodegen generate -q
 xcodebuild -project Cutline.xcodeproj -scheme Cutline -configuration Release \
   -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedData \
   build > build/release-build.log 2>&1 || { tail -30 build/release-build.log; exit 1; }
-mkdir -p build/Release
-rm -rf build/Release/Cutline.app
-ditto build/DerivedData/Build/Products/Release/Cutline.app build/Release/Cutline.app
+mkdir -p build/Release/Cutline.app
+# Update the app in place (not delete and copy), so Finder aliases to it keep working.
+rsync -a --delete build/DerivedData/Build/Products/Release/Cutline.app/ build/Release/Cutline.app/
 echo "Release app: $PWD/build/Release/Cutline.app"
