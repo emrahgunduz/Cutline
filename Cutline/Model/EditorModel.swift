@@ -117,7 +117,7 @@ final class EditorModel: ObservableObject {
 
     func replaceWithoutUndo(_ p: Project) {
         var p = p
-        p.normalizeWordEnds()
+        p.keepLinesAroundWords()
         project = p
         revision += 1
     }
@@ -130,7 +130,7 @@ final class EditorModel: ObservableObject {
         if liveOriginal == nil { liveOriginal = project }
         var next = project
         change(&next)
-        next.normalizeWordEnds()
+        next.keepLinesAroundWords()
         guard next != project else { return }
         project = next
         revision += 1
@@ -149,7 +149,7 @@ final class EditorModel: ObservableObject {
     func edit(_ actionName: String, _ change: (inout Project) -> Void) {
         var next = project
         change(&next)
-        next.normalizeWordEnds()
+        next.keepLinesAroundWords()
         guard next != project else { return }
         apply(next, actionName: actionName)
     }

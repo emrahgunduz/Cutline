@@ -46,17 +46,24 @@ extension Project {
                 line.words[wi].alignedStart = audioStart + a.start
                 line.words[wi].alignedEnd = audioStart + a.end
             }
-            // Words never overlap after quantizing.
-            for wi in line.words.indices.dropFirst() where line.words[wi].start < line.words[wi - 1].end {
-                line.words[wi - 1].end = max(line.words[wi - 1].start + f, line.words[wi].start)
-                if line.words[wi].start < line.words[wi - 1].end { line.words[wi].start = line.words[wi - 1].end }
+            // Starts stay in order after quantizing (ends may overlap: words end with the line).
+            for wi in line.words.indices.dropFirst() where line.words[wi].start <= line.words[wi - 1].start {
+                line.words[wi].start = line.words[wi - 1].start + f
                 line.words[wi].end = max(line.words[wi].end, line.words[wi].start + f)
+            }
+            // New timing: every word ends with the line (the last word's end); each word's end
+            // can be changed afterwards.
+            if let lineEnd = aligned.map(\.end).max() {
+                let e = max(quantize(audioStart + lineEnd - lead), (line.words.map(\.start).max() ?? 0) + f)
+                for wi in line.words.indices where !(keepConfirmed && line.words[wi].confirmed) {
+                    line.words[wi].end = max(e, line.words[wi].start + f)
+                    line.words[wi].alignedEnd = audioStart + lineEnd
+                }
             }
             line.fitToWords()
             lyricTracks[loc.track].lines[loc.index] = line
         }
         for t in lyricTracks.indices { lyricTracks[t].lines.sort { $0.start < $1.start } }
-        normalizeWordEnds()
     }
 
     /// Re-place aligned, unconfirmed words for the current lead-in. Lines that hugged their
@@ -80,7 +87,6 @@ extension Project {
                 lyricTracks[t].lines[l] = line
             }
         }
-        normalizeWordEnds()
     }
 }
 

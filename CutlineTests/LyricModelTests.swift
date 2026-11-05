@@ -45,8 +45,8 @@ final class LyricModelTests: XCTestCase {
         p.retimeLine(id, start: 3)
         let line = p.lyricTracks[0].lines[0]
         XCTAssertEqual(line.start, 3)
-        XCTAssertEqual(line.words.map(\.start), [3, 4.2], "words keep their offsets from the start")
-        XCTAssertTrue(line.words.allSatisfy { $0.end == line.end })
+        XCTAssertEqual(line.words.map(\.start), [3, 4.2], "word starts keep their offsets from the start")
+        XCTAssertEqual(line.words.map(\.end), [6, 8.8], "word ends stay")
     }
 
     func testOverlappingLinesOnTwoTracksAreBothVisible() {

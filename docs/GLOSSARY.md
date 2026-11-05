@@ -92,5 +92,5 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Tap mode** | T: plays from 5 s before the selected word; each Space sets the current word's start to that moment, confirms it, and moves to the next word sung (any track). 1/2/3 play at 100/75/50% with pitch kept. After the last word the song plays 5 s more, then pauses. Esc ends. |
 | **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
 | **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
-| **Word timing** | Each word starts on its own time and ends with its line. Dragging a line's start or end edge carries its words along, each keeping its distance from that edge; the other edge stays. Dragging a word's right edge moves the line's end. |
+| **Word timing** | New or aligned words start on their own time and end with their line; each word's end can then be changed on its own. Dragging a line's start moves every word's start with it (ends stay); dragging its end moves every word's end with it (starts stay). |
 | **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |

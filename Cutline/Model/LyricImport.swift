@@ -50,7 +50,9 @@ enum LyricImport {
                 words.append(LyricWord(text: w, start: ws, end: we, confidence: 0))
                 t += d
             }
-            lines.append(LyricLine(start: words.first!.start, end: words.last!.end, words: words, stanza: l.stanza))
+            var line = LyricLine(start: words.first!.start, end: words.last!.end, words: words, stanza: l.stanza)
+            line.endWordsAtLineEnd()   // new words end with their line by default
+            lines.append(line)
         }
         return lines
     }

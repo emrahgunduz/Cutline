@@ -19,7 +19,8 @@ final class LyricImportTests: XCTestCase {
         XCTAssertEqual(lines.first?.start, 10)
         XCTAssertLessThanOrEqual(lines.last!.end, 40)
         let words = lines.flatMap(\.words)
-        XCTAssertTrue(zip(words, words.dropFirst()).allSatisfy { $0.end <= $1.start })
+        XCTAssertTrue(zip(words, words.dropFirst()).allSatisfy { $0.start < $1.start })
+        XCTAssertTrue(lines.allSatisfy { l in l.words.allSatisfy { $0.end == l.end } }, "new words end with their line")
         XCTAssertTrue(words.allSatisfy { $0.confidence == 0 && !$0.confirmed })
         XCTAssertTrue(lines.allSatisfy { l in l.words.allSatisfy { $0.start >= l.start && $0.end <= l.end } })
         // The stanza pause is longer than the line gap.
@@ -78,7 +79,7 @@ final class LyricImportTests: XCTestCase {
         for line in p.lyricTracks[0].lines {
             for (a, b) in zip(line.words, line.words.dropFirst()) { XCTAssertLessThan(a.start, b.start) }
             for w in line.words {
-                XCTAssertEqual(w.end, line.end, "every word ends with its line")
+                XCTAssertEqual(w.end, line.end, "aligned words end with their line by default")
                 XCTAssertGreaterThanOrEqual(w.end - w.start, p.frameDuration - 1e-9)
             }
         }

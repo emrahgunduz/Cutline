@@ -110,7 +110,7 @@ extension Project {
         let words = lyricOrder()
         guard words.count > 1 else { return }
         let old = Dictionary(uniqueKeysWithValues: before.lyricTracks.flatMap(\.lines).flatMap(\.words).map { ($0.id, $0) })
-        // Words end with their lines, so only starts take part: each word is a one-frame span.
+        // Only starts are re-timed (each word is a one-frame span here); ends stay as they are.
         let f = frameDuration
         let after = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.start + f) }
         let prior = words.map { w in old[w.value.id].map { AnchorStretch.Span(start: $0.start, end: $0.start + f) } ?? AnchorStretch.Span(start: w.value.start, end: w.value.start + f) }
@@ -127,13 +127,10 @@ extension Project {
         write(AnchorStretch.resolveOverlaps(spans, anchored: anchored, minLength: frameDuration), to: words, anchored: anchored)
     }
 
-    /// Write new word starts. A line whose last word moved keeps the same distance from that
-    /// word to its end, so stretched lines don't leave long tails or get cut short.
+    /// Write new word starts (ends stay, but never before their start).
     private mutating func write(_ result: [AnchorStretch.Span], to words: [(track: Int, line: Int, word: Int, value: LyricWord)], anchored: [Bool]) {
         let lead = lyricStyle.leadIn
         var touched = Set<[Int]>()
-        var oldLast: [[Int]: Double] = [:]
-        for w in words { let key = [w.track, w.line]; oldLast[key] = max(oldLast[key] ?? -.infinity, w.value.start) }
         for (k, w) in words.enumerated() where !anchored[k] {
             var word = lyricTracks[w.track].lines[w.line].words[w.word]
             let s = quantize(max(0, result[k].start))
@@ -146,10 +143,10 @@ extension Project {
         }
         for tl in touched {
             var line = lyricTracks[tl[0]].lines[tl[1]]
-            let newLast = line.words.map(\.start).max() ?? line.start
-            line.end = quantize(line.end + newLast - (oldLast[tl] ?? newLast))
-            line.start = line.words.map(\.start).min() ?? line.start
-            line.endWordsWithLine(frame: frameDuration)
+            for i in line.words.indices where line.words[i].end < line.words[i].start + frameDuration {
+                line.words[i].end = line.words[i].start + frameDuration
+            }
+            line.containWords()
             lyricTracks[tl[0]].lines[tl[1]] = line
         }
     }
@@ -162,22 +159,23 @@ extension LyricLine {
         start = s; end = e
     }
 
-    /// Every word ends with its line (R: words start on their own time, end at the line's end).
-    mutating func endWordsWithLine(frame: Double) {
-        guard let lastStart = words.map(\.start).max(), let firstStart = words.map(\.start).min() else { return }
-        start = min(start, firstStart)
-        end = max(end, lastStart + frame)
+    /// Grow the line so it contains every word (never shrinks it).
+    mutating func containWords() {
+        guard let s = words.map(\.start).min(), let e = words.map(\.end).max() else { return }
+        start = min(start, s); end = max(end, e)
+    }
+
+    /// New words end with their line by default (they can be changed one by one after).
+    mutating func endWordsAtLineEnd() {
         for i in words.indices { words[i].end = end }
     }
 }
 
 extension Project {
-    /// Keep every word ending at its line's end. Run after every change to the project.
-    mutating func normalizeWordEnds() {
+    /// After any change, every line still contains its words.
+    mutating func keepLinesAroundWords() {
         for t in lyricTracks.indices {
-            for l in lyricTracks[t].lines.indices where lyricTracks[t].lines[l].words.contains(where: { $0.end != lyricTracks[t].lines[l].end }) || lyricTracks[t].lines[l].words.contains(where: { $0.start >= lyricTracks[t].lines[l].end }) {
-                lyricTracks[t].lines[l].endWordsWithLine(frame: frameDuration)
-            }
+            for l in lyricTracks[t].lines.indices { lyricTracks[t].lines[l].containWords() }
         }
     }
 }
