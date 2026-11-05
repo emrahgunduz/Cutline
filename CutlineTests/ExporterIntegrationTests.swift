@@ -135,3 +135,35 @@ final class SizeEstimatorSamplingTests: XCTestCase {
         for s in starts { XCTAssertGreaterThan(SizeEstimator.busyness(p, at: s + 1), 0, "\(s)") }
     }
 }
+
+/// R37 end to end: a real size-targeted export of sample footage lands at or under the target.
+@MainActor
+final class SizeTargetedExportTests: XCTestCase {
+    func testAdExportLandsUnderTheSizeTarget() async throws {
+        let footage = try SampleMedia.require(SampleMedia.footage)
+        let clip = try XCTUnwrap(try FileManager.default.contentsOfDirectory(at: footage, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension.lowercased() == "mp4" }.sorted { $0.path < $1.path }.first)
+        let doc = ProjectDocument(project: Project(type: .ad, canvas: .init(width: 1080, height: 1920)))
+        let e = doc.editor
+        _ = await e.importFiles([clip])
+        let id = try XCTUnwrap(e.project.assets.first { $0.kind == .video }?.id)
+        e.edit("setup") { p in
+            _ = p.addClip(assetID: id, track: 0, at: 0)
+            p.videoTracks[0].clips[0].duration = min(p.videoTracks[0].clips[0].duration, 8)
+            p.videoTracks[0].clips[0].transform.scale = 1.8      // fill the portrait frame
+        }
+        var settings = ExportSettings.defaults(for: e.project)
+        settings.rateMode = .size
+        settings.sizeTargetMB = 3
+        let out = TestMedia.tempURL("mp4")
+        defer { try? FileManager.default.removeItem(at: out) }
+        let note = try await ExportSheet.exportToSize(project: e.project, settings: settings, targetMB: 3, to: out,
+                                                      exporter: SegmentExporter(cacheDir: FileManager.default.temporaryDirectory.appendingPathComponent("seg-\(UUID())")),
+                                                      model: ExportProgressModel())
+        let bytes = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: out.path)[.size] as? NSNumber).doubleValue
+        XCTAssertLessThanOrEqual(bytes, 3_000_000, note)
+        XCTAssertGreaterThan(bytes, 3_000_000 * 0.6, "uses most of the budget: \(note)")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: out.deletingLastPathComponent().path).filter { $0.contains("-pass") && $0.contains(out.deletingPathExtension().lastPathComponent) }
+        XCTAssertEqual(leftovers, [], "pass files are cleaned up")
+    }
+}

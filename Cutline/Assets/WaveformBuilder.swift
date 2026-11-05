@@ -75,6 +75,10 @@ final class WaveformStore: ObservableObject {
     private let folder: () -> URL?
     init(folder: @escaping () -> URL?) { self.folder = folder }
 
+    /// Forget the waveforms in memory (Reset Media Caches rebuilds them).
+    @MainActor
+    func removeAll() { waveforms = [:] }
+
     @MainActor
     func ensureWaveform(for asset: Asset) async {
         if waveforms[asset.id] != nil { return }

@@ -11,6 +11,8 @@ enum ExportSheet {
         let host = NSHostingController(rootView: ExportSettingsView(editor: editor, finish: { settings in
             window.endSheet(sheet)
             guard let settings else { return }
+            // Remember the choices for the next export and for the budget bar.
+            if editor.project.exportSettings != settings { editor.edit("Export Settings") { $0.exportSettings = settings } }
             DispatchQueue.main.async { chooseDestination(editor: editor, settings: settings, window: window) }
         }))
         host.sizingOptions = [.preferredContentSize]
@@ -35,7 +37,8 @@ enum ExportSheet {
     }
 
     private static func run(editor: EditorModel, settings: ExportSettings, to url: URL, window: NSWindow) {
-        let exporter = Exporter()
+        guard let cacheDir = editor.segmentCacheURL else { return }
+        let exporter = SegmentExporter(cacheDir: cacheDir)
         let model = ExportProgressModel()
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
         let host = NSHostingController(rootView: ExportProgressView(model: model, fileName: url.lastPathComponent,
@@ -46,11 +49,18 @@ enum ExportSheet {
         let project = editor.project
         Task { @MainActor in
             var failure: Error?
+            var sizeNote: String?
             do {
-                try await exporter.export(project: project, settings: settings, to: url) { p in
-                    Task { @MainActor in model.progress = p }
+                if settings.rateMode == .size, let mb = settings.sizeTargetMB {
+                    sizeNote = try await exportToSize(project: project, settings: settings, targetMB: mb, to: url, exporter: exporter, model: model)
+                } else {
+                    let stats = try await exporter.export(project: project, settings: settings, to: url) { p in
+                        Task { @MainActor in model.progress = p }
+                    }
+                    if stats.reused > 0 { sizeNote = "Reused \(stats.reused) of \(stats.reused + stats.encoded) unchanged segments from the cache." }
                 }
             } catch { failure = error }
+            editor.segmentCacheChanged()
             window.endSheet(sheet)
             if let failure {
                 if case ExportError.cancelled = failure { return }
@@ -61,6 +71,7 @@ enum ExportSheet {
             let alert = NSAlert()
             alert.messageText = "Export finished"
             alert.informativeText = "\(url.lastPathComponent) · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))"
+                + (sizeNote.map { "\n\n" + $0 } ?? "")
             alert.addButton(withTitle: "OK")
             alert.addButton(withTitle: "Show in Finder")
             alert.beginSheetModal(for: window) { r in
@@ -70,8 +81,47 @@ enum ExportSheet {
     }
 }
 
+extension ExportSheet {
+    /// Size-targeted export (R37): each pass renders to its own file beside `url`; the best
+    /// one is kept. Returns a note for the finish alert.
+    @MainActor
+    static func exportToSize(project: Project, settings: ExportSettings, targetMB: Double, to url: URL,
+                             exporter: SegmentExporter, model: ExportProgressModel) async throws -> String {
+        let target = targetMB * 1_000_000
+        var made: [URL] = []
+        defer { made.forEach { try? FileManager.default.removeItem(at: $0) } }
+        let outcome = try await SizeSolver.run(targetBytes: target, duration: project.duration, audioKbps: settings.audioBitrateKbps) { bitrate, pass in
+            model.pass = pass
+            model.progress = 0
+            var s = settings
+            s.bitrateMbps = bitrate / 1_000_000
+            let passURL = url.deletingLastPathComponent()
+                .appendingPathComponent(".\(url.deletingPathExtension().lastPathComponent)-pass\(pass + 1).\(url.pathExtension)")
+            made.append(passURL)
+            try await exporter.export(project: project, settings: s, to: passURL) { p in Task { @MainActor in model.progress = p } }
+
+            let bytes = (try FileManager.default.attributesOfItem(atPath: passURL.path)[.size] as? NSNumber)?.int64Value ?? 0
+            return SizeSolver.Attempt(bitrate: bitrate, bytes: bytes, url: passURL)
+        }
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: outcome.best.url)
+        } else {
+            try FileManager.default.moveItem(at: outcome.best.url, to: url)
+        }
+        let size = ByteCountFormatter.string(fromByteCount: outcome.best.bytes, countStyle: .file)
+        let passes = outcome.attempts.count == 1 ? "1 pass" : "\(outcome.attempts.count) passes"
+        return outcome.met
+            ? "Fits the \(formatMB(targetMB)) target (\(size), \(passes))."
+            : "Couldn't get under \(formatMB(targetMB)) in \(passes). Kept the smallest file (\(size)); try a lower target or a shorter cut."
+    }
+
+    static func formatMB(_ mb: Double) -> String { mb.rounded() == mb ? "\(Int(mb)) MB" : String(format: "%.1f MB", mb) }
+}
+
 final class ExportProgressModel: ObservableObject {
     @Published var progress: Double = 0
+    /// Size-targeted export: which pass is running (0 = first).
+    @Published var pass = 0
     let started = Date()
 }
 
@@ -85,7 +135,7 @@ struct ExportProgressView: View {
             HStack(spacing: 12) {
                 Image(systemName: "square.and.arrow.up.circle.fill").font(.system(size: 32)).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Exporting").font(.title3.bold())
+                    Text(model.pass == 0 ? "Exporting" : "Exporting · correcting size, pass \(model.pass + 1) of \(SizeSolver.maxRetries + 1)").font(.title3.bold())
                     Text(fileName).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
@@ -162,10 +212,24 @@ struct ExportSettingsView: View {
                     Picker("", selection: $settings.rateMode) {
                         Text("Constant quality").tag(ExportSettings.RateMode.quality)
                         Text("Target bitrate").tag(ExportSettings.RateMode.bitrate)
+                        Text("Target size").tag(ExportSettings.RateMode.size)
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
-                if settings.rateMode == .quality {
+                if settings.rateMode == .size {
+                    row("Maximum size") {
+                        HStack {
+                            TextField("", value: Binding(get: { settings.sizeTargetMB ?? 50 }, set: { settings.sizeTargetMB = max(0.1, $0) }),
+                                      format: .number.precision(.fractionLength(0...1)))
+                                .textFieldStyle(.roundedBorder).frame(width: 80).multilineTextAlignment(.trailing)
+                            Text("MB").foregroundStyle(.secondary)
+                            if let v = settings.sizeTargetBitrateMbps(duration: editor.project.duration) {
+                                Text(v * 1_000_000 < SizeSolver.minimumVideoBitrate ? "too small for this length" : String(format: "≈ %.1f Mbit/s video", v))
+                                    .foregroundStyle(v * 1_000_000 < SizeSolver.minimumVideoBitrate ? Color.red : Color.secondary)
+                            }
+                        }
+                    }
+                } else if settings.rateMode == .quality {
                     row("Quality") {
                         ValueRow(label: "", value: settings.quality * 100, range: 30...100, step: 1, format: "%.0f%%", defaultValue: 100,
                                  onChange: { settings.quality = $0 / 100 }, onCommit: {})
@@ -191,7 +255,9 @@ struct ExportSettingsView: View {
             Label {
                 Text(settings.rateMode == .quality
                      ? "Constant quality keeps the picture at the chosen quality, so busy scenes use more data. The size is measured by test-encoding the busiest parts of your timeline."
-                     : "Target bitrate keeps the data rate fixed, so the size is predictable: bitrate × length. Use it when a platform limits file size.")
+                     : settings.rateMode == .bitrate
+                     ? "Target bitrate keeps the data rate fixed, so the size is predictable: bitrate × length."
+                     : "Target size picks the bitrate that fills the size you set, checks the finished file, and re-encodes automatically (up to twice) if it came out too big. Use it when a platform limits file size.")
             } icon: { Image(systemName: "info.circle") }
             .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
@@ -232,7 +298,7 @@ struct ExportSettingsView: View {
     private func refreshEstimate() {
         estimateTask?.cancel()
         guard editor.project.duration > 0 else { estimate = nil; return }
-        if settings.rateMode == .bitrate {
+        if settings.rateMode != .quality {
             estimating = false
             estimate = settings.estimatedBytes(duration: editor.project.duration)
             return
