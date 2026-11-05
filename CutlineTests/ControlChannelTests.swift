@@ -127,6 +127,23 @@ final class ControlTrackTests: XCTestCase {
         XCTAssertEqual(tracks[1]["items"]?.array?.first?["kind"]?.string, "image")
         XCTAssertEqual(tracks[2]["items"]?.array?.first?["kind"]?.string, "dummy")
         XCTAssertEqual(tracks[2]["items"]?.array?.first?["name"]?.string, "Outro")
+        XCTAssertNil(items[0]["description"], "videos have no description")
+        XCTAssertNotNil(tracks[2]["items"]?.array?.first?["dummy_id"]?.string)
+    }
+
+    func testReadingBackWhatTheUserReArranged() throws {
+        var p = project()
+        try p.placeDummies([PlacedScene(title: "Bridge", description: "Rooftop at night", start: 20, end: 40, color: nil)],
+                           track: 0, songTime: false, replace: true, defaults: DummyDefaults())
+        // The user drags the dummy later and trims it.
+        let i = p.videoTracks[0].clips.firstIndex { p.asset($0.assetID)?.isDummy == true }!
+        p.videoTracks[0].clips[i].start = 22
+        p.videoTracks[0].clips[i].duration = 15
+        let item = try XCTUnwrap(p.videoTrackListing.array?[0]["items"]?.array?.first { $0["kind"]?.string == "dummy" })
+        XCTAssertEqual(item["name"]?.string, "Bridge")
+        XCTAssertEqual(item["description"]?.string, "Rooftop at night")
+        XCTAssertEqual(item["start"]?.number, 22)
+        XCTAssertEqual(item["end"]?.number, 37, "the times as they are now on the timeline")
     }
 
     func testTracksCanBeCreatedAnywhere() {

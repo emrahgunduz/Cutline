@@ -1,6 +1,6 @@
 ---
 name: cutline-dummies
-description: Read a music video production document (treatment, concept, shot list or storyboard) and place one Cutline dummy card per scene on the timeline at the scene's exact start and end, through Cutline's control channel. Use when the user wants to put the scenes of a production / concept document into Cutline, block out a video with placeholders, or "generate dummies" from a document. Triggers on: cutline dummies, place dummies, dummies from the document, put the scenes in Cutline, block out the timeline, storyboard to Cutline.
+description: Place one Cutline dummy card per scene of a music video production document (treatment, concept, shot list or storyboard) at the scene's exact start and end, through Cutline's control channel; and the reverse, read the dummies' times back from Cutline after the user re-arranged them and update the document. Use when the user wants to put a document's scenes into Cutline, block out a video with placeholders, "generate dummies", or bring the edited scene timing back into the document. Triggers on: cutline dummies, place dummies, dummies from the document, put the scenes in Cutline, block out the timeline, storyboard to Cutline, update the document from Cutline, read the dummies back, sync scene times from Cutline.
 ---
 
 # Cutline dummies from a production document
@@ -62,6 +62,20 @@ Then `list_video_tracks` again and check the track's dummies match what you sent
 ## 5. Tell the user
 
 How many dummies were placed, on which project and track (and whether you created it), from when to when; that it's one undo step in Cutline (Edit > Undo Place Dummies); and any scene you skipped or changed and why. Keep it short.
+
+## Reading the timing back into the document
+
+When the user has re-arranged the dummies in Cutline (moved, trimmed, cut, deleted, reordered) and wants the document to match:
+
+1. Connect as in step 2 (hello, use). `project_info` gives `song_start`.
+2. `list_video_tracks`; take the dummy items (`kind: "dummy"`) of the track the scenes are on (the one you or the user chose; if unsure, ask). Each has `name` (its title), `description`, `start`, `end` in timeline seconds, and `dummy_id`.
+3. Convert to song time: `song time = timeline time − song_start` (the document's times are song times), and write them in the document's own format (e.g. `MM:SS.cc`, with the duration in seconds if the document shows it).
+4. Match each dummy to its scene by title first, then by description. Sort by start: that is the new scene order.
+   - Two items with the same `dummy_id`: the user cut one scene into two. Ask whether to split the scene in the document or keep it as one.
+   - A scene with no dummy left: the user removed it. Ask before deleting it from the document.
+   - A dummy that matches no scene: ask what it is.
+5. Before editing, show the user a compact before/after table (scene, old start–end, new start–end) of only what changed. Then update the document: times and durations, scene order; keep everything else as it is (don't rewrite the scene text). If the document requires contiguous scenes (like `music-video-concept`'s "contiguous from 00:00.00"), point out any gaps or overlaps the new timing has instead of silently fixing them.
+6. `bye`. The dummy cards still show their original length in their bottom-right corner; that's fine (a fresh add_dummies run would redraw them).
 
 ## Rules
 

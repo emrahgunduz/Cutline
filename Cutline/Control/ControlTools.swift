@@ -112,8 +112,15 @@ extension Project {
                 "items": .array(t.clips.sorted { $0.start < $1.start }.map { c in
                     let a = asset(c.assetID)
                     let kind = a?.isDummy == true ? "dummy" : (a?.kind == .image ? "image" : "video")
-                    return .object(["id": .string(c.id.uuidString.lowercased()), "name": .string(a?.name ?? ""), "kind": .string(kind),
-                                    "start": .number(c.start), "end": .number(c.end)])
+                    var item: [String: JSONValue] = ["id": .string(c.id.uuidString.lowercased()), "name": .string(a?.name ?? ""), "kind": .string(kind),
+                                                     "start": .number(c.start), "end": .number(c.end)]
+                    // A dummy also says what scene it stands for, so its times can be read back
+                    // into the production document after the user re-arranges the timeline.
+                    if let card = a?.dummy {
+                        item["description"] = .string(card.sceneDescription)
+                        item["dummy_id"] = .string(a!.id.uuidString.lowercased())
+                    }
+                    return .object(item)
                 }),
             ])
         })
@@ -127,7 +134,7 @@ enum ControlTools {
                         description: "The project's size, frame rate, length, where the song starts, and a summary of its video tracks.",
                         arguments: [:]),
         ControlToolInfo(name: "list_video_tracks",
-                        description: "Every video track, bottom layer first (index 0 is drawn first; the highest index is on top), with its id, name, whether it's hidden, and what is on it: each item's id, name, kind (video, image or dummy), start and end in seconds (timeline time).",
+                        description: "Every video track, bottom layer first (index 0 is drawn first; the highest index is on top), with its id, name, whether it's hidden, and what is on it: each item's id, name, kind (video, image or dummy), start and end in seconds (timeline time). Dummies also give their scene description and dummy_id (the same card used twice, e.g. after a cut, has the same dummy_id). The project's song_start (project_info) converts timeline times back to song times.",
                         arguments: [:]),
         ControlToolInfo(name: "create_video_track",
                         description: "Add an empty video track and return its index and id. Tracks can be created, never deleted.",
