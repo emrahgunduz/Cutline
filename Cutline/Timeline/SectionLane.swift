@@ -54,21 +54,24 @@ enum SectionLane {
     /// Where the waveform draws an amplitude `v` (0...1) in `wave`: above and below its centre
     /// line. The waveform, the loudness curve and the loud/quiet levels all use this, so they
     /// share one scale.
-    static func amplitudeY(_ v: Float, in wave: CGRect) -> (top: CGFloat, bottom: CGFloat) {
-        let half = max(0, wave.height / 2 - 2)
-        let a = CGFloat(min(1, max(0, v))) * half
+    /// `gain` scales the song so its loudest moment fills the row (Waveform.displayGain).
+    static let wavePadding: CGFloat = 4
+
+    static func amplitudeY(_ v: Float, gain: Float = 1, in wave: CGRect) -> (top: CGFloat, bottom: CGFloat) {
+        let half = max(0, wave.height / 2 - wavePadding)
+        let a = CGFloat(min(1, max(0, v * gain))) * half
         return (wave.midY - a, wave.midY + a)
     }
 
     /// The loudness curve (smoothed RMS, mirrored like the waveform's RMS layer) and the loud
     /// and quiet levels (dashed, mirrored), drawn over the waveform on its own scale.
-    static func drawLoudnessCurve(_ envelope: Loudness.Envelope?, audioStart: Double, in wave: CGRect,
+    static func drawLoudnessCurve(_ envelope: Loudness.Envelope?, gain: Float, audioStart: Double, in wave: CGRect,
                                   visible: ClosedRange<CGFloat>, time: (CGFloat) -> Double) {
         guard let e = envelope, e.peak > 0, wave.height > 12 else { return }
         let lo = max(visible.lowerBound, wave.minX), hi = min(visible.upperBound, wave.maxX)
         guard hi > lo else { return }
         for (level, color) in [(e.loudLevel, loudColor), (e.quietLevel, quietColor)] {
-            let y = amplitudeY(level, in: wave)
+            let y = amplitudeY(level, gain: gain, in: wave)
             let line = NSBezierPath()
             for edge in [y.top, y.bottom] {
                 line.move(to: CGPoint(x: lo, y: edge)); line.line(to: CGPoint(x: hi, y: edge))
@@ -82,7 +85,7 @@ enum SectionLane {
         var px = lo
         var first = true
         while px <= hi {
-            let y = amplitudeY(e.value(at: time(px) - audioStart), in: wave)
+            let y = amplitudeY(e.value(at: time(px) - audioStart), gain: gain, in: wave)
             if first { upper.move(to: CGPoint(x: px, y: y.top)); lower.move(to: CGPoint(x: px, y: y.bottom)); first = false }
             else { upper.line(to: CGPoint(x: px, y: y.top)); lower.line(to: CGPoint(x: px, y: y.bottom)) }
             px += 2

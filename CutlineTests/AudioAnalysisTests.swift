@@ -129,11 +129,11 @@ final class AudioAnalysisTests: XCTestCase {
 
     func testTheCurveAndLevelsUseTheWaveformsScale() throws {
         let e = try XCTUnwrap(Loudness.envelope(steppedWaveform()))
-        let wave = CGRect(x: 0, y: 20, width: 100, height: 64)      // centre 52, half 30
+        let wave = CGRect(x: 0, y: 20, width: 100, height: 68)      // centre 54, half 34 - 4 padding = 30
         let loud = SectionLane.amplitudeY(e.loudLevel, in: wave), quiet = SectionLane.amplitudeY(e.quietLevel, in: wave)
         // An amplitude sits where the waveform draws it: centre ± value × half.
-        XCTAssertEqual(loud.top, 52 - CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
-        XCTAssertEqual(loud.bottom, 52 + CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
+        XCTAssertEqual(loud.top, 54 - CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
+        XCTAssertEqual(loud.bottom, 54 + CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
         XCTAssertEqual((loud.top + loud.bottom) / 2, wave.midY, accuracy: 1e-6, "mirrored around the waveform's centre")
         XCTAssertEqual((quiet.top + quiet.bottom) / 2, wave.midY, accuracy: 1e-6)
         XCTAssertLessThan(loud.top, quiet.top, "the loud level is further from the centre")
@@ -141,6 +141,39 @@ final class AudioAnalysisTests: XCTestCase {
         let rms: Float = 0.5
         XCTAssertEqual(SectionLane.amplitudeY(e.value(at: 25), in: wave).top, SectionLane.amplitudeY(rms, in: wave).top, accuracy: 1e-3)
         XCTAssertEqual(SectionLane.amplitudeY(2, in: wave).top, wave.midY - 30, "clamped to the lane")
+    }
+
+    func testTheLoudestAverageLevelFillsTheRow() throws {
+        let wf = steppedWaveform()                       // loudest RMS 0.5
+        XCTAssertEqual(wf.peakRMS, 0.5, accuracy: 1e-6)
+        XCTAssertEqual(wf.displayGain, 1.8, accuracy: 1e-6)
+        let wave = CGRect(x: 0, y: 0, width: 100, height: 64)   // half 32 - 4 padding = 28
+        XCTAssertEqual(SectionLane.amplitudeY(wf.peakRMS, gain: wf.displayGain, in: wave).top, wave.midY - 28 * 0.9, accuracy: 1e-3,
+                       "without a curve, the loudest average level reaches 90% of the row")
+        XCTAssertEqual(SectionLane.amplitudeY(0.9, gain: wf.displayGain, in: wave).top, wave.midY - 28, accuracy: 1e-6, "louder peaks stop at the padding")
+        // The curve and the levels get the same gain as the waveform.
+        let e = try XCTUnwrap(Loudness.envelope(wf))
+        XCTAssertEqual(SectionLane.amplitudeY(e.loudLevel, gain: 2, in: wave).top, SectionLane.amplitudeY(e.loudLevel * 2, in: wave).top, accuracy: 1e-6)
+    }
+
+    func testTheCurvesLoudestMomentFillsTheRowWithAMargin() throws {
+        let e = try XCTUnwrap(Loudness.envelope(steppedWaveform()))
+        let wave = CGRect(x: 0, y: 0, width: 100, height: 108)  // half 54 - 4 padding = 50
+        let gain = e.displayGain()
+        let top = SectionLane.amplitudeY(e.peak, gain: gain, in: wave).top
+        XCTAssertEqual(top, wave.midY - 50 * 0.92, accuracy: 1e-3, "the curve's loudest moment reaches 92%")
+        XCTAssertGreaterThan(top, wave.minY + SectionLane.wavePadding, "with a margin from the top")
+        let quiet = SectionLane.amplitudeY(e.quietLevel, gain: gain, in: wave)
+        XCTAssertGreaterThan(quiet.bottom - quiet.top, 10, "the quiet level is spread out, not squeezed at the centre")
+        XCTAssertEqual(Loudness.Envelope(bucket: 1, values: [0], loudLevel: 0, quietLevel: 0, peak: 0).displayGain(), 1)
+    }
+
+    func testTheGainIsCappedAndSilenceIsLeftAlone() {
+        let tiny: [Float] = [0.001, 0.002]
+        XCTAssertEqual(Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 1, mins: tiny.map { -$0 }, maxs: tiny, rms: tiny)]).displayGain, 20)
+        XCTAssertEqual(Waveform(sampleRate: 48000, levels: []).displayGain, 1)
+        let full: [Float] = [1, 0.9]
+        XCTAssertEqual(Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 1, mins: full.map { -$0 }, maxs: full, rms: full)]).displayGain, 0.9, accuracy: 1e-6)
     }
 
     func testSilenceHasNoEnvelope() {
