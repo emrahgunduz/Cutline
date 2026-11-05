@@ -33,6 +33,8 @@ struct ValueRow: View {
     let range: ClosedRange<Double>
     var step: Double? = nil
     var format: String = "%.2f"
+    /// When set, a reset arrow appears while the value differs from it.
+    var defaultValue: Double? = nil
     let onChange: (Double) -> Void
     let onCommit: () -> Void
 
@@ -55,10 +57,19 @@ struct ValueRow: View {
                 .focused($focused)
                 .onSubmit(commitText)
                 .onChange(of: focused) { _, f in if !f { commitText() } }
+            Button {
+                if let d = defaultValue { onChange(d); onCommit() }
+            } label: { Image(systemName: "arrow.counterclockwise").font(.system(size: 10)) }
+            .buttonStyle(.borderless)
+            .help("Reset \(label)")
+            .opacity(isDefault ? 0 : 1)
+            .disabled(isDefault)
         }
         .onAppear { text = String(format: format, value) }
         .onChange(of: value) { _, v in if !focused { text = String(format: format, v) } }
     }
+
+    private var isDefault: Bool { defaultValue.map { abs($0 - value) < 1e-9 } ?? true }
 
     private func quantized(_ v: Double) -> Double {
         guard let step else { return v }

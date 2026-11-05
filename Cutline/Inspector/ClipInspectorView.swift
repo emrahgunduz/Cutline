@@ -16,21 +16,22 @@ struct ClipInspectorView: View {
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
                     InspectorSection(title: "Size & Position", icon: "arrow.up.left.and.arrow.down.right") {
-                        row("Scale", clip.transform.scale, 0.05...4, step: 0.01) { $0.transform.scale = $1 }
-                        row("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width), step: 1, format: "%.0f") { $0.transform.offsetX = $1 }
-                        row("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height), step: 1, format: "%.0f") { $0.transform.offsetY = $1 }
+                        row("Scale", clip.transform.scale, 0.05...4, step: 0.01, reset: 1) { $0.transform.scale = $1 }
+                        row("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetX = $1 }
+                        row("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetY = $1 }
                         HStack {
                             Spacer()
-                            Button("Reset") { editor.edit("Reset Transform") { $0.updateClip(clipID) { $0.transform = ClipTransform() } } }
-                                .controlSize(.small)
-                                .disabled(clip.transform == ClipTransform())
+                            Button("Reset Scale") { editor.edit("Reset Scale") { $0.updateClip(clipID) { $0.transform.scale = 1 } } }
+                                .controlSize(.small).disabled(clip.transform.scale == 1)
+                            Button("Reset Position") { editor.edit("Reset Position") { $0.updateClip(clipID) { $0.transform.offsetX = 0; $0.transform.offsetY = 0 } } }
+                                .controlSize(.small).disabled(clip.transform.offsetX == 0 && clip.transform.offsetY == 0)
                         }
                     }
                     InspectorSection(title: "Color", icon: "paintpalette", isOn: toggle(clip.filters.color.enabled, "Color") { $0.filters.color.enabled = $1 }) {
-                        row("Hue", clip.filters.color.hue, -180...180, step: 1, format: "%.0f°") { $0.filters.color.hue = $1 }
-                        row("Saturation", clip.filters.color.saturation, 0...2) { $0.filters.color.saturation = $1 }
-                        row("Brightness", clip.filters.color.brightness, -1...1) { $0.filters.color.brightness = $1 }
-                        row("Contrast", clip.filters.color.contrast, 0...2) { $0.filters.color.contrast = $1 }
+                        row("Hue", clip.filters.color.hue, -180...180, step: 1, format: "%.0f°", reset: 0) { $0.filters.color.hue = $1 }
+                        row("Saturation", clip.filters.color.saturation, 0...2, reset: 1) { $0.filters.color.saturation = $1 }
+                        row("Brightness", clip.filters.color.brightness, -1...1, reset: 0) { $0.filters.color.brightness = $1 }
+                        row("Contrast", clip.filters.color.contrast, 0...2, reset: 1) { $0.filters.color.contrast = $1 }
                         HStack {
                             Spacer()
                             Button("Reset") { editor.edit("Reset Color") { $0.updateClip(clipID) { $0.filters.color = ColorFilter(enabled: true) } } }
@@ -38,8 +39,8 @@ struct ClipInspectorView: View {
                         }
                     }
                     InspectorSection(title: "Fade In / Out", icon: "circle.lefthalf.filled", isOn: toggle(clip.filters.fade.enabled, "Fade") { $0.filters.fade.enabled = $1 }) {
-                        row("Fade in", clip.filters.fade.fadeIn, 0...min(5, clip.duration), step: 0.01, format: "%.2fs") { $0.filters.fade.fadeIn = $1 }
-                        row("Fade out", clip.filters.fade.fadeOut, 0...min(5, clip.duration), step: 0.01, format: "%.2fs") { $0.filters.fade.fadeOut = $1 }
+                        row("Fade in", clip.filters.fade.fadeIn, 0...min(5, clip.duration), step: 0.01, format: "%.2fs", reset: 0.5) { $0.filters.fade.fadeIn = $1 }
+                        row("Fade out", clip.filters.fade.fadeOut, 0...min(5, clip.duration), step: 0.01, format: "%.2fs", reset: 0.5) { $0.filters.fade.fadeOut = $1 }
                     }
                 }
                 .padding(12)
@@ -52,8 +53,8 @@ struct ClipInspectorView: View {
     }
 
     private func row(_ label: String, _ value: Double, _ range: ClosedRange<Double>, step: Double? = nil, format: String = "%.2f",
-                     set: @escaping (inout Clip, Double) -> Void) -> some View {
-        ValueRow(label: label, value: value, range: range, step: step, format: format,
+                     reset: Double? = nil, set: @escaping (inout Clip, Double) -> Void) -> some View {
+        ValueRow(label: label, value: value, range: range, step: step, format: format, defaultValue: reset,
                  onChange: { v in editor.liveEdit { $0.updateClip(clipID) { set(&$0, v) } } },
                  onCommit: { editor.endLiveEdit(label) })
     }

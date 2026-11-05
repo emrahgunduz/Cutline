@@ -183,6 +183,12 @@ struct LyricStyle: Codable, Equatable {
     var shadowDX: Double = 0
     var shadowDY: Double = 4   // +down
     var shadowColor = RGBA(r: 0, g: 0, b: 0, a: 0.8)
+    /// Shadow density multiplier (1 = the color's own opacity). Optional so older projects load.
+    var shadowStrengthValue: Double?
+    var shadowStrength: Double {
+        get { shadowStrengthValue ?? 1 }
+        set { shadowStrengthValue = newValue }
+    }
     /// Vertical center of the lyric block, as a fraction of canvas height from the top.
     var verticalPosition: Double = 0.82
 }

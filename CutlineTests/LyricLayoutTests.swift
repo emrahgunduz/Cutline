@@ -50,3 +50,29 @@ final class LyricLayoutTests: XCTestCase {
         XCTAssertNil(r.image(at: 12))
     }
 }
+
+final class ShadowStrengthTests: XCTestCase {
+    func testOldProjectsWithoutStrengthDecodeAtOne() throws {
+        let json = try JSONEncoder().encode(LyricStyle())
+        var dict = try JSONSerialization.jsonObject(with: json) as! [String: Any]
+        dict.removeValue(forKey: "shadowStrengthValue")
+        let style = try JSONDecoder().decode(LyricStyle.self, from: JSONSerialization.data(withJSONObject: dict))
+        XCTAssertEqual(style.shadowStrength, 1)
+    }
+
+    func testStrongerShadowIsDarkerAroundText() throws {
+        func meanAlpha(_ strength: Double) throws -> Double {
+            var p = Project(type: .musicVideo, canvas: .init(width: 640, height: 360))
+            p.fps = 24
+            p.lyricStyle.shadowBlur = 10
+            p.lyricStyle.shadowStrength = strength
+            p.lyricTracks[0].lines = [LyricLine(start: 0, end: 5, words: [LyricWord(text: "WWWW", start: 0, end: 5)])]
+            let img = try XCTUnwrap(LyricRenderer(project: p).image(at: 2))
+            let avg = img.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: img.extent)])
+            var px = [UInt8](repeating: 0, count: 4)
+            CIContext().render(avg, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
+            return Double(px[3])
+        }
+        XCTAssertGreaterThan(try meanAlpha(3), try meanAlpha(1))
+    }
+}
