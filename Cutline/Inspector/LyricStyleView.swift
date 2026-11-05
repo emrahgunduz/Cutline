@@ -14,6 +14,7 @@ struct LyricStyleView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if let text = selectedText { Text(text).font(.headline).lineLimit(3) }
+                LineLayoutSection()
                 placement
                 if !editor.placementLineIDs.isEmpty { NudgeSection(what: editor.placementLineIDs.count > 1 ? "the selected lines" : "the line") }
                 InspectorSection(title: "Text", icon: "textformat") {

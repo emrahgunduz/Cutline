@@ -84,8 +84,14 @@ extension EditorModel {
                 guard let loc = p.lineLocation(id) else { continue }
                 var l = p.lyricTracks[loc.track].lines[loc.index]
                 let auto = renderer.placedLines(at: l.start + 0.001).first { $0.line.id == id }?.rect
-                if let h = horizontal { l.centerX = Double(LyricPlacement.x(for: h, box: boxes[i], canvasWidth: canvas.width, padding: CGFloat(paddingX))).rounded() }
-                else if l.centerX == nil { l.centerX = Double(auto?.midX ?? canvas.width / 2) }
+                // The x stored is the line's alignment anchor (left edge, middle or right edge).
+                let w = boxes[i].size.width
+                if let h = horizontal {
+                    let mid = LyricPlacement.x(for: h, box: boxes[i], canvasWidth: canvas.width, padding: CGFloat(paddingX))
+                    l.centerX = Double(LineLayout.anchor(boxMidX: mid, width: w, align: l.layout.align)).rounded()
+                } else if l.centerX == nil {
+                    l.centerX = Double(LineLayout.anchor(boxMidX: auto?.midX ?? canvas.width / 2, width: w, align: l.layout.align)).rounded()
+                }
                 if let ys { l.centerY = Double(ys[i]).rounded() }
                 else if l.centerY == nil { l.centerY = Double(auto?.midY ?? canvas.height * 0.2) }
                 p.lyricTracks[loc.track].lines[loc.index] = l

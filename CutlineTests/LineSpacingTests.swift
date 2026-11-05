@@ -75,35 +75,6 @@ final class LineSpacingTests: XCTestCase {
     }
 }
 
-final class LyricWrapTests: XCTestCase {
-    func testALongLineWrapsAtTheSameFontSize() throws {
-        var p = Project(type: .social, canvas: .init(width: 1080, height: 1920))
-        let words = "Seviyor da kendince de sevilmek istiyor sevilince".split(separator: " ").map { LyricWord(text: String($0), start: 0, end: 5) }
-        p.lyricTracks[0].lines = [LyricLine(start: 0, end: 5, words: words)]
-        let placed = try XCTUnwrap(LyricRenderer(project: p).placedLines(at: 1).first)
-        XCTAssertEqual(placed.fit, 1, "the font isn't scaled down")
-        XCTAssertGreaterThanOrEqual(placed.raster.rows, 2)
-        XCTAssertEqual(placed.raster.wordRects.count, words.count)
-        XCTAssertLessThanOrEqual(placed.rect.width, 1080)
-        // Rows are balanced: the words split near the middle rather than leaving one word behind.
-        let rows = LineRasterizer.wrap(words.map(\.text), maxWidth: 600) { CGFloat($0.joined(separator: " ").count) * 20 }
-        let lengths = rows.map { $0.joined(separator: " ").count }
-        XCTAssertLessThanOrEqual(lengths.max()! - lengths.min()!, 12, "\(rows)")
-    }
-
-    func testAShortLineStaysOnOneRowAndStackedLinesDontOverlap() throws {
-        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
-        let long = "Seviyor da kendince de sevilmek istiyor sevilince ve daha da uzun bir satır".split(separator: " ").map { LyricWord(text: String($0), start: 0, end: 5) }
-        p.lyricTracks = [LyricTrack(lines: [LyricLine(start: 0, end: 5, words: long)]),
-                         LyricTrack(lines: [LyricLine(start: 0, end: 5, words: [LyricWord(text: "kısa", start: 0, end: 5)])])]
-        let placed = LyricRenderer(project: p).placedLines(at: 1)
-        XCTAssertEqual(placed.count, 2)
-        XCTAssertEqual(placed[1].raster.rows, 1)
-        XCTAssertGreaterThanOrEqual(placed[0].raster.rows, 2)
-        XCTAssertGreaterThanOrEqual(placed[0].rect.minY, placed[1].rect.maxY - placed[1].rect.height * 0.25, "the wrapped line sits above the next one")
-    }
-}
-
 final class ExportSettingsTargetTests: XCTestCase {
     func testTargetSizeModeUsesTheShownTargetEvenBeforeItIsEdited() {
         let p = Project(type: .social, canvas: .init(width: 1080, height: 1920))

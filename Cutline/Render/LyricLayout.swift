@@ -126,7 +126,7 @@ struct LineRaster {
     let wordRects: [CGRect]
     /// Per word, the rectangle of each letter (grapheme), for letter-by-letter fades.
     var letterRects: [[CGRect]] = []
-    /// Rows the line wrapped onto.
+    /// Rows the line has (1 for a single line).
     var rows = 1
     /// Where the letters are (glyph outlines, raster coordinates, y up).
     var ink: CGRect = .null
@@ -138,9 +138,13 @@ enum LineRasterizer {
         return f
     }
 
-    /// Rasterize the line's words in the lyric color. A line wider than `maxWidth` wraps onto
-    /// balanced rows (the font size never changes); rows are centred on each other.
-    static func rasterize(words: [String], style: LyricStyle, fontSize: CGFloat, scale: CGFloat = 1, maxWidth: CGFloat? = nil) -> LineRaster? {
+    /// Rasterize the line's words in the lyric color, at the font size (never scaled to fit).
+    /// - `wrapWidth` nil: one row, as wide as the text.
+    /// - `wrapWidth` set: the words wrap at that width (in canvas pixels at `scale` 1); the box
+    ///   is that wide (wider only if one word is), and as tall as its rows.
+    /// - `align`: where each row sits inside the box.
+    static func rasterize(words: [String], style: LyricStyle, fontSize: CGFloat, scale: CGFloat = 1,
+                          wrapWidth: CGFloat? = nil, align: LineLayout.Align = .left) -> LineRaster? {
         guard !words.joined().isEmpty else { return nil }
         let ctFont = font(style, size: fontSize * scale)
         func ctLine(_ text: String) -> CTLine {
@@ -151,15 +155,16 @@ enum LineRasterizer {
         }
         func width(_ line: CTLine) -> CGFloat { CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)) }
         let pad = ceil(fontSize * scale * 0.15)
-        let rows = wrap(words, maxWidth: maxWidth.map { $0 * scale - pad * 2 }) { width(ctLine($0.joined(separator: " "))) }
+        let rows = wrap(words, width: wrapWidth.map { $0 * scale }) { width(ctLine($0.joined(separator: " "))) }
         let lines = rows.map { ctLine($0.joined(separator: " ")) }
         var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
         _ = CTLineGetTypographicBounds(ctLine(words.joined(separator: " ")), &ascent, &descent, &leading)
         let widths = lines.map(width)
+        let content = max(widths.max() ?? 0, wrapWidth.map { $0 * scale } ?? 0)
         let rowStep = ceil(ascent + descent + pad)
-        let size = CGSize(width: ceil((widths.max() ?? 0) + pad * 2), height: ceil(rowStep * CGFloat(rows.count) + pad))
-        guard size.width > 0, let ctx = CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
-                                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let size = CGSize(width: max(1, ceil(content + pad * 2)), height: ceil(rowStep * CGFloat(rows.count) + pad))
+        guard let ctx = CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.setAllowsFontSmoothing(false)
         var rects: [CGRect] = []
         var letters: [[CGRect]] = []
@@ -168,7 +173,12 @@ enum LineRasterizer {
             let line = lines[r]
             // Row 0 is on top (y grows upwards).
             let bottom = rowStep * CGFloat(rows.count - 1 - r)
-            let left = (size.width - pad * 2 - widths[r]) / 2
+            let left: CGFloat
+            switch align {
+            case .left: left = 0
+            case .center: left = (content - widths[r]) / 2
+            case .right: left = content - widths[r]
+            }
             ctx.textPosition = CGPoint(x: pad + left, y: pad + descent + bottom)
             CTLineDraw(line, ctx)
             let glyphs = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
@@ -207,26 +217,16 @@ enum LineRasterizer {
         return raster
     }
 
-    /// Split words into the fewest rows that fit `maxWidth`, with the rows as even as possible.
-    /// A single word wider than the limit gets a row of its own.
-    static func wrap(_ words: [String], maxWidth: CGFloat?, measure: ([String]) -> CGFloat) -> [[String]] {
-        guard let maxWidth, words.count > 1, measure(words) > maxWidth else { return [words] }
-        func greedy(_ limit: CGFloat) -> [[String]] {
-            var rows: [[String]] = [], row: [String] = []
-            for w in words {
-                if !row.isEmpty && measure(row + [w]) > limit { rows.append(row); row = [w] } else { row.append(w) }
-            }
-            if !row.isEmpty { rows.append(row) }
-            return rows
+    /// Split words into rows no wider than `width`, filling each row before starting the next
+    /// (like a text box). nil = one row. A word wider than the width gets a row of its own.
+    static func wrap(_ words: [String], width: CGFloat?, measure: ([String]) -> CGFloat) -> [[String]] {
+        guard let width, words.count > 1 else { return [words] }
+        var rows: [[String]] = [], row: [String] = []
+        for w in words {
+            if !row.isEmpty && measure(row + [w]) > width + 0.5 { rows.append(row); row = [w] } else { row.append(w) }
         }
-        let count = greedy(maxWidth).count
-        // The narrowest limit that still needs no more rows than that: balanced rows.
-        var lo = measure(words) / CGFloat(count), hi = maxWidth
-        for _ in 0..<16 {
-            let mid = (lo + hi) / 2
-            if greedy(mid).count <= count { hi = mid } else { lo = mid }
-        }
-        return greedy(hi)
+        if !row.isEmpty { rows.append(row) }
+        return rows
     }
 
     /// True when the font has a glyph for every character of `text`.

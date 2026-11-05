@@ -8,7 +8,7 @@ import Foundation
 /// of the ranges whose output it changes.
 enum RenderKey {
     /// Bump when the renderer's output changes, so every cached frame and segment is stale.
-    static let rendererVersion = 2
+    static let rendererVersion = 3
 
     private struct Signature: Encodable {
         var version = RenderKey.rendererVersion
@@ -28,7 +28,7 @@ enum RenderKey {
         var start: Double; var duration: Double; var sourceIn: Double
         var transform: ClipTransform; var filters: FilterSettings
     }
-    private struct LineSig: Encodable { var id: UUID; var track: Int; var text: String; var x: Double?; var y: Double?; var drawn: [Double] }
+    private struct LineSig: Encodable { var id: UUID; var track: Int; var text: String; var x: Double?; var y: Double?; var layout: LineLayout; var drawn: [Double] }
     private struct WordSig: Encodable { var line: UUID; var text: String; var start: Double; var end: Double }
     struct EncoderSig: Encodable, Equatable { var codec: String; var mode: String; var quality: Double?; var bitrate: Double? }
 
@@ -60,7 +60,7 @@ enum RenderKey {
                 let drawnEnd = max(l.end, l.words.map { LyricLayout.visibleEnd(of: $0, letters: $0.text.count, animation: animation) }.max() ?? l.end)
                 guard l.start < end, drawnEnd > start else { continue }
                 // Only the part of the line's life inside this range matters (which lines stack).
-                sig.lines.append(LineSig(id: l.id, track: t, text: l.text, x: l.centerX, y: l.centerY,
+                sig.lines.append(LineSig(id: l.id, track: t, text: l.text, x: l.centerX, y: l.centerY, layout: l.layout,
                                          drawn: [max(l.start, start), min(drawnEnd, end)]))
                 for w in l.words where w.start < end && LyricLayout.visibleEnd(of: w, letters: w.text.count, animation: animation) > start {
                     sig.words.append(WordSig(line: l.id, text: w.text, start: w.start, end: w.end))
