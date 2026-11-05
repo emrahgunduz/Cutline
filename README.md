@@ -66,13 +66,43 @@ The first time you open Cutline, the New Project window offers to download them.
 ## Building
 
 ```bash
-scripts/build_python_runtime.sh   # once: the Python runtime into build/ml (and a development copy of the models into build/ml/models)
-scripts/build_release.sh          # the Release app into build/Release/Cutline.app
+scripts/build_python_runtime.sh   # once: the Python runtime into build/ml, and a development copy of the models into build/ml/models
+scripts/build_release.sh          # the Release app
 ```
 
-Run `xcodegen generate` after adding, moving or removing source files; the build scripts run it too. Every build raises `BUILD_NUMBER` and stamps the app as 1.0.<build number>.
+`scripts/build_release.sh` builds the Python runtime when it's missing or its lock file changed, then the Release app. It re-signs the app (ad-hoc), zips it, and runs a smoke test. The test checks that the app's bundled helper works in a clean environment and refuses the network. Then it analyses a short synthetic song and aligns lyrics on it, with internet access blocked.
 
-Tests:
+- `--clean` rebuilds everything, including the Python runtime. It keeps the models in `build/ml/models`.
+- `--no-smoke` skips the analysis part of the smoke test.
+- `--open` opens the app when done.
+
+The results go to `build/Release`:
+- `Cutline.app`
+- `Cutline.app.dSYM` (symbols for crash logs; the app's binary is stripped)
+- `Cutline.zip` and `Cutline.zip.sha256`
+
+Run `xcodegen generate` after adding, moving or removing source files; the build scripts run it too.
+
+### GitHub CI and releases
+
+Both workflows run only when started by hand: **Actions → CI** (or **Release**) **→ Run workflow**, then pick the branch.
+
+- **CI** (`.github/workflows/ci.yml`) runs the helper tests and the app tests on an Apple Silicon runner. To run it on every pull request, add a `pull_request` trigger.
+- **Release** (`.github/workflows/release.yml`) runs `scripts/build_release.sh --clean`, smoke test included, and publishes a GitHub Release.
+  - The release has the app as `Cutline-1.0.<n>.zip`, its `.sha256` file (works with `shasum -a 256 -c`), the zipped dSYM, and install notes.
+  - The app isn't notarized. After downloading, run `xattr -dr com.apple.quarantine Cutline.app` once.
+  - The models used by the smoke test are cached between runs.
+
+### Versions
+
+Every build is versioned `1.0.<n>`, and its build number is `<n>`:
+
+- **GitHub releases:** `<n>` is the Release workflow's run number. The tag is `v1.0.<n>`, on the chosen branch's commit.
+- **Local builds** (Debug, Release and test builds): `<n>` counts up in `build/build-number`, which isn't tracked in git. To set a version yourself: `APP_VERSION=1.0.42 APP_BUILD=42 scripts/build_release.sh`.
+
+Local and GitHub numbers are counted separately, so the same number can mean different builds.
+
+### Tests
 
 ```bash
 xcodebuild test -project Cutline.xcodeproj -scheme Cutline -destination 'platform=macOS,arch=arm64'
@@ -103,8 +133,9 @@ PYTHONPATH=build/ml-dev build/ml/python/bin/python3 -B -m pytest -c helper/pytes
 | `CutlineTests` | Unit and integration tests |
 | `Tools/cutline-ctl` | Command-line client for the control channel, shipped inside the app |
 | `helper` | The offline Python helper, its pinned requirements, the model list and its tests |
-| `scripts` | Build scripts: Python runtime, Release app, version stamp, icons, model download |
+| `scripts` | Build scripts: Python runtime, Release app, smoke test, version stamp, icons, model download |
 | `docs` | The glossary, the original plan, the Claude skill and README images |
+| `.github/workflows` | CI and Release workflows (manual) |
 
 `build/` isn't tracked. `build/ml` holds the Python runtime that's copied into the app, plus a development copy of the models.
 
