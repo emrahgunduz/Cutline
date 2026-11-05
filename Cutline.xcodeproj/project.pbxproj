@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		022A70AEC3CAA8C82AEDF0B5 /* CacheStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCA27CA941B33DD18D0BE71 /* CacheStrip.swift */; };
 		04E554C1E0C3AB7A36916365 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61B588EFD4F7FDB1987B63B /* Project.swift */; };
+		05890CA0C9E07CCC0663D852 /* ModelsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84FDEB49BFFE8B488B2FE347 /* ModelsCard.swift */; };
 		074510D246A808ABEF966E16 /* ResetCachesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1029945BCB50F63522B226 /* ResetCachesSheet.swift */; };
 		0827A51F4D5336E7655431AF /* CutlineCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD02505D46A8FF9B68A2B4C5 /* CutlineCompositor.swift */; };
 		09B4D3AD8C7A42F1CA80C1FB /* Transport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 051E14094EBD9B055B68F982 /* Transport.swift */; };
@@ -25,6 +26,7 @@
 		2A553A5F55B59E1356459ACB /* SectionLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66CE9CF978CD7004789B8EB2 /* SectionLane.swift */; };
 		2ACBE6B14BEB837D81E8BCF4 /* LineSpacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD1FA774F6D43CFBDC79503 /* LineSpacing.swift */; };
 		2DA99A7158AA2B61BDDE8CBA /* TimelineContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29DA3D9EC68856266AA1D0C5 /* TimelineContainer.swift */; };
+		32854D8775A46679827816F8 /* models.json in Resources */ = {isa = PBXBuildFile; fileRef = 66FD8AB0509E885D727231ED /* models.json */; };
 		33A3E32D65EB1DE91425AB42 /* FrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D308F2CA6627635889BC272A /* FrameRenderer.swift */; };
 		35D269737CF8CF7135BE40B2 /* AssetsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1ABF76E9440DC508D9B421 /* AssetsPanelView.swift */; };
 		35DD116F2970C41E9FFD9D9D /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97E38B962C1BCFAC09AAE54 /* InspectorView.swift */; };
@@ -85,10 +87,12 @@
 		9017E4B0F513329EA2116B0E /* Letterbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DDB309B7C757CB36556283A /* Letterbox.swift */; };
 		9524D81E547E66316B6C0CF2 /* RenderKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2AC9E284A36F5F5FE6EEF4E /* RenderKeyTests.swift */; };
 		95E6865F006CE9705333F2F0 /* ShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F17E5F28B1246F79C69B619 /* ShortcutsView.swift */; };
+		97EC8BF9337734D896A07BE7 /* ModelManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21262E7F8B2D4231920826EE /* ModelManifest.swift */; };
 		9EA66948C17455860579AD1E /* SegmentExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468CC9282E6D6B661CF974D2 /* SegmentExporterTests.swift */; };
 		9F0F539F1B731645B4135FD9 /* ControlTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45636C5F686F3D6C976A1D49 /* ControlTools.swift */; };
 		9F184FC8D73D074DD022D13F /* SizeSolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABFAB894CC5875B45C117A7 /* SizeSolver.swift */; };
 		A00CB5ADF858C4EFAFAB6B89 /* LyricTextOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E0B76BC88172E11B2F278F /* LyricTextOrderTests.swift */; };
+		A21973F9B4E9CE78186C8A53 /* ModelsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2950CF3B790AD647F4FA7A7 /* ModelsSettingsView.swift */; };
 		A2466DFD678D3DEA9C2BD606 /* RenderKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313AA7B915CD822E056025E4 /* RenderKey.swift */; };
 		A30521EE1CB3E7B4070D338C /* PresetsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D9A7CD15529928566289FD /* PresetsSettingsView.swift */; };
 		A44AFB029EAB542218121ABB /* DummyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34409C894C25E2B53AE6D9A /* DummyTests.swift */; };
@@ -116,6 +120,7 @@
 		CAC01F81B3B02C0FA28115DF /* LineLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AE431F918E57B6B59F8139 /* LineLayoutTests.swift */; };
 		CBB83956E1B120DADA0DFDBC /* FlipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E36BC4C2C7A14C8AB089974 /* FlipTests.swift */; };
 		CDD4C5819081069F157ADF5F /* LineLayoutEdits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8830845079114BBD02ED9DC2 /* LineLayoutEdits.swift */; };
+		CF11A65C47C88105E313AC00 /* ModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A62852F5348214DE4BEBAD2 /* ModelStore.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
 		D06650ADD7E107DBBD60CB91 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA421E8C312CB7B4257A1569 /* main.swift */; };
 		D3F377BE83CD7139BCFE377E /* SafeArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE74C377AEEB471B081E7E1 /* SafeArea.swift */; };
@@ -123,8 +128,10 @@
 		DDE98CA2EB1F162CA95BD338 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECE5731B9354BC0C76A3A77 /* Dummy.swift */; };
 		E110BB480605A894A0CA8339 /* ControlService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70604AB5308A9241B82F2663 /* ControlService.swift */; };
 		E15DE66864FDAFE27CA40E64 /* LyricPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6FB8B2C6C5FBF204D6908C /* LyricPlacement.swift */; };
+		E49716E7C2742392C1D8853C /* ModelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B419982736003C9DFC0D9BC /* ModelStoreTests.swift */; };
 		E595C8588F4292E299228E7B /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */; };
 		E665C190EE64E8AEEC62FF40 /* SnappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D42B84D2C503ED810A13AA50 /* SnappingTests.swift */; };
+		E7451C285B903E5F76AA7723 /* ModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3AD31291863B82BFC882E29 /* ModelDownloader.swift */; };
 		EB548A9EA1E729689E9268F2 /* presets.json in Resources */ = {isa = PBXBuildFile; fileRef = 3F86A8C237D2346DBF191F17 /* presets.json */; };
 		EB88B778CD25D40B8016F63A /* MediaCacheReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12CD17D1D14F773BBB8BABF /* MediaCacheReset.swift */; };
 		ED1CD503FAC1D8BD056B1AC0 /* EditCommandsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6CBC7EF2FCDEF542BCB501 /* EditCommandsTests.swift */; };
@@ -163,10 +170,12 @@
 		19F8AA3C08E957501BF0222F /* Presets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presets.swift; sourceTree = "<group>"; };
 		1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricLayoutTests.swift; sourceTree = "<group>"; };
 		1E6492F46E4214AD109DDBC3 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
+		21262E7F8B2D4231920826EE /* ModelManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManifest.swift; sourceTree = "<group>"; };
 		25D2D132D911EE445BA2025B /* LyricLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricLayout.swift; sourceTree = "<group>"; };
 		263C40DE25F06B14F13BC4A6 /* ProxyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyManager.swift; sourceTree = "<group>"; };
 		271CECC95E24E3015CB3D4AB /* ProjectImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectImportTests.swift; sourceTree = "<group>"; };
 		29DA3D9EC68856266AA1D0C5 /* TimelineContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineContainer.swift; sourceTree = "<group>"; };
+		2A62852F5348214DE4BEBAD2 /* ModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelStore.swift; sourceTree = "<group>"; };
 		2ABFAB894CC5875B45C117A7 /* SizeSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeSolver.swift; sourceTree = "<group>"; };
 		2B22B3DC2BB9AF28995BE746 /* LyricsLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsLanguage.swift; sourceTree = "<group>"; };
 		2E30DF3BC8EF1EF1AC661937 /* ControlProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlProtocol.swift; sourceTree = "<group>"; };
@@ -198,6 +207,7 @@
 		5A1ABF76E9440DC508D9B421 /* AssetsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetsPanelView.swift; sourceTree = "<group>"; };
 		600FA2FA9F17EB52AD6B658B /* HardOutLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardOutLine.swift; sourceTree = "<group>"; };
 		66CE9CF978CD7004789B8EB2 /* SectionLane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionLane.swift; sourceTree = "<group>"; };
+		66FD8AB0509E885D727231ED /* models.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = models.json; sourceTree = "<group>"; };
 		672C5395911B157CFFA7E2FE /* TrackMuteHideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMuteHideTests.swift; sourceTree = "<group>"; };
 		6747E1F00382AB5CAD82123F /* CompositionBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionBuilderTests.swift; sourceTree = "<group>"; };
 		6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeEstimator.swift; sourceTree = "<group>"; };
@@ -211,11 +221,13 @@
 		81BF6447E10E82DFF132DB56 /* WindowToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowToolbar.swift; sourceTree = "<group>"; };
 		82B2F0160D2D3BEE419B2B85 /* LineSpacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineSpacingTests.swift; sourceTree = "<group>"; };
 		830C8956745FE80350038799 /* ControlChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlChannelTests.swift; sourceTree = "<group>"; };
+		84FDEB49BFFE8B488B2FE347 /* ModelsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsCard.swift; sourceTree = "<group>"; };
 		858F6775E8B4AA655EC12500 /* ExportSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettings.swift; sourceTree = "<group>"; };
 		86364879801D464F4CA7B592 /* Timecode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timecode.swift; sourceTree = "<group>"; };
 		8830845079114BBD02ED9DC2 /* LineLayoutEdits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineLayoutEdits.swift; sourceTree = "<group>"; };
 		8989B594B3D7A8ED217EE5AB /* BudgetBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetBarView.swift; sourceTree = "<group>"; };
 		8A15C4D7584ACEF73D94EDA7 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
+		8B419982736003C9DFC0D9BC /* ModelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelStoreTests.swift; sourceTree = "<group>"; };
 		8ECE5731B9354BC0C76A3A77 /* Dummy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dummy.swift; sourceTree = "<group>"; };
 		910CE9F27A8B6B8232C5BE7A /* TimelineLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineLayoutTests.swift; sourceTree = "<group>"; };
 		9274C7F6E607FAA343E05201 /* MainWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowTests.swift; sourceTree = "<group>"; };
@@ -237,6 +249,7 @@
 		B03892639E2E3D5B2E4A564E /* LyricCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricCorrection.swift; sourceTree = "<group>"; };
 		B1AA1B8DEDFF49AC4A55FCCF /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
 		B1AE431F918E57B6B59F8139 /* LineLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineLayoutTests.swift; sourceTree = "<group>"; };
+		B3AD31291863B82BFC882E29 /* ModelDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloader.swift; sourceTree = "<group>"; };
 		B57241241CDE82184DC86E55 /* EditCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCommands.swift; sourceTree = "<group>"; };
 		B695A995DCC967FB746B5209 /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
 		B7D07C62E0D47CC496685E9C /* EditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorModel.swift; sourceTree = "<group>"; };
@@ -258,6 +271,7 @@
 		CECA242B50C1CD9AD30485E4 /* TestMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestMedia.swift; sourceTree = "<group>"; };
 		D12CD17D1D14F773BBB8BABF /* MediaCacheReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCacheReset.swift; sourceTree = "<group>"; };
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2950CF3B790AD647F4FA7A7 /* ModelsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsSettingsView.swift; sourceTree = "<group>"; };
 		D308F2CA6627635889BC272A /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		D41363E6F47DBE1A2B1227C3 /* AssetImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetImporter.swift; sourceTree = "<group>"; };
 		D42B84D2C503ED810A13AA50 /* SnappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnappingTests.swift; sourceTree = "<group>"; };
@@ -346,6 +360,7 @@
 				17E0B76BC88172E11B2F278F /* LyricTextOrderTests.swift */,
 				9274C7F6E607FAA343E05201 /* MainWindowTests.swift */,
 				ADFCF500DB7D6CBDADACF6B3 /* MediaCacheResetTests.swift */,
+				8B419982736003C9DFC0D9BC /* ModelStoreTests.swift */,
 				DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */,
 				00EAA2C07BF4BE00113F684B /* PreviewPerformanceTests.swift */,
 				E0C6DD7080EBE3BFA0B8888B /* ProjectCodingTests.swift */,
@@ -401,6 +416,18 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		6BEDADB1ABDBFD7C4A69ADE6 /* ModelDownloads */ = {
+			isa = PBXGroup;
+			children = (
+				B3AD31291863B82BFC882E29 /* ModelDownloader.swift */,
+				21262E7F8B2D4231920826EE /* ModelManifest.swift */,
+				84FDEB49BFFE8B488B2FE347 /* ModelsCard.swift */,
+				D2950CF3B790AD647F4FA7A7 /* ModelsSettingsView.swift */,
+				2A62852F5348214DE4BEBAD2 /* ModelStore.swift */,
+			);
+			path = ModelDownloads;
+			sourceTree = "<group>";
+		};
 		73571C2F21A72F1CA6061C94 /* cutline-ctl */ = {
 			isa = PBXGroup;
 			children = (
@@ -414,6 +441,7 @@
 			isa = PBXGroup;
 			children = (
 				C1B7679D41B3D9D30FD7ECF9 /* Cutline */,
+				E4D688778AEFC8F1D77377B9 /* cutline_helper */,
 				73571C2F21A72F1CA6061C94 /* cutline-ctl */,
 				1EFB22C6FFA5935479B39FA6 /* CutlineTests */,
 				FD52E0A4AA7C655AE380604B /* Products */,
@@ -483,6 +511,7 @@
 				448D55C287E076114315896C /* Export */,
 				869D42511CA7794714BC590A /* Inspector */,
 				CC3A4EFF98B7414012927CB4 /* Model */,
+				6BEDADB1ABDBFD7C4A69ADE6 /* ModelDownloads */,
 				0AE13975C18D8030CF271221 /* Render */,
 				57CB7CA69ED9D863BC0CC9D0 /* Resources */,
 				AC8DCF15A923A7248FB80F30 /* Timeline */,
@@ -521,6 +550,15 @@
 				051E14094EBD9B055B68F982 /* Transport.swift */,
 			);
 			path = Model;
+			sourceTree = "<group>";
+		};
+		E4D688778AEFC8F1D77377B9 /* cutline_helper */ = {
+			isa = PBXGroup;
+			children = (
+				66FD8AB0509E885D727231ED /* models.json */,
+			);
+			name = cutline_helper;
+			path = helper/cutline_helper;
 			sourceTree = "<group>";
 		};
 		FD52E0A4AA7C655AE380604B /* Products */ = {
@@ -641,6 +679,7 @@
 			files = (
 				6290C072CCA367F39B29E887 /* Assets.xcassets in Resources */,
 				C464A325189789A06EBDE0F6 /* CutlineDocument.icns in Resources */,
+				32854D8775A46679827816F8 /* models.json in Resources */,
 				168D6316929563EEA6FCE971 /* platform_overlays.json in Resources */,
 				EB548A9EA1E729689E9268F2 /* presets.json in Resources */,
 			);
@@ -666,7 +705,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Copies the Python runtime, models (build/ml, made by scripts/build_python_runtime.sh)\n# and the helper source into Contents/Resources/ml.\nSRC=\"$SRCROOT/build/ml\"\nDST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml\"\nif [ ! -x \"$SRC/python/bin/python3\" ] || [ ! -f \"$SRC/models/manifest.json\" ]; then\n  echo \"warning: build/ml is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build.\"\n  rm -rf \"$DST\"\n  exit 0\nfi\nmkdir -p \"$DST/helper\"\nrsync -a --delete \"$SRC/python/\" \"$DST/python/\"\nrsync -a --delete \"$SRC/models/\" \"$DST/models/\"\nrsync -a --delete --exclude __pycache__ \"$SRCROOT/helper/cutline_helper/\" \"$DST/helper/cutline_helper/\"\n";
+			shellScript = "# Copies the Python runtime (build/ml/python, made by scripts/build_python_runtime.sh)\n# and the helper source into Contents/Resources/ml. The models are not bundled: the app\n# downloads them into a folder the user picks (ModelStore).\nSRC=\"$SRCROOT/build/ml\"\nDST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml\"\nrm -rf \"$DST/models\"\nif [ ! -x \"$SRC/python/bin/python3\" ]; then\n  echo \"warning: build/ml/python is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build.\"\n  rm -rf \"$DST\"\n  exit 0\nfi\nmkdir -p \"$DST/helper\"\nrsync -a --delete \"$SRC/python/\" \"$DST/python/\"\nrsync -a --delete --exclude __pycache__ \"$SRCROOT/helper/cutline_helper/\" \"$DST/helper/cutline_helper/\"\n";
 		};
 		2316C4F8A7EB5EF5CDFA9851 /* Stamp version */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -762,6 +801,11 @@
 				E595C8588F4292E299228E7B /* MainMenu.swift in Sources */,
 				518C4503BF19A867E8E2CCCE /* MainWindowController.swift in Sources */,
 				EB88B778CD25D40B8016F63A /* MediaCacheReset.swift in Sources */,
+				E7451C285B903E5F76AA7723 /* ModelDownloader.swift in Sources */,
+				97EC8BF9337734D896A07BE7 /* ModelManifest.swift in Sources */,
+				CF11A65C47C88105E313AC00 /* ModelStore.swift in Sources */,
+				05890CA0C9E07CCC0663D852 /* ModelsCard.swift in Sources */,
+				A21973F9B4E9CE78186C8A53 /* ModelsSettingsView.swift in Sources */,
 				5AC57C8DE86871899EB09988 /* NewDummySheet.swift in Sources */,
 				C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */,
 				4767FD52352B89696CD5E022 /* Presets.swift in Sources */,
@@ -832,6 +876,7 @@
 				A00CB5ADF858C4EFAFAB6B89 /* LyricTextOrderTests.swift in Sources */,
 				5744FF40D09A805C85B912E8 /* MainWindowTests.swift in Sources */,
 				6FBD32C3EB4F42E58A31B35E /* MediaCacheResetTests.swift in Sources */,
+				E49716E7C2742392C1D8853C /* ModelStoreTests.swift in Sources */,
 				694E32FB938517F8178010A4 /* PreviewGeometryTests.swift in Sources */,
 				A47713E0C9AC27C96F8F700B /* PreviewPerformanceTests.swift in Sources */,
 				278C36D9E3DCCA647FE22CFF /* ProjectCodingTests.swift in Sources */,

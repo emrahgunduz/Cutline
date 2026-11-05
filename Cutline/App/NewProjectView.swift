@@ -6,6 +6,10 @@ import UniformTypeIdentifiers
 enum NewProjectChoice { case create(Project), open, openRecent(URL), importFrom(URL, ProjectType, CanvasSize) }
 
 enum NewProjectPrompt {
+    /// The window while it's up (it runs modally, so there is at most one).
+    private(set) static var window: NSWindow?
+    static var isShowing: Bool { window != nil }
+
     /// nil when cancelled.
     static func run() -> NewProjectChoice? {
         var result: NewProjectChoice?
@@ -25,7 +29,9 @@ enum NewProjectPrompt {
         let closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
             NSApp.stopModal()
         }
+        Self.window = window
         NSApp.runModal(for: window)
+        Self.window = nil
         NotificationCenter.default.removeObserver(closeObserver)
         window.orderOut(nil)
         return result
@@ -37,6 +43,9 @@ struct NewProjectView: View {
     @State private var type: ProjectType = .musicVideo
     @State private var canvasIndex = 0
     @State private var recents: [URL] = RecentProjects.list()
+    /// Projects can't be made or opened until the analysis models are downloaded.
+    private var models: ModelStore { .shared }
+    private var ready: Bool { models.isReady }
 
     private var preset: FormatPreset { Presets.preset(for: type) }
 
@@ -49,11 +58,15 @@ struct NewProjectView: View {
                     Text("Choose what you're making. You can't change this later.").foregroundStyle(.secondary)
                 }
             }
+            if !ready {
+                ModelsCard(store: models)
+                    .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.97))))
+            }
             HStack(spacing: 12) {
                 ForEach(ProjectType.allCases) { t in
                     TypeCard(type: t, preset: Presets.preset(for: t), selected: t == type)
                         .onTapGesture { type = t; canvasIndex = 0 }
-                        .onTapGesture(count: 2) { type = t; create() }
+                        .onTapGesture(count: 2) { type = t; if ready { create() } }
                 }
             }
             HStack {
@@ -72,17 +85,27 @@ struct NewProjectView: View {
             }
             HStack {
                 Button("Open…") { finish(.open) }.controlSize(.large).help("Open an existing project")
+                    .disabled(!ready)
                 Button("Import from Project…", action: importFromProject).controlSize(.large)
                     .help("Create this project with the song, lyric timing, clips and tracks of another project (a one-time copy)")
+                    .disabled(!ready)
                 Spacer()
+                if !ready {
+                    Text(models.isDownloading ? "Downloading the models…" : "Download the models to start")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
                 Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
                 Button("Create Project", action: create).keyboardShortcut(.defaultAction).controlSize(.large)
+                    .disabled(!ready)
             }
             Divider()
             recentSection
         }
         .padding(24)
         .frame(width: 640)
+        .animation(.smooth(duration: 0.35), value: ready)
+        // A project opened while the models were missing lands in the list (see CutlineDocumentController).
+        .onReceive(NotificationCenter.default.publisher(for: RecentProjects.changed)) { _ in recents = RecentProjects.list() }
     }
 
     @ViewBuilder private var recentSection: some View {
@@ -105,7 +128,7 @@ struct NewProjectView: View {
                 ScrollView {
                     VStack(spacing: 2) {
                         ForEach(recents, id: \.self) { url in
-                            RecentRow(url: url) { finish(.openRecent(url)) }
+                            RecentRow(url: url, enabled: ready) { finish(.openRecent(url)) }
                         }
                     }
                 }
@@ -117,6 +140,7 @@ struct NewProjectView: View {
     private var canvas: CanvasSize { preset.canvases[min(canvasIndex, preset.canvases.count - 1)] }
 
     private func create() {
+        guard ready else { return }
         finish(.create(Project(type: type, canvas: canvas)))
     }
 
@@ -206,13 +230,20 @@ enum RecentProjects {
         var paths = (defaults.stringArray(forKey: key) ?? []).filter { $0 != url.path }
         paths.insert(url.path, at: 0)
         defaults.set(Array(paths.prefix(limit)), forKey: key)
+        NotificationCenter.default.post(name: changed, object: nil)
     }
 
-    static func clear() { defaults.removeObject(forKey: key) }
+    static func clear() {
+        defaults.removeObject(forKey: key)
+        NotificationCenter.default.post(name: changed, object: nil)
+    }
+
+    static let changed = Notification.Name("CutlineRecentProjectsChanged")
 }
 
 private struct RecentRow: View {
     let url: URL
+    var enabled = true
     let open: () -> Void
     @State private var hovering = false
 
@@ -238,7 +269,9 @@ private struct RecentRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(url.path)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.55)
+        .onHover { hovering = $0 && enabled }
+        .help(enabled ? url.path : "\(url.path)\nOpens once the models are downloaded")
     }
 }

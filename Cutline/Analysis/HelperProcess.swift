@@ -1,18 +1,21 @@
 import Foundation
 
-/// Where the bundled Python runtime, helper source and models live.
-struct HelperConfig {
+/// Where the bundled Python runtime and helper source live, and the models folder it uses.
+struct HelperConfig: Sendable {
     var python: URL
     /// Folder that contains the `cutline_helper` package.
     var helperDir: URL
     var modelsDir: URL
+    /// The pinned model list to check against (nil: the helper's own models.json).
+    var manifest: URL? = nil
 
-    /// The copy inside the app: `Contents/Resources/ml/{python, helper, models}`.
+    /// The runtime inside the app (`Contents/Resources/ml/{python, helper}`) with the models
+    /// folder the user chose or downloaded into (ModelStore). The models aren't bundled.
     static var bundled: HelperConfig? {
         guard let ml = Bundle.main.resourceURL?.appendingPathComponent("ml", isDirectory: true) else { return nil }
         let config = HelperConfig(python: ml.appendingPathComponent("python/bin/python3"),
                                   helperDir: ml.appendingPathComponent("helper", isDirectory: true),
-                                  modelsDir: ml.appendingPathComponent("models", isDirectory: true))
+                                  modelsDir: ModelStore.currentFolder())
         return FileManager.default.isExecutableFile(atPath: config.python.path) ? config : nil
     }
 }
@@ -104,6 +107,7 @@ final class HelperProcess: @unchecked Sendable {
             "HF_HOME": config.modelsDir.appendingPathComponent("hf").path,
             "HF_HUB_OFFLINE": "1",
         ]
+        if let manifest = config.manifest { process.environment?["CUTLINE_MODELS_MANIFEST"] = manifest.path }
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         process.standardInput = stdin
         process.standardOutput = stdout
