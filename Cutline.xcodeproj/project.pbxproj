@@ -77,6 +77,7 @@
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
 		E15DE66864FDAFE27CA40E64 /* LyricPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6FB8B2C6C5FBF204D6908C /* LyricPlacement.swift */; };
 		E595C8588F4292E299228E7B /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */; };
+		E665C190EE64E8AEEC62FF40 /* SnappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D42B84D2C503ED810A13AA50 /* SnappingTests.swift */; };
 		EB548A9EA1E729689E9268F2 /* presets.json in Resources */ = {isa = PBXBuildFile; fileRef = 3F86A8C237D2346DBF191F17 /* presets.json */; };
 		ED1CD503FAC1D8BD056B1AC0 /* EditCommandsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6CBC7EF2FCDEF542BCB501 /* EditCommandsTests.swift */; };
 		EFD46847894D82E40C7436A7 /* AssetUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9552D1BBCE487AFBEAD510 /* AssetUsage.swift */; };
@@ -161,6 +162,7 @@
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D308F2CA6627635889BC272A /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		D41363E6F47DBE1A2B1227C3 /* AssetImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetImporter.swift; sourceTree = "<group>"; };
+		D42B84D2C503ED810A13AA50 /* SnappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnappingTests.swift; sourceTree = "<group>"; };
 		DA0BC60B5EFC2D0CA9A6F2CD /* JobRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobRunner.swift; sourceTree = "<group>"; };
 		DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewGeometryTests.swift; sourceTree = "<group>"; };
 		DE9552D1BBCE487AFBEAD510 /* AssetUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetUsage.swift; sourceTree = "<group>"; };
@@ -232,6 +234,7 @@
 				38156AC8C58F8D0E10425F10 /* ProxyManagerTests.swift */,
 				6FC982F65D966A1E5A0FE8F8 /* SampleMedia.swift */,
 				5986D783A144C13227A543EF /* SampleMediaImportTests.swift */,
+				D42B84D2C503ED810A13AA50 /* SnappingTests.swift */,
 				CECA242B50C1CD9AD30485E4 /* TestMedia.swift */,
 				910CE9F27A8B6B8232C5BE7A /* TimelineLayoutTests.swift */,
 				3809159D9792EF49DD8FFA5B /* WaveformBuilderTests.swift */,
@@ -557,6 +560,7 @@
 				70E4F9970450129B7032B46D /* ProxyManagerTests.swift in Sources */,
 				24F7198642C60775585EC2E6 /* SampleMedia.swift in Sources */,
 				C2B91A0740ECEE4E2003275E /* SampleMediaImportTests.swift in Sources */,
+				E665C190EE64E8AEEC62FF40 /* SnappingTests.swift in Sources */,
 				52C123D1DB240FE32B977F1C /* TestMedia.swift in Sources */,
 				163EBA7691D837C6C138A179 /* TimelineLayoutTests.swift in Sources */,
 				207794CEC071FE9095BF2660 /* WaveformBuilderTests.swift in Sources */,

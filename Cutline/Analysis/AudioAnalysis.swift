@@ -89,6 +89,7 @@ extension Project {
         c.movedDownbeats.removeAll { $0.index == index }
         if abs(t - a.downbeats[index]) > 1e-4 { c.movedDownbeats.append(.init(index: index, time: t)) }
         beatCorrections = c
+        followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
     }
 
     /// Move boundary `index` (1...count-1; section 0 always starts at 0) between its neighbours.
@@ -101,6 +102,7 @@ extension Project {
         s[index].start = min(max(time, lo), hi)
         c.sections = s
         beatCorrections = c
+        followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
     }
 
     mutating func addSectionBoundary(at time: Double, analysis a: AudioAnalysis) {
@@ -113,6 +115,7 @@ extension Project {
         s.sort { $0.start < $1.start }
         c.sections = s
         beatCorrections = c
+        followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
     }
 
     mutating func removeSectionBoundary(_ index: Int, analysis a: AudioAnalysis) {
@@ -122,6 +125,7 @@ extension Project {
         s.remove(at: index)
         c.sections = s
         beatCorrections = c
+        followAnchors(ResolvedBeats(a, c), hash: a.audioHash)
     }
 }
 

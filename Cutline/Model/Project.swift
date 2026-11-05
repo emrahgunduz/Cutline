@@ -225,4 +225,7 @@ struct Cinemascope: Codable, Equatable {
     var enabled = false
     var startMarker: Double = 0
     var endMarker: Double = 5
+    /// Set when a marker is tied to the song's beats (it then follows beat corrections).
+    var startAnchor: BeatAnchor?
+    var endAnchor: BeatAnchor?
 }

@@ -83,3 +83,5 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Loud / quiet shading** | Orange tint over loud stretches of the song and dark tint over quiet ones. |
 | **Vocal stem** | The song's vocals on their own, separated once by analysis and kept in the project's `analysis/` folder. |
 | **Beat and section fixes** | Your corrections to downbeats and sections. Saved in the project, separate from the raw analysis; reset from the audio row's right-click menu. |
+| **Snap groups** | The four toggles next to the snapping button: Sections, Downbeats, Beats, and Edges & Playhead. When several targets are in reach, sections win, then downbeats, then beats, then edges. Saved per project. |
+| **Beat anchor** | Cinemascope markers placed on (or near) a beat remember it, so they move when that downbeat is corrected or the song is moved. |

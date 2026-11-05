@@ -176,6 +176,9 @@ extension Project {
         guard delta != 0 else { return }
         a.start = newStart
         audio = a
+        // Markers tied to the song's beats move with it.
+        if cinemascope.startAnchor != nil { cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta)) }
+        if cinemascope.endAnchor != nil { cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta)) }
         for t in lyricTracks.indices {
             for l in lyricTracks[t].lines.indices {
                 lyricTracks[t].lines[l].start += delta
