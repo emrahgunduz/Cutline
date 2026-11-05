@@ -44,8 +44,13 @@ struct ValueRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label).font(.system(size: 12)).frame(width: 76, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: { onChange(quantized($0)) }), in: range) { editing in
-                if !editing { onCommit() }
+            Slider(value: Binding(get: { value }, set: { v in
+                // Grabbing the slider ends typing in the field, so the field follows the slider.
+                if focused { focused = false }
+                onChange(quantized(v))
+                text = String(format: format, quantized(v))
+            }), in: range) { editing in
+                if editing { focused = false } else { onCommit() }
             }
             .controlSize(.small)
             TextField("", text: $text)
