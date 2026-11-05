@@ -5,11 +5,28 @@ import Foundation
 /// project's size, and its clips default to its length.
 struct DummyCard: Codable, Equatable, Hashable {
     var title: String
+    /// What the scene is (several lines allowed); empty = none.
+    var sceneDescription: String = ""
     /// Font family name ("Helvetica Neue").
     var fontName: String
     /// Seconds; also the length of the clip when the dummy is dropped on the timeline.
     var length: Double
     var color: RGBA
+
+    enum CodingKeys: String, CodingKey { case title, sceneDescription = "description", fontName, length, color }
+
+    init(title: String, sceneDescription: String = "", fontName: String, length: Double, color: RGBA) {
+        self.title = title; self.sceneDescription = sceneDescription; self.fontName = fontName; self.length = length; self.color = color
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title = try c.decode(String.self, forKey: .title)
+        sceneDescription = try c.decodeIfPresent(String.self, forKey: .sceneDescription) ?? ""
+        fontName = try c.decode(String.self, forKey: .fontName)
+        length = try c.decode(Double.self, forKey: .length)
+        color = try c.decode(RGBA.self, forKey: .color)
+    }
 
     /// The second line on the card: "12 seconds", "1.5 seconds".
     var lengthText: String {
@@ -48,10 +65,11 @@ extension Project {
 
     /// Add a dummy to the assets (not the timeline). An empty title takes the automatic name.
     @discardableResult
-    mutating func addDummy(title: String, fontName: String, length: Double, color: RGBA) -> Asset {
+    mutating func addDummy(title: String, description: String = "", fontName: String, length: Double, color: RGBA) -> Asset {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = trimmed.isEmpty ? nextDummyName : trimmed
-        let card = DummyCard(title: name, fontName: fontName, length: max(frameDuration, length), color: color)
+        let card = DummyCard(title: name, sceneDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),
+                             fontName: fontName, length: max(frameDuration, length), color: color)
         var asset = Asset(kind: .image, name: name, path: "", pixelSize: canvas, duration: card.length)
         asset.dummy = card
         assets.append(asset)
@@ -63,10 +81,10 @@ extension EditorModel {
     /// Create the dummy (one undo step), remember the choices, and select it in the assets.
     @MainActor
     @discardableResult
-    func createDummy(_ d: DummyDefaults) -> Asset? {
+    func createDummy(_ d: DummyDefaults, description: String = "") -> Asset? {
         rememberDummyDefaults(d)
         var made: Asset?
-        edit("New Dummy") { p in made = p.addDummy(title: d.title, fontName: d.fontName, length: d.length, color: d.color) }
+        edit("New Dummy") { p in made = p.addDummy(title: d.title, description: description, fontName: d.fontName, length: d.length, color: d.color) }
         guard let asset = made else { return nil }
         selectedAssets = [asset.id]
         Task { await thumbnails.ensureThumbnail(for: asset) }
