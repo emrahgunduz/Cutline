@@ -1,45 +1,79 @@
-"""The model manifest written at build time, checked before every job."""
+"""The pinned model set (models.json, next to this file) and what a models folder holds.
+
+The app downloads the models into a folder the user picks (or Application Support) and
+passes it as CUTLINE_MODELS. The same rules are in the app's ModelFolderStatus.check():
+a file counts only when its size matches (`.part` files count as a started download); the
+folder is "ready" when every byte is there and `.complete` names the manifest's version.
+"""
+import hashlib
 import json
 import os
 
-MANIFEST = "manifest.json"
+MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models.json")
+COMPLETE = ".complete"
 
 
-def default_models_dir() -> str:
-    # Bundle layout: Resources/ml/{helper/cutline_helper, models}
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.normpath(os.path.join(here, "..", "..", "models"))
+def load_manifest(path: str | None = None) -> dict:
+    with open(path or os.environ.get("CUTLINE_MODELS_MANIFEST") or MANIFEST, encoding="utf-8") as f:
+        return json.load(f)
 
 
-def missing_files(models_dir: str) -> list[str]:
-    """Paths (relative to models_dir) that the manifest lists but are absent or the wrong size."""
-    manifest_path = os.path.join(models_dir, MANIFEST)
+def expected_files(manifest: dict) -> list[dict]:
+    return [f for item in manifest["items"] for f in item["files"]]
+
+
+def _size(path: str) -> int | None:
     try:
-        with open(manifest_path, encoding="utf-8") as f:
-            manifest = json.load(f)
-    except (OSError, ValueError):
-        return [MANIFEST]
-    missing = []
-    for entry in manifest.get("files", []):
-        path = os.path.join(models_dir, entry["path"])
-        try:
-            if os.path.getsize(path) != entry["size"]:
-                missing.append(entry["path"])
-        except OSError:
-            missing.append(entry["path"])
-    return missing
+        return os.path.getsize(path)
+    except OSError:
+        return None
 
 
-def write_manifest(models_dir: str) -> dict:
-    files = []
-    for root, _dirs, names in os.walk(models_dir):
-        for name in sorted(names):
-            if name == MANIFEST or name.startswith("."):
-                continue
-            full = os.path.join(root, name)
-            files.append({"path": os.path.relpath(full, models_dir), "size": os.path.getsize(full)})
-    files.sort(key=lambda e: e["path"])
-    manifest = {"version": 1, "files": files}
-    with open(os.path.join(models_dir, MANIFEST), "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=1)
-    return manifest
+def missing_files(models_dir: str, manifest: dict | None = None) -> list[str]:
+    """Paths (relative to models_dir) that are absent or the wrong size."""
+    manifest = manifest or load_manifest()
+    return [f["path"] for f in expected_files(manifest) if _size(os.path.join(models_dir, f["path"])) != f["size"]]
+
+
+def installed_version(models_dir: str) -> int | None:
+    try:
+        with open(os.path.join(models_dir, COMPLETE), encoding="utf-8") as f:
+            return json.load(f).get("version")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def status(models_dir: str, manifest: dict | None = None) -> dict:
+    manifest = manifest or load_manifest()
+    have = part = 0
+    for f in expected_files(manifest):
+        path = os.path.join(models_dir, f["path"])
+        if _size(path) == f["size"]:
+            have += f["size"]
+        else:
+            part += min(_size(path + ".part") or 0, f["size"])  # a download continues from these
+    total = manifest["total_bytes"]
+    marker = os.path.exists(os.path.join(models_dir, COMPLETE))
+    if have == total and installed_version(models_dir) == manifest["version"]:
+        state = "ready"
+    elif have == 0 and part == 0 and not marker:
+        state = "missing"
+    else:
+        state = "partial"
+    return {"state": state, "have_bytes": have, "part_bytes": part, "total_bytes": total, "version": manifest["version"]}
+
+
+def sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_complete(models_dir: str, manifest: dict | None = None) -> None:
+    """Marks the folder complete. Call only after every file is in place and verified."""
+    import datetime
+    manifest = manifest or load_manifest()
+    with open(os.path.join(models_dir, COMPLETE), "w", encoding="utf-8") as f:
+        json.dump({"version": manifest["version"], "installed": datetime.datetime.now().isoformat(timespec="seconds")}, f)

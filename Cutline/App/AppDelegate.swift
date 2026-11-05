@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         controlServer?.stop()
         HelperProcess.terminateAll()
+        // The partial file stays; the next download continues from it.
+        MainActor.assumeIsolated { ModelStore.shared.cancelDownload() }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -53,9 +55,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Asks for the project type and resolution before creating a new project.
+/// Asks for the project type and resolution before creating a new project. Until the
+/// analysis models are downloaded, projects aren't opened: an open (a Finder double-click,
+/// Open Recent, window restoration) shows the New Project window with the download instead,
+/// and the project goes into its recent list to open once the models are ready.
 final class CutlineDocumentController: NSDocumentController {
+    private var modelsReady: Bool {
+        AppDelegate.isTestHost || MainActor.assumeIsolated { ModelStore.shared.isReady }
+    }
+
+    private var promptScheduled = false
+
     override func newDocument(_ sender: Any?) {
+        if let window = NewProjectPrompt.window {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        // The window runs modally. Started from inside a main-queue block (a GCD timer or
+        // async call), it would hold the main queue, so main-actor work such as the model
+        // download couldn't run until it closed. A run-loop block runs outside the queue.
+        guard !promptScheduled else { return }
+        promptScheduled = true
+        RunLoop.main.perform(inModes: [.default, .modalPanel]) { [weak self] in
+            guard let self else { return }
+            self.promptScheduled = false
+            self.runNewProjectPrompt()
+        }
+    }
+
+    private func runNewProjectPrompt() {
+        guard NewProjectPrompt.window == nil else { return }
         switch NewProjectPrompt.run() {
         case .none: return
         case .open: openDocument(nil)
@@ -68,6 +97,32 @@ final class CutlineDocumentController: NSDocumentController {
         case .importFrom(let url, let type, let canvas):
             do { show(try ProjectImport.document(importing: url, type: type, canvas: canvas)) } catch { NSAlert(error: error).runModal() }
         }
+    }
+
+    override func openDocument(withContentsOf url: URL, display displayDocument: Bool,
+                               completionHandler: @escaping (NSDocument?, Bool, Error?) -> Void) {
+        guard modelsReady || document(for: url) != nil else {
+            deferOpen(url)
+            completionHandler(nil, false, nil)
+            return
+        }
+        super.openDocument(withContentsOf: url, display: displayDocument, completionHandler: completionHandler)
+    }
+
+    override func reopenDocument(for urlOrNil: URL?, withContentsOf contentsURL: URL, display displayDocument: Bool,
+                                 completionHandler: @escaping (NSDocument?, Bool, Error?) -> Void) {
+        guard modelsReady else {
+            deferOpen(urlOrNil ?? contentsURL)
+            completionHandler(nil, false, nil)
+            return
+        }
+        super.reopenDocument(for: urlOrNil, withContentsOf: contentsURL, display: displayDocument, completionHandler: completionHandler)
+    }
+
+    /// Remembers the project in the recent list and shows New Project with the model download.
+    private func deferOpen(_ url: URL) {
+        RecentProjects.note(url)
+        newDocument(nil)
     }
 
     private func show(_ doc: ProjectDocument) {
