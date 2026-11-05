@@ -1,0 +1,32 @@
+[
+  {
+    "id": "tiktok",
+    "name": "TikTok",
+    "reference": { "width": 1080, "height": 1920 },
+    "zones": [
+      { "name": "Top bar", "x": 0, "y": 0, "width": 1080, "height": 150 },
+      { "name": "Like, comment, share", "x": 930, "y": 620, "width": 150, "height": 860 },
+      { "name": "Caption and sound", "x": 0, "y": 1480, "width": 1080, "height": 440 }
+    ]
+  },
+  {
+    "id": "reels",
+    "name": "Instagram Reels",
+    "reference": { "width": 1080, "height": 1920 },
+    "zones": [
+      { "name": "Top bar", "x": 0, "y": 0, "width": 1080, "height": 220 },
+      { "name": "Like, comment, share", "x": 950, "y": 900, "width": 130, "height": 700 },
+      { "name": "Caption and account", "x": 0, "y": 1500, "width": 1080, "height": 420 }
+    ]
+  },
+  {
+    "id": "shorts",
+    "name": "YouTube Shorts",
+    "reference": { "width": 1080, "height": 1920 },
+    "zones": [
+      { "name": "Top bar", "x": 0, "y": 0, "width": 1080, "height": 180 },
+      { "name": "Like, comment, share", "x": 950, "y": 760, "width": 130, "height": 740 },
+      { "name": "Title and subscribe", "x": 0, "y": 1520, "width": 1080, "height": 400 }
+    ]
+  }
+]

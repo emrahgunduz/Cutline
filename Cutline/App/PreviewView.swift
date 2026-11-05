@@ -20,6 +20,7 @@ struct PreviewView: View {
             HStack(spacing: 12) {
                 TransportControls(transport: editor.transport)
                 Spacer()
+                if editor.project.type.isPortrait { PlatformOverlayMenu() }
                 Button { controller.stepZoom(1 / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }.tip("Zoom out (mouse wheel or pinch zooms at the pointer)")
                 Menu(zoomLabel) {
                     Button("Fit") { controller.resetView() }
@@ -86,4 +87,31 @@ private struct ToolTipView: NSViewRepresentable {
 
 extension View {
     func tip(_ text: String) -> some View { help(text).overlay(ToolTipView(text: text)) }
+}
+
+/// Portrait projects: switch the TikTok / Reels / Shorts screen zones on and off in the preview.
+private struct PlatformOverlayMenu: View {
+    @EnvironmentObject var editor: EditorModel
+
+    private var on: Set<String> { Set(editor.project.platformOverlays ?? []) }
+
+    var body: some View {
+        Menu {
+            ForEach(PlatformOverlay.all) { o in
+                Toggle(o.name, isOn: Binding(get: { on.contains(o.id) }, set: { show in
+                    editor.edit(show ? "Show \(o.name) Zones" : "Hide \(o.name) Zones") { p in
+                        var ids = p.platformOverlays ?? []
+                        ids.removeAll { $0 == o.id }
+                        if show { ids.append(o.id) }
+                        p.platformOverlays = ids.isEmpty ? nil : ids
+                    }
+                }))
+            }
+        } label: {
+            Label(on.isEmpty ? "Platform UI" : "Platform UI (\(on.count))", systemImage: "rectangle.dashed")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .tip("Show where TikTok, Reels and Shorts draw their buttons and captions. Automatically placed lyrics stay clear of the zones you switch on. Preview only, never exported.")
+    }
 }

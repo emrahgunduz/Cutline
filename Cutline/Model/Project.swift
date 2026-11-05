@@ -24,6 +24,9 @@ struct Project: Codable, Equatable {
     /// Language Whisper uses to double-check aligned lyrics (a Whisper code such as "tr");
     /// nil detects it from the lyric text.
     var lyricsLanguage: String?
+    /// Portrait only: platform UI overlays shown in the preview (ids from platform_overlays.json);
+    /// automatically placed lyrics stay clear of them.
+    var platformOverlays: [String]?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type
