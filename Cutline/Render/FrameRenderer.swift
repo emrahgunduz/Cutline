@@ -13,11 +13,15 @@ struct RenderSnapshot {
 
 enum FrameRenderer {
     /// Compose the frame at time `t`. `sourceFrame` returns the decoded video frame for a clip.
-    static func render(_ snap: RenderSnapshot, at t: Double, sourceFrame: (Clip) -> CIImage?) -> CIImage {
+    static func render(_ snap: RenderSnapshot, at time: Double, sourceFrame: (Clip) -> CIImage?) -> CIImage {
         let canvas = CGRect(origin: .zero, size: snap.project.canvas.cgSize)
         var out = CIImage(color: .black).cropped(to: canvas)
+        // Work on the frame grid: compare frame numbers, not floating-point seconds.
+        let p = snap.project
+        let frame = p.frameIndex(time)
+        let t = Double(frame) / p.fps
         for track in snap.project.videoTracks {
-            for clip in track.clips where t >= clip.start && t < clip.end {
+            for clip in track.clips where frame >= p.frameIndex(clip.start) && frame < p.frameIndex(clip.end) {
                 guard let asset = snap.project.asset(clip.assetID) else { continue }
                 let source: CIImage? = asset.kind == .image ? snap.images[asset.id] : sourceFrame(clip)
                 guard let src = source else { continue }

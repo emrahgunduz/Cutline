@@ -82,7 +82,8 @@ final class ProjectDocument: NSDocument {
         struct Header: Decodable { var schemaVersion: Int }
         let header = try JSONDecoder().decode(Header.self, from: data)
         guard header.schemaVersion <= projectSchemaVersion else { throw ProjectFileError.unsupportedSchema(header.schemaVersion) }
-        let project = try JSONDecoder().decode(Project.self, from: data)
+        var project = try JSONDecoder().decode(Project.self, from: data)
+        project.migrateFrameRate()
         var layout = LayoutState()
         if let ld = try? Data(contentsOf: url.appendingPathComponent("layout.json")),
            let l = try? JSONDecoder().decode(LayoutState.self, from: ld) {

@@ -14,7 +14,9 @@ struct BuiltComposition {
 }
 
 enum CompositionBuilder {
-    static let timescale: CMTimeScale = 600
+    /// Divides every supported frame duration exactly (1/24 … 1001/60000), so frame times
+    /// never round onto the wrong frame.
+    static let timescale: CMTimeScale = 120_000
 
     static func time(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: timescale) }
 
@@ -84,7 +86,7 @@ enum CompositionBuilder {
         let vc = AVMutableVideoComposition()
         vc.customVideoCompositorClass = CutlineCompositor.self
         vc.renderSize = project.canvas.cgSize
-        vc.frameDuration = CMTime(seconds: 1 / project.fps, preferredTimescale: 60000)
+        vc.frameDuration = project.frameTime
         let instruction = CutlineInstruction(timeRange: CMTimeRange(start: .zero, duration: duration),
                                              snapshot: snapshot, baseTrackID: baseTrackID,
                                              clipTracks: clipTracks.mapValues { (trackID: $0.0, transform: $0.1) })

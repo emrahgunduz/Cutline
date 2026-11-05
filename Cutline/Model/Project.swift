@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import CoreMedia
 
 /// Current on-disk schema version of `project.json`.
 let projectSchemaVersion = 1
@@ -36,6 +37,16 @@ struct Project: Codable, Equatable {
     /// Snap a time to the nearest frame boundary.
     func quantize(_ t: Double) -> Double { (t * fps).rounded() / fps }
     var frameDuration: Double { 1 / fps }
+    /// Index of the frame that contains time t (times on the grid map to their own frame).
+    func frameIndex(_ t: Double) -> Int { Int((t * fps + 1e-6).rounded(.down)) }
+
+    /// Exact frame duration for the compositor: 1001/30000 for 29.97, 1/24 for 24, and so on.
+    var frameTime: CMTime {
+        for (rate, ts) in [(24000.0 / 1001, Int32(24000)), (30000.0 / 1001, 30000), (60000.0 / 1001, 60000)] where abs(fps - rate) < 0.01 {
+            return CMTime(value: 1001, timescale: ts)
+        }
+        return CMTime(value: 1, timescale: Int32(max(1, fps.rounded())))
+    }
 }
 
 struct CanvasSize: Codable, Equatable, Hashable {
