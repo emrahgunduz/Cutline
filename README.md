@@ -1,45 +1,114 @@
 # Cutline
 
-A simple native macOS (Apple Silicon) editor for music videos, portrait social videos and portrait ads.
+A simple, native macOS video editor made for music videos: cut your footage to the song, time the lyrics word by word, and export for YouTube, TikTok, Reels, Shorts or a paid ad.
 
-## Folders
+![Cutline editing a music video: assets on the left, preview in the middle, shortcuts on the right, and the timeline with the song, lyrics and video tracks below](docs/images/cutline.png)
 
-| Folder | What's in it |
-|---|---|
-| `Cutline/App` | App start, menus, the project document, the main window and its toolbar and status bar |
-| `Cutline/Assets` | Assets panel, importing, thumbnails, waveforms, proxies |
-| `Cutline/Preview` | The live preview and the player behind it |
-| `Cutline/Timeline` | Timeline view, layout, snapping, lyric correction |
-| `Cutline/Inspector` | Right-hand inspector (clips, lyrics, shortcuts) |
-| `Cutline/Model` | The project data model and editing commands |
-| `Cutline/Render` | Compositor, frame and lyric rendering, render cache keys |
-| `Cutline/Export` | Export, size estimate and the size-target solver |
-| `Cutline/Analysis` | Runs the Python helper (song analysis, lyric alignment) |
-| `Cutline/Analysis/Models` | The analysis models: manifest, folder state, download, the New Project card |
-| `Cutline/Control` | The control channel (local socket that Claude uses, with your approval) |
-| `Cutline/Dialogs` | New Project, New Dummy, Export and Reset Caches |
-| `Cutline/Settings` | The Settings window: Presets and Models tabs |
-| `Cutline/Resources` | Bundled presets, platform overlays, document icon |
-| `CutlineTests` | Unit and integration tests |
-| `Tools/cutline-ctl` | Command-line client for the control channel (shipped inside the app) |
-| `helper` | The offline Python helper (`cutline_helper`), its pinned requirements, models list and tests |
-| `scripts` | Build scripts (runtime, Release, version stamp, icons, model fetch) |
-| `docs` | Glossary, the plan, and the Claude skill |
+## What it's for
 
-`build/` isn't tracked. `build/ml` holds the Python runtime (copied into the app) and a development copy of the models. `build/Release/Cutline.app` is the Release app.
+General editors are built for every kind of video. Cutline does one job: building a music video around a finished song. The song drives everything. Cutline finds its beats, bars and sections, so cuts and markers snap to the music. It separates the vocals, and lines the lyrics up with them word by word, so the words appear as they're sung. The same song can become a 16:9 music video, a 9:16 social cut and a 30-second ad, each with its own limits and export settings.
+
+Everything runs on your Mac. The analysis is offline; the only download is a one-time set of models.
+
+## What it can do
+
+**Projects**
+- Three project types, chosen when you create a project:
+  - **Music video**: 16:9, HD or 4K, no length limit, H.265.
+  - **Portrait social**: 9:16, 1080×1920, up to 3 minutes, H.264.
+  - **Portrait ad**: 9:16, 1080×1920, up to 30 seconds, H.264, with a file-size target.
+- Length limits, codecs and export defaults are editable in Settings > Presets.
+- Import from Project: start a new format with another project's song, lyric timing, clips and tracks (a one-time copy).
+- Panel sizes and track heights are saved with each project.
+
+**Editing**
+- Assets panel with thumbnails: videos, images (PNG with transparency), the song and lyrics TXT files.
+- Live preview with frame stepping, zoom and pan; drag clips in the preview to move and scale them.
+- One audio track and any number of video and lyrics tracks; mute the song, hide any track.
+- Trim, split, move and group-drag clips, with snapping to sections, downbeats, beats, edges and the playhead.
+- Per-clip size and position (Fill or Fit), horizontal flip, and filters: Color (hue, saturation, contrast, brightness) and Fade, each with an on/off switch.
+- Proxies (½, ¼, ⅛ size) for smooth preview of heavy footage; export always uses the originals.
+- Cinemascope bars for music videos: animated from 16:9 to 2.35:1 between two markers on the timeline.
+
+**The song**
+- Waveform, loudness curve with loud and quiet stretches, beats, downbeats and song sections, drawn on the audio track.
+- Correct a downbeat or a section by dragging it; your fixes are kept apart from the raw analysis.
+- Dragging the song moves the clips, lyrics and markers with it.
+
+**Lyrics**
+- Drop a TXT on a lyrics track: one item per line, with each word inside it.
+- Automatic word timing from the vocals (forced alignment, checked against speech recognition), with a confidence for every word.
+- Fix the unsure ones fast: N jumps to the next unsure word and loops the song around it, T taps words in time to the music, and confirmed words act as anchors for the words between them.
+- Multi-line lyrics: lines on different tracks show at the same time.
+- One font, size and color, a drop shadow (blur, offset, color, strength), quick fades or letter-by-letter animation, and lead-in / lead-out times.
+- Placement with alignment, padding, line width and wrapping. In portrait projects lyrics keep clear of where TikTok, Reels and Shorts draw their buttons.
+
+**Export**
+- H.265 or H.264, with constant quality, a target bitrate, or a target file size (Cutline picks the bitrate and re-encodes if the file comes out too big).
+- A live budget bar for length and file size.
+- A render cache: a re-export only encodes the parts an edit changed.
+
+**Placeholders and Claude**
+- Dummies: colored placeholder cards (title, scene description, length) for shots that don't exist yet.
+- A local control channel lets Claude place one dummy per scene of a production document, with your approval each time it connects. It can add tracks and dummies; it never deletes tracks or touches the song or lyrics.
+
+## The analysis models
+
+Song analysis and lyric alignment use four models: HTDemucs (vocal separation), Beat This! (beats and downbeats), the MMS forced aligner and Whisper medium. They're about 3 GB and are not inside the app.
+
+The first time you open Cutline, the New Project window offers to download them. They go to `~/Library/Application Support/Cutline/models`, or to a folder you choose (for example on another disk). A folder that already has them is used as is. The download can be paused and resumed, and every file is checked before use. Until the models are ready, projects can't be created or opened. Settings > Models shows where they are and can move, re-download or remove them.
+
+## Requirements
+
+- A Mac with Apple Silicon, macOS 15 or later.
+- To build: Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen) and [uv](https://github.com/astral-sh/uv) (for the Python runtime).
 
 ## Building
 
 ```bash
-scripts/build_python_runtime.sh   # once: Python runtime into build/ml (and models into build/ml/models)
-xcodegen generate                 # after adding or moving files
-scripts/build_release.sh          # Release app into build/Release/Cutline.app
+scripts/build_python_runtime.sh   # once: the Python runtime into build/ml (and a development copy of the models into build/ml/models)
+scripts/build_release.sh          # the Release app into build/Release/Cutline.app
 ```
 
-The models aren't in the app. Cutline downloads them from the New Project window or Settings > Models (see `docs/GLOSSARY.md`, "Analysis models").
+Run `xcodegen generate` after adding, moving or removing source files; the build scripts run it too. Every build raises `BUILD_NUMBER` and stamps the app as 1.0.<build number>.
 
-Helper tests:
+Tests:
+
+```bash
+xcodebuild test -project Cutline.xcodeproj -scheme Cutline -destination 'platform=macOS,arch=arm64'
+```
 
 ```bash
 PYTHONPATH=build/ml-dev build/ml/python/bin/python3 -B -m pytest -c helper/pytest.ini --rootdir helper helper/tests
 ```
+
+## Project layout
+
+| Folder | What's in it |
+|---|---|
+| `Cutline/App` | App start, menus, the project document, the main window, toolbar and status bar |
+| `Cutline/Assets` | Assets panel, importing, thumbnails, waveforms, proxies |
+| `Cutline/Preview` | The live preview and the player behind it |
+| `Cutline/Timeline` | Timeline view, layout, snapping, lyric correction |
+| `Cutline/Inspector` | The right-hand inspector: clips, lyrics, keyboard shortcuts |
+| `Cutline/Model` | The project data model and editing commands |
+| `Cutline/Render` | Compositor, frame and lyric rendering, render cache keys |
+| `Cutline/Export` | Export, size estimate and the file-size solver |
+| `Cutline/Analysis` | Runs the Python helper: song analysis and lyric alignment |
+| `Cutline/Analysis/Models` | The analysis models: list, folder state, download, the New Project card |
+| `Cutline/Control` | The control channel Claude uses |
+| `Cutline/Dialogs` | New Project, New Dummy, Export and Reset Caches |
+| `Cutline/Settings` | The Settings window: Presets and Models |
+| `Cutline/Resources` | Format presets, platform UI zones, the document icon |
+| `CutlineTests` | Unit and integration tests |
+| `Tools/cutline-ctl` | Command-line client for the control channel, shipped inside the app |
+| `helper` | The offline Python helper, its pinned requirements, the model list and its tests |
+| `scripts` | Build scripts: Python runtime, Release app, version stamp, icons, model download |
+| `docs` | The glossary, the original plan, the Claude skill and README images |
+
+`build/` isn't tracked. `build/ml` holds the Python runtime that's copied into the app, plus a development copy of the models.
+
+## Docs
+
+- [docs/GLOSSARY.md](docs/GLOSSARY.md): the name and meaning of every part of the app, from the toolbar to tap mode.
+- [docs/claude-skill/cutline-dummies](docs/claude-skill/cutline-dummies/SKILL.md): the Claude skill that turns a production document into dummies on the timeline, and reads their times back.
