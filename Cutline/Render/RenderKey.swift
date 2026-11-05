@@ -8,7 +8,7 @@ import Foundation
 /// of the ranges whose output it changes.
 enum RenderKey {
     /// Bump when the renderer's output changes, so every cached frame and segment is stale.
-    static let rendererVersion = 1
+    static let rendererVersion = 2
 
     private struct Signature: Encodable {
         var version = RenderKey.rendererVersion
