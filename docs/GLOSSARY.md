@@ -73,6 +73,25 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Shadow strength** | How dense the lyric drop shadow is (100% = the color's own opacity). |
 | **Lyric style** | The one font, size, color, position and drop shadow used for all lyrics. |
 | **Proxy** | A smaller copy of a video used only for preview. Export always uses the original. |
-| **Alignment** | Matching each lyric word to when it's sung in the song (coming in PR 2). |
+| **Alignment** | Matching each lyric word to when it's sung, from the TXT and the vocal stem. Runs after you drop the TXT on a lyrics track (when the song is on the timeline), or from Lyrics > Align Words to Song (⌥⌘L). |
 | **Cinemascope / letterbox** | Animated black bars from 16:9 to 2.35:1, music videos only. Toggle in the timeline button bar. |
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
+| **Analysis helper** | The bundled, offline Python process (inside `Cutline.app/Contents/Resources/ml`) that runs the music and lyric models. Built by `scripts/build_python_runtime.sh`. |
+| **Job** | One run of the analysis helper (for example separating the vocal stem). Shows progress, can be cancelled, and leaves nothing behind if it fails. |
+| **Section lane** | The colored strip along the top of the audio row: song sections (A, B, C…) found by analysis. Drag a white boundary to move it, double-click the lane to add one, right-click to remove one. |
+| **Beat ticks / downbeats** | Marks along the bottom of the audio row: short ticks for beats, tall ticks for downbeats (the first beat of each bar). Drag a downbeat to correct it. |
+| **Loud / quiet shading** | Orange tint over loud stretches of the song and dark tint over quiet ones. |
+| **Vocal stem** | The song's vocals on their own, separated once by analysis and kept in the project's `analysis/` folder. |
+| **Beat and section fixes** | Your corrections to downbeats and sections. Saved in the project, separate from the raw analysis; reset from the audio row's right-click menu. |
+| **Snap groups** | The four toggles next to the snapping button: Sections, Downbeats, Beats, and Edges & Playhead. When several targets are in reach, sections win, then downbeats, then beats, then edges. Saved per project. |
+| **Beat anchor** | Cinemascope markers placed on (or near) a beat remember it, so they move when that downbeat is corrected or the song is moved. |
+| **Unsure word** | A lyric word whose timing confidence is below 60% and that you haven't confirmed. Drawn with an orange outline and bar on the timeline. |
+| **Confirmed word** | A word you've checked; alignment asks whether to keep its time. |
+| **Lead-in** | Lyric inspector > Animation: aligned words appear this much before they are sung (default 0.15 s). Changing it moves aligned words live; confirmed and hand-placed words stay put. |
+| **Next unsure word** | N (⇧N back): selects the next unsure, unconfirmed word in sung order and loops the song around it (±1.75 s, yellow band on the ruler). Return confirms it; Esc stops the loop. |
+| **Tap mode** | T: plays from 5 s before the selected word; each Space sets the current word's start to that moment, confirms it, and moves to the next word sung (any track). 1/2/3 play at 100/75/50% with pitch kept. After the last word the song plays 5 s more, then pauses. Esc ends. |
+| **Anchor stretch** | Confirmed words are anchors. Unconfirmed words between two anchors are re-timed in proportion to fit between them; aligned words outside anchors stay put. |
+| **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
+| **Word timing** | New or aligned words start on their own time and end with their line; each word's end can then be changed on its own. Dragging a line's start moves every word's start with it (ends stay); dragging its end moves every word's end with it (starts stay). |
+| **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |
+| **Lyrics Language** | Lyrics > Lyrics Language, or the menu that opens from the Align Lyrics button: "Detect from Lyrics" (reads your TXT) or any of the 100 languages Whisper knows, saved per project. It only steers the double-check of unsure words. |

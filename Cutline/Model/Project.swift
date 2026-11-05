@@ -19,6 +19,11 @@ struct Project: Codable, Equatable {
     var lyricTracks: [LyricTrack] = [LyricTrack()]
     var lyricStyle = LyricStyle()
     var cinemascope = Cinemascope()
+    /// User fixes to the song's beats and sections (see AudioAnalysis).
+    var beatCorrections: BeatCorrections?
+    /// Language Whisper uses to double-check aligned lyrics (a Whisper code such as "tr");
+    /// nil detects it from the lyric text.
+    var lyricsLanguage: String?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type
@@ -179,6 +184,10 @@ struct LyricWord: Codable, Equatable, Identifiable {
     var end: Double
     var confidence: Double = 1
     var confirmed = false
+    /// Timeline times found by alignment, before the lead-in. Cleared when the word is
+    /// edited by hand; then the lead-in no longer moves it.
+    var alignedStart: Double?
+    var alignedEnd: Double?
 }
 
 struct RGBA: Codable, Equatable {
@@ -206,6 +215,9 @@ struct LyricStyle: Codable, Equatable {
     var letterByLetterValue: Bool?
     /// How much consecutive letter fades overlap (0 = one after another, 1 = all together).
     var letterOverlapValue: Double?
+    /// Aligned words are shown this many seconds early (they read better slightly ahead of the voice).
+    var leadInValue: Double?
+    var leadIn: Double { get { leadInValue ?? 0.15 } set { leadInValue = newValue } }
     var letterByLetter: Bool { get { letterByLetterValue ?? false } set { letterByLetterValue = newValue } }
     var letterOverlap: Double { get { letterOverlapValue ?? 0.5 } set { letterOverlapValue = newValue } }
 
@@ -223,4 +235,7 @@ struct Cinemascope: Codable, Equatable {
     var enabled = false
     var startMarker: Double = 0
     var endMarker: Double = 5
+    /// Set when a marker is tied to the song's beats (it then follows beat corrections).
+    var startAnchor: BeatAnchor?
+    var endAnchor: BeatAnchor?
 }

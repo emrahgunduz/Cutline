@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = MainMenu.build()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        HelperProcess.terminateAll()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate()
         // Window restoration and Finder opens finish just after launch; only offer a new
@@ -49,6 +53,10 @@ final class CutlineDocumentController: NSDocumentController {
         switch NewProjectPrompt.run() {
         case .none: return
         case .open: openDocument(nil)
+        case .openRecent(let url):
+            openDocument(withContentsOf: url, display: true) { _, _, error in
+                if let error { NSAlert(error: error).runModal() }
+            }
         case .create(let project):
             let doc = ProjectDocument(project: project)
             addDocument(doc)

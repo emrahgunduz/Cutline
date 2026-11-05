@@ -168,14 +168,32 @@ extension Project {
 
     mutating func removeAudio() { audio = nil }
 
-    /// Move the song in time (length unchanged). Lyrics are timed to the song, so they move too.
-    mutating func moveAudio(start: Double) {
+    /// Move the song in time (length unchanged). Everything is laid out against the song, so
+    /// lyrics, video and image clips and the cinemascope markers move with it, unless `alone`
+    /// (⌥-drag). Nothing is pushed before 0: the move stops where the earliest item hits it.
+    mutating func moveAudio(start: Double, alone: Bool = false) {
         guard var a = audio else { return }
-        let newStart = quantize(max(0, start))
+        var newStart = quantize(max(0, start))
+        if !alone, newStart < a.start {
+            // How far left everything can go before the earliest item reaches 0.
+            let earliest = ([a.start] + videoTracks.flatMap(\.clips).map(\.start) + lyricTracks.flatMap(\.lines).map(\.start)).min() ?? a.start
+            newStart = max(newStart, a.start - earliest)
+        }
         let delta = newStart - a.start
         guard delta != 0 else { return }
         a.start = newStart
         audio = a
+        if alone {
+            // Only markers tied to the song's beats follow the song.
+            if cinemascope.startAnchor != nil { cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta)) }
+            if cinemascope.endAnchor != nil { cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta)) }
+            return
+        }
+        cinemascope.startMarker = quantize(max(0, cinemascope.startMarker + delta))
+        cinemascope.endMarker = quantize(max(0, cinemascope.endMarker + delta))
+        for t in videoTracks.indices {
+            for c in videoTracks[t].clips.indices { videoTracks[t].clips[c].start = quantize(videoTracks[t].clips[c].start + delta) }
+        }
         for t in lyricTracks.indices {
             for l in lyricTracks[t].lines.indices {
                 lyricTracks[t].lines[l].start += delta
@@ -183,6 +201,8 @@ extension Project {
                 for w in lyricTracks[t].lines[l].words.indices {
                     lyricTracks[t].lines[l].words[w].start += delta
                     lyricTracks[t].lines[l].words[w].end += delta
+                    lyricTracks[t].lines[l].words[w].alignedStart? += delta
+                    lyricTracks[t].lines[l].words[w].alignedEnd? += delta
                 }
             }
         }
@@ -228,19 +248,42 @@ extension Project {
         let delta = quantize(max(0, start)) - line.start
         line.start += delta
         line.end += delta
-        for i in line.words.indices { line.words[i].start += delta; line.words[i].end += delta }
+        for i in line.words.indices {
+            line.words[i].start += delta; line.words[i].end += delta
+            line.words[i].alignedStart? += delta; line.words[i].alignedEnd? += delta
+        }
         lyricTracks[track].lines.append(line)
         lyricTracks[track].lines.sort { $0.start < $1.start }
     }
 
-    /// Change a line's edges. The line always contains its words, so edges stop at them.
+    /// Change a line's edges. Dragging the start moves every word's start with it (each keeps
+    /// its distance from the line start); dragging the end moves every word's end with it (each
+    /// keeps its distance from the line end). A word never gets shorter than a frame, so the
+    /// drag stops there.
     mutating func retimeLine(_ id: UUID, start: Double? = nil, end: Double? = nil) {
         guard let loc = lineLocation(id) else { return }
         var line = lyricTracks[loc.track].lines[loc.index]
-        let firstWord = line.words.map(\.start).min() ?? line.end
-        let lastWord = line.words.map(\.end).max() ?? line.start
-        if let start { line.start = min(quantize(max(0, start)), firstWord, line.end - frameDuration) }
-        if let end { line.end = max(quantize(end), lastWord, line.start + frameDuration) }
+        let f = frameDuration
+        if let start {
+            let room = line.words.map { $0.end - f - $0.start }.min() ?? (line.end - f - line.start)
+            let s = min(quantize(max(0, start)), line.start + max(0, room))
+            let delta = s - line.start
+            for i in line.words.indices {
+                line.words[i].start = quantize(line.words[i].start + delta)
+                line.words[i].alignedStart? += delta
+            }
+            line.start = s
+        }
+        if let end {
+            let room = line.words.map { $0.end - f - $0.start }.min() ?? (line.end - f - line.start)
+            let e = max(quantize(end), line.end - max(0, room))
+            let delta = e - line.end
+            for i in line.words.indices {
+                line.words[i].end = quantize(line.words[i].end + delta)
+                line.words[i].alignedEnd? += delta
+            }
+            line.end = e
+        }
         lyricTracks[loc.track].lines[loc.index] = line
     }
 
@@ -255,6 +298,7 @@ extension Project {
             if end != nil && start == nil { w.end = w.start + frameDuration } else { w.start = w.end - frameDuration }
         }
         if confirm { w.confirmed = true }
+        w.alignedStart = nil; w.alignedEnd = nil   // set by hand now
         line.words[loc.word] = w
         line.start = min(line.start, w.start)
         line.end = max(line.end, w.end)

@@ -18,6 +18,8 @@ struct StatusBarView: View {
                     divider
                     Label("\(proxyCount) proxied", systemImage: "bolt.horizontal").help("Videos playing from preview proxies")
                 }
+                CorrectionStatusView(transport: editor.transport)
+                JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis, cancel: { editor.cancelJobs() })
                 divider
                 Label(saveText, systemImage: editor.document?.isDocumentEdited == true ? "pencil.circle" : "checkmark.circle")
             }
@@ -92,5 +94,46 @@ struct StatusBarView: View {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
         return "Saved \(f.localizedString(for: date, relativeTo: Date()))"
+    }
+}
+
+/// The running analysis job with its progress and a cancel button.
+private struct JobStatusView: View {
+    @ObservedObject var jobs: JobRunner
+    @ObservedObject var analysis: AudioAnalysisStore
+    let cancel: () -> Void
+
+    var body: some View {
+        if let job = jobs.active.first {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            HStack(spacing: 6) {
+                ProgressView(value: job.fraction).progressViewStyle(.linear).frame(width: 70).controlSize(.mini)
+                Text("\(job.message ?? job.title) \(Int((job.fraction * 100).rounded()))%").lineLimit(1)
+                Button(action: cancel) { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless).help("Cancel")
+            }
+        } else if case .failed(let message) = analysis.state {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Analysis failed", systemImage: "exclamationmark.triangle").foregroundStyle(.orange).help(message)
+        }
+    }
+}
+
+/// Tap mode and loop state, with the keys that control them.
+private struct CorrectionStatusView: View {
+    @ObservedObject var transport: TransportState
+
+    var body: some View {
+        if transport.tapWordID != nil {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Tap mode · \(Int((transport.rate * 100).rounded()))% · Space taps · 1/2/3 speed · Esc ends", systemImage: "hand.tap")
+                .foregroundStyle(.green)
+        } else if transport.stopAt != nil {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Last word tapped · playing 5 s more", systemImage: "hand.tap").foregroundStyle(.green)
+        } else if transport.loop != nil {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Looping · Return confirms · N next · Esc stops", systemImage: "repeat").foregroundStyle(.yellow)
+        }
     }
 }

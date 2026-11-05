@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The "New Project" window: pick what you're making as a card, then a resolution.
-enum NewProjectChoice { case create(Project), open }
+enum NewProjectChoice { case create(Project), open, openRecent(URL) }
 
 enum NewProjectPrompt {
     /// nil when cancelled.
@@ -33,6 +33,7 @@ struct NewProjectView: View {
     let finish: (NewProjectChoice?) -> Void
     @State private var type: ProjectType = .musicVideo
     @State private var canvasIndex = 0
+    @State private var recents: [URL] = RecentProjects.list()
 
     private var preset: FormatPreset { Presets.preset(for: type) }
 
@@ -69,9 +70,40 @@ struct NewProjectView: View {
                 Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
                 Button("Create Project", action: create).keyboardShortcut(.defaultAction).controlSize(.large)
             }
+            Divider()
+            recentSection
         }
         .padding(24)
         .frame(width: 640)
+    }
+
+    @ViewBuilder private var recentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Recent Projects").font(.headline)
+                Spacer()
+                Button("Clear") {
+                    RecentProjects.clear()
+                    recents = []
+                }
+                .controlSize(.small)
+                .disabled(recents.isEmpty)
+                .help("Forget the recent projects list (the projects themselves are not touched)")
+            }
+            if recents.isEmpty {
+                Text("Projects you open or save appear here.").font(.callout).foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(recents, id: \.self) { url in
+                            RecentRow(url: url) { finish(.openRecent(url)) }
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            }
+        }
     }
 
     private func create() {
@@ -130,5 +162,62 @@ private struct TypeCard: View {
         .background(RoundedRectangle(cornerRadius: 10).fill(selected ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.04)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: selected ? 2 : 1))
         .contentShape(Rectangle())
+    }
+}
+
+/// Cutline's own list of recently opened or saved projects (newest first, up to 10).
+/// Kept in user defaults because the system recent-documents list doesn't record this
+/// locally signed build.
+enum RecentProjects {
+    static let limit = 10
+    static let key = "recentProjects"
+    static var defaults: UserDefaults = .standard
+
+    /// Projects that still exist on disk.
+    static func list() -> [URL] {
+        (defaults.stringArray(forKey: key) ?? [])
+            .map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    static func note(_ url: URL) {
+        guard url.pathExtension == "cutline", !url.path.hasPrefix(FileManager.default.temporaryDirectory.path) else { return }
+        var paths = (defaults.stringArray(forKey: key) ?? []).filter { $0 != url.path }
+        paths.insert(url.path, at: 0)
+        defaults.set(Array(paths.prefix(limit)), forKey: key)
+    }
+
+    static func clear() { defaults.removeObject(forKey: key) }
+}
+
+private struct RecentRow: View {
+    let url: URL
+    let open: () -> Void
+    @State private var hovering = false
+
+    private var folder: String { (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath }
+    private var modified: String? {
+        guard let d = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
+        return d.formatted(.relative(presentation: .named))
+    }
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 28, height: 28)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(url.deletingPathExtension().lastPathComponent).font(.system(size: 13, weight: .medium))
+                    Text(folder).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer()
+                if let modified { Text(modified).font(.caption).foregroundStyle(.secondary) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Color.accentColor.opacity(0.15) : Color.clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(url.path)
     }
 }

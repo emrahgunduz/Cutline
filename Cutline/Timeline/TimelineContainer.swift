@@ -9,7 +9,10 @@ final class TimelineContainer: NSView {
     private let vScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 200))
     private let bar = NSStackView()
     private var snapButton: NSButton!
+    private var groupButtons: [SnapGroup: NSButton] = [:]
     private var cinemaButton: NSButton!
+    private var analyzeButton: NSButton!
+    private var alignButton: NSButton!
     private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
 
@@ -32,10 +35,28 @@ final class TimelineContainer: NSView {
         }
         let split = button("scissors", "Cut at playhead (C)") { [weak editor] in editor?.splitAtPlayhead() }
         let delete = button("trash", "Delete selection (⌫)") { [weak editor] in editor?.deleteSelection() }
-        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (S): edges, playhead and lyrics attract while dragging. Hold ⌘ to bypass.") { [weak self] in
+        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (S): the groups to the right attract while dragging. Hold ⌘ to bypass.") { [weak self] in
             self?.timeline.snappingEnabled.toggle()
         }
         snapButton.setButtonType(.pushOnPushOff)
+        let groupSymbols: [SnapGroup: (String, String)] = [
+            .sections: ("square.split.2x1", "Snap to section edges (strongest)"),
+            .downbeats: ("metronome.fill", "Snap to downbeats (first beat of each bar)"),
+            .beats: ("metronome", "Snap to beats"),
+            .edges: ("arrow.left.and.right.righttriangle.left.righttriangle.right", "Snap to clip, lyric and audio edges and the playhead"),
+        ]
+        for g in SnapGroup.allCases {
+            let (symbol, tip) = groupSymbols[g]!
+            let b = button(symbol, tip) { [weak self] in
+                guard let self else { return }
+                var groups = self.timeline.snapGroups
+                if groups.contains(g) { groups.remove(g) } else { groups.insert(g) }
+                self.timeline.snapGroups = groups
+            }
+            b.setButtonType(.pushOnPushOff)
+            b.controlSize = .small
+            groupButtons[g] = b
+        }
         cinemaButton = button("rectangle.ratio.16.to.9", "Cinemascope bars (music videos): drag the orange markers on the ruler to set where the bars start and finish closing to 2.35:1") { [weak editor] in
             guard let editor else { return }
             editor.edit(editor.project.cinemascope.enabled ? "Cinemascope Off" : "Cinemascope On") { p in
@@ -44,20 +65,47 @@ final class TimelineContainer: NSView {
                 if p.cinemascope.enabled && p.cinemascope.startMarker == 0 && p.cinemascope.endMarker == 5 {
                     p.cinemascope.startMarker = p.quantize(editor.playhead)
                     p.cinemascope.endMarker = p.quantize(editor.playhead + 4)
+                    p.anchorMarkers(editor.resolvedBeats, hash: editor.audioAnalysis.analysis?.audioHash)
                 }
             }
         }
         cinemaButton.setButtonType(.pushOnPushOff)
+        analyzeButton = button("waveform.badge.magnifyingglass", "Analyze the song again: vocals, beats, downbeats and sections") { [weak editor] in
+            guard let editor, let audio = editor.project.audio else { return }
+            editor.audioAnalysis.ensure(for: editor.project.asset(audio.assetID), force: true)
+        }
+        analyzeButton.title = "Analyze Song"
+        analyzeButton.imagePosition = .imageLeading
+        alignButton = button("text.word.spacing", "Time every lyric word to the song: pick the lyrics language (or detect it), then align") { [weak self, weak editor] in
+            guard let self, let editor else { return }
+            // Pick the language first; choosing one saves it with the project and aligns.
+            let menu = LyricsLanguage.menu(selected: editor.project.lyricsLanguage) { [weak self, weak editor] code in
+                guard let editor else { return }
+                editor.edit("Lyrics Language") { $0.lyricsLanguage = code }
+                editor.alignLyrics(window: self?.window)
+            }
+            menu.popUp(positioning: menu.items.first { $0.state == .on }, at: NSPoint(x: 0, y: self.alignButton.bounds.height + 4), in: self.alignButton)
+        }
+        alignButton.title = "Align Lyrics"
+        alignButton.imagePosition = .imageLeading
         let zoomOut = button("minus.magnifyingglass", "Zoom out (−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
         let zoomIn = button("plus.magnifyingglass", "Zoom in (=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        for v in [addVideo, addLyrics, separator(), split, delete, separator(), snapButton!, cinemaButton!, spacer, zoomOut, zoomIn, fit] { bar.addArrangedSubview(v) }
+        let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
+        let items: [NSView] = [addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
+            + [separator(), cinemaButton, separator(), analyzeButton, alignButton, spacer, zoomOut, zoomIn, fit]
+        for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo
         editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
             self.cinemaButton.state = editor.project.cinemascope.enabled ? .on : .off
+            self.updateAnalysisButtons(editor)
+        }.store(in: &cancellables)
+        editor.audioAnalysis.$state.combineLatest(editor.jobs.$active).receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
+            guard let self, let editor else { return }
+            self.updateAnalysisButtons(editor)
         }.store(in: &cancellables)
 
         for v in [bar, timeline, hScroller, vScroller] as [NSView] { addSubview(v) }
@@ -67,14 +115,31 @@ final class TimelineContainer: NSView {
         vScroller.target = self; vScroller.action = #selector(vScrolled)
         hScroller.isEnabled = true; vScroller.isEnabled = true
         timeline.onScroll = { [weak self] in self?.syncScrollers() }
-        timeline.onSnappingChange = { [weak self] on in self?.snapButton.state = on ? .on : .off }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.snapButton.state = self.timeline.snappingEnabled ? .on : .off
-        }
+        timeline.onSnappingChange = { [weak self] _ in self?.syncSnapButtons() }
+        timeline.onSnapGroupsChange = { [weak self] _ in self?.syncSnapButtons() }
+        DispatchQueue.main.async { [weak self] in self?.syncSnapButtons() }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Both need the song; aligning needs lyrics too. Neither runs while a job is running.
+    private func updateAnalysisButtons(_ editor: EditorModel) {
+        let p = editor.project
+        let busy = !editor.jobs.active.isEmpty
+        let available = editor.audioAnalysis.state != .unavailable
+        analyzeButton.isEnabled = p.audio != nil && available && !busy
+        alignButton.isEnabled = p.audio != nil && available && !busy && p.lyricTracks.contains { !$0.lines.isEmpty }
+    }
+
+    /// Group toggles keep their own state but grey out while snapping is off.
+    private func syncSnapButtons() {
+        let on = timeline.snappingEnabled, groups = timeline.snapGroups
+        snapButton.state = on ? .on : .off
+        for (g, b) in groupButtons {
+            b.state = groups.contains(g) ? .on : .off
+            b.isEnabled = on
+        }
+    }
 
     private func separator() -> NSView {
         let b = NSBox(); b.boxType = .separator

@@ -50,7 +50,9 @@ enum LyricImport {
                 words.append(LyricWord(text: w, start: ws, end: we, confidence: 0))
                 t += d
             }
-            lines.append(LyricLine(start: words.first!.start, end: words.last!.end, words: words, stanza: l.stanza))
+            var line = LyricLine(start: words.first!.start, end: words.last!.end, words: words, stanza: l.stanza)
+            line.endWordsAtLineEnd()   // new words end with their line by default
+            lines.append(line)
         }
         return lines
     }
@@ -74,6 +76,8 @@ extension EditorModel {
                 guard p.lyricTracks.indices.contains(track) else { return }
                 p.lyricTracks[track].lines = lines
             }
+            // With a song on the timeline, time the words to it right away (R21).
+            if project.audio != nil, audioAnalysis.state != .unavailable { alignLyrics(window: window) }
         }
         if project.lyricTracks.indices.contains(track), !project.lyricTracks[track].lines.isEmpty, let window {
             let alert = NSAlert()

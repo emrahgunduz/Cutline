@@ -39,14 +39,14 @@ final class LyricModelTests: XCTestCase {
         XCTAssertTrue(p.lyricTracks[0].lines[0].words[0].confirmed)
     }
 
-    func testLineEdgeCannotCutIntoWords() {
+    func testDraggingTheLineStartLeftKeepsWordOffsets() {
         var p = project()
         let id = p.lyricTracks[0].lines[0].id
-        p.retimeLine(id, start: 5.5, end: 8)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].start, 5)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 8.8)
         p.retimeLine(id, start: 3)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].start, 3)
+        let line = p.lyricTracks[0].lines[0]
+        XCTAssertEqual(line.start, 3)
+        XCTAssertEqual(line.words.map(\.start), [3, 4.2], "word starts keep their offsets from the start")
+        XCTAssertEqual(line.words.map(\.end), [6, 8.8], "word ends stay")
     }
 
     func testOverlappingLinesOnTwoTracksAreBothVisible() {

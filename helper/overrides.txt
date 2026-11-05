@@ -1,0 +1,2 @@
+# demucs 4.0.1 pins torchaudio<2.1, which has no wheels for Python 3.12. It runs fine on 2.8.
+torchaudio==2.8.0
