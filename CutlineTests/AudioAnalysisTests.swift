@@ -95,6 +95,46 @@ final class AudioAnalysisTests: XCTestCase {
         XCTAssertEqual(regions[1].end, 30, accuracy: 0.01)
     }
 
+    private func steppedWaveform() -> Waveform {
+        // 30 s at 1 bucket per 0.1 s: quiet 0-10 s, normal 10-20 s, loud 20-30 s.
+        let rms = [Float](repeating: 0.05, count: 100) + [Float](repeating: 0.2, count: 100) + [Float](repeating: 0.5, count: 100)
+        return Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 4800, mins: rms.map { -$0 }, maxs: rms, rms: rms)])
+    }
+
+    func testTheEnvelopeIsTheCurveThePatchesComeFrom() throws {
+        let e = try XCTUnwrap(Loudness.envelope(steppedWaveform()))
+        XCTAssertEqual(e.bucket, 0.1, accuracy: 1e-9)
+        XCTAssertEqual(e.duration, 30, accuracy: 1e-6)
+        XCTAssertEqual(e.value(at: 5), 0.05, accuracy: 1e-6)
+        XCTAssertEqual(e.value(at: 25), 0.5, accuracy: 1e-6)
+        XCTAssertEqual(e.value(at: 99), 0, "past the end is silent")
+        XCTAssertGreaterThan(e.loudLevel, e.quietLevel)
+        XCTAssertEqual(e.peak, 0.5, accuracy: 1e-6)
+        // Every patch is where the curve is past its line.
+        for r in Loudness.regions(e) {
+            for t in stride(from: r.start + 0.05, to: r.end, by: 0.1) {
+                if r.kind == .loud { XCTAssertGreaterThan(e.value(at: t), e.loudLevel, "\(t)") }
+                else { XCTAssertLessThan(e.value(at: t), e.quietLevel, "\(t)") }
+            }
+        }
+        XCTAssertEqual(Loudness.regions(e), Loudness.regions(steppedWaveform()), "same patches either way")
+    }
+
+    func testTheCurveIsScaledToTheLoudestMoment() throws {
+        let e = try XCTUnwrap(Loudness.envelope(steppedWaveform()))
+        XCTAssertEqual(e.height(e.peak), 1)
+        XCTAssertEqual(e.height(0), 0)
+        XCTAssertEqual(e.height(e.peak * 2), 1, "clamped")
+        let lane = CGRect(x: 0, y: 0, width: 100, height: 52)
+        XCTAssertEqual(SectionLane.curveHeight(e, e.peak, lane), 50 * 0.85, accuracy: 1e-6, "the loudest moment stays inside the lane")
+        XCTAssertLessThan(SectionLane.curveHeight(e, e.quietLevel, lane), SectionLane.curveHeight(e, e.loudLevel, lane))
+    }
+
+    func testSilenceHasNoEnvelope() {
+        let rms = [Float](repeating: 0, count: 50)
+        XCTAssertNil(Loudness.envelope(Waveform(sampleRate: 48000, levels: [WaveformLevel(samplesPerBucket: 4800, mins: rms, maxs: rms, rms: rms)])))
+    }
+
     // MARK: Store
 
     private func store(_ calls: Counter) -> AudioAnalysisStore {
