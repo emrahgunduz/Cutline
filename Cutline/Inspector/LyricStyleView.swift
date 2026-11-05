@@ -4,6 +4,8 @@ import SwiftUI
 /// The single project-wide lyric style: font, size, color and drop shadow.
 struct LyricStyleView: View {
     @EnvironmentObject var editor: EditorModel
+    @AppStorage("lyricAlignPadding") private var padding = 60.0
+    @AppStorage("lyricAlignGap") private var gap = 16.0
     private static let families = NSFontManager.shared.availableFontFamilies
 
     var body: some View {
@@ -11,6 +13,7 @@ struct LyricStyleView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if let text = selectedText { Text(text).font(.headline).lineLimit(3) }
+                placement
                 InspectorSection(title: "Text", icon: "textformat") {
                     Picker("Font", selection: binding(\.fontName, "Font")) {
                         ForEach(fontChoices(current: style.fontName), id: \.self) { Text($0).tag($0) }
@@ -32,9 +35,45 @@ struct LyricStyleView: View {
         }
     }
 
+    @ViewBuilder private var placement: some View {
+        let ids = editor.placementLineIDs
+        if !ids.isEmpty {
+            InspectorSection(title: ids.count > 1 ? "Placement · \(ids.count) lines" : "Placement", icon: "rectangle.dashed") {
+                HStack(spacing: 4) {
+                    alignButton("align.horizontal.left", "Align left") { editor.alignLines(horizontal: .left, vertical: nil, padding: padding, gap: gap) }
+                    alignButton("align.horizontal.center", "Center horizontally") { editor.alignLines(horizontal: .center, vertical: nil, padding: padding, gap: gap) }
+                    alignButton("align.horizontal.right", "Align right") { editor.alignLines(horizontal: .right, vertical: nil, padding: padding, gap: gap) }
+                    Divider().frame(height: 18)
+                    alignButton("align.vertical.top", ids.count > 1 ? "Stack at top" : "Align top") { editor.alignLines(horizontal: nil, vertical: .top, padding: padding, gap: gap) }
+                    alignButton("align.vertical.center", ids.count > 1 ? "Stack in the middle" : "Center vertically") { editor.alignLines(horizontal: nil, vertical: .center, padding: padding, gap: gap) }
+                    alignButton("align.vertical.bottom", ids.count > 1 ? "Stack at bottom" : "Align bottom") { editor.alignLines(horizontal: nil, vertical: .bottom, padding: padding, gap: gap) }
+                }
+                ValueRow(label: "Padding", value: padding, range: 0...400, step: 1, format: "%.0f px", defaultValue: 60,
+                         onChange: { padding = $0 }, onCommit: {})
+                if ids.count > 1 {
+                    ValueRow(label: "Line gap", value: gap, range: 0...200, step: 1, format: "%.0f px", defaultValue: 16,
+                             onChange: { gap = $0 }, onCommit: {})
+                }
+                HStack {
+                    Text(ids.count > 1 ? "Selected lines stack under each other." : "Drag the line in the preview to move it.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Auto Position") { editor.resetLinePositions() }
+                        .controlSize(.small)
+                        .disabled(!ids.contains { editor.line($0)?.hasPosition == true })
+                }
+            }
+        }
+    }
+
+    private func alignButton(_ symbol: String, _ tip: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol).frame(width: 22, height: 18) }
+            .buttonStyle(.bordered).controlSize(.small).help(tip)
+    }
+
     private var selectedText: String? {
         switch editor.selection {
-        case .lyricLine(let id): editor.line(id)?.text
+        case .lyricLine(let id): editor.selectedLineIDs.count > 1 ? "\(editor.selectedLineIDs.count) lines selected" : editor.line(id)?.text
         case .lyricWord(let id): editor.word(id)?.text
         default: nil
         }

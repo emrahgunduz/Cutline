@@ -54,7 +54,7 @@ final class PreviewCanvasView: NSView {
     private let controller: PreviewController
     private var cancellables: Set<AnyCancellable> = []
 
-    private enum DragMode { case move, scale(anchor: CGPoint), pan }
+    private enum DragMode { case move, scale(anchor: CGPoint), pan, moveLines([UUID: CGPoint]) }
     private var drag: (mode: DragMode, start: CGPoint, original: Project, clip: Clip?, startPan: CGPoint)?
 
     init(controller: PreviewController, editor: EditorModel) {
@@ -102,7 +102,13 @@ final class PreviewCanvasView: NSView {
         playerLayer.frame = viewRect(g)
         let fit = Int((g.fitScale * 100).rounded())
         if controller.fitPercent != fit { DispatchQueue.main.async { self.controller.fitPercent = fit } }
-        if let r = selectedClipViewRect(g) {
+        let lineRects = selectedLineViewRects(g)
+        if !lineRects.isEmpty {
+            let path = CGMutablePath()
+            lineRects.forEach { path.addRect($0) }
+            overlay.path = path
+            handlesLayer.path = nil
+        } else if let r = selectedClipViewRect(g) {
             overlay.path = CGPath(rect: r, transform: nil)
             let handles = CGMutablePath()
             for c in corners(r) { handles.addEllipse(in: CGRect(x: c.x - 5, y: c.y - 5, width: 10, height: 10)) }
@@ -132,6 +138,28 @@ final class PreviewCanvasView: NSView {
         return clipViewRect(clip, g)
     }
 
+    private func lyricRenderer() -> LyricRenderer { LyricRenderer(project: editor.project) }
+
+    /// Lyric lines drawn at the playhead with their view rectangles.
+    private func visibleLineRects(_ g: PreviewGeometry) -> [(LyricLine, CGRect)] {
+        lyricRenderer().placedLines(at: editor.playhead).map { ($0.line, g.viewRect(ofCanvasRect: $0.rect).offsetBy(dx: 12, dy: 12)) }
+    }
+
+    private func selectedLineViewRects(_ g: PreviewGeometry) -> [CGRect] {
+        visibleLineRects(g).filter { editor.isSelected(.lyricLine($0.0.id)) }.map(\.1)
+    }
+
+    /// Start a drag of lyric lines: the clicked one, plus any other selected visible lines.
+    private func beginLineDrag(_ line: LyricLine, at p: CGPoint, event: NSEvent) {
+        if event.modifierFlags.contains(.command) { editor.toggleSelected(.lyricLine(line.id)); return }
+        if !editor.isSelected(.lyricLine(line.id)) { editor.selection = .lyricLine(line.id) }
+        let placed = lyricRenderer().placedLines(at: editor.playhead)
+        var starts: [UUID: CGPoint] = [:]
+        for pl in placed where editor.isSelected(.lyricLine(pl.line.id)) { starts[pl.line.id] = CGPoint(x: pl.rect.midX, y: pl.rect.midY) }
+        drag = (.moveLines(starts), p, editor.project, nil, controller.pan)
+        NSCursor.closedHand.set()
+    }
+
     /// Topmost clip under the point at the playhead.
     private func clip(at p: CGPoint) -> Clip? {
         let g = geometry
@@ -155,6 +183,11 @@ final class PreviewCanvasView: NSView {
             drag = (.pan, p, original, nil, controller.pan); return
         }
         let g = geometry
+        // Lyric lines sit above video, so they are hit first. Words are never picked alone.
+        if let (line, _) = visibleLineRects(g).last(where: { $0.1.insetBy(dx: -4, dy: -4).contains(p) }) {
+            beginLineDrag(line, at: p, event: event)
+            return
+        }
         if let r = selectedClipViewRect(g), let clip = editor.selectedClip {
             if let corner = corners(r).first(where: { hypot($0.x - p.x, $0.y - p.y) < 9 }) {
                 _ = corner   // scaling is uniform around the clip center
@@ -191,6 +224,15 @@ final class PreviewCanvasView: NSView {
             if abs(oy) * Double(g.scale) < 6 && !event.modifierFlags.contains(.command) { oy = 0 }
             next.updateClip(clip.id) { $0.transform.offsetX = ox.rounded(); $0.transform.offsetY = oy.rounded() }
             editor.replaceWithoutUndo(next)
+        case .moveLines(let starts):
+            var next = d.original
+            let dx = Double((p.x - d.start.x) / g.scale), dy = Double(-(p.y - d.start.y) / g.scale)
+            for (id, c) in starts {
+                guard let loc = next.lineLocation(id) else { continue }
+                next.lyricTracks[loc.track].lines[loc.index].centerX = (Double(c.x) + dx).rounded()
+                next.lyricTracks[loc.track].lines[loc.index].centerY = (Double(c.y) + dy).rounded()
+            }
+            editor.replaceWithoutUndo(next)
         case .scale(let center):
             guard let clip = d.clip else { return }
             let d0 = hypot(d.start.x - center.x, d.start.y - center.y), d1 = hypot(p.x - center.x, p.y - center.y)
@@ -205,7 +247,15 @@ final class PreviewCanvasView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { drag = nil; NSCursor.arrow.set() }
-        guard let d = drag, d.clip != nil else { return }
+        guard let d = drag else { return }
+        if case .moveLines = d.mode {
+            let final = editor.project
+            guard final != d.original else { return }
+            editor.replaceWithoutUndo(d.original)
+            editor.edit("Move Lyrics") { $0 = final }
+            return
+        }
+        guard d.clip != nil else { return }
         let final = editor.project
         guard final != d.original else { return }
         editor.replaceWithoutUndo(d.original)

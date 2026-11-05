@@ -44,6 +44,7 @@
 		7DDAD07CAE072A0F9F01D9E2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858F6775E8B4AA655EC12500 /* ExportSettings.swift */; };
 		801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75B629399C7ACF1CFA72AEA /* LyricImport.swift */; };
 		81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */; };
+		844740FF67B0903A98F485A1 /* LyricPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726ADC25A13D2E39324D7F7B /* LyricPlacementTests.swift */; };
 		8C93807386D4A76192988DB3 /* FilterChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */; };
 		8F12F68EF5BE700BD8B53D81 /* Filmstrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF90EE62F3B92ADD7ED730F /* Filmstrip.swift */; };
 		8FD8835304008E56911C478D /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4572ED9F4E345B083FB20AF9 /* ProjectDocument.swift */; };
@@ -63,6 +64,7 @@
 		C9098E168CA54FE2974429E6 /* SizeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */; };
 		C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB459A5AB6C2322B399C2F4F /* NewProjectView.swift */; };
 		CF50D45B19402FD6AA3721EE /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B695A995DCC967FB746B5209 /* Exporter.swift */; };
+		E15DE66864FDAFE27CA40E64 /* LyricPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6FB8B2C6C5FBF204D6908C /* LyricPlacement.swift */; };
 		E595C8588F4292E299228E7B /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */; };
 		EB548A9EA1E729689E9268F2 /* presets.json in Resources */ = {isa = PBXBuildFile; fileRef = 3F86A8C237D2346DBF191F17 /* presets.json */; };
 		ED1CD503FAC1D8BD056B1AC0 /* EditCommandsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6CBC7EF2FCDEF542BCB501 /* EditCommandsTests.swift */; };
@@ -112,6 +114,7 @@
 		6747E1F00382AB5CAD82123F /* CompositionBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionBuilderTests.swift; sourceTree = "<group>"; };
 		6E9AC9504213A58BE67FB399 /* SizeEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeEstimator.swift; sourceTree = "<group>"; };
 		6FC982F65D966A1E5A0FE8F8 /* SampleMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleMedia.swift; sourceTree = "<group>"; };
+		726ADC25A13D2E39324D7F7B /* LyricPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPlacementTests.swift; sourceTree = "<group>"; };
 		7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricRasterizer.swift; sourceTree = "<group>"; };
 		81AC03D61FA4DFDB21042B81 /* ClipInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipInspectorView.swift; sourceTree = "<group>"; };
 		81BF6447E10E82DFF132DB56 /* WindowToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowToolbar.swift; sourceTree = "<group>"; };
@@ -150,6 +153,7 @@
 		F1D8E193DCC13514C90ADD93 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		F23FD7544E013663B4C9C951 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExporterIntegrationTests.swift; sourceTree = "<group>"; };
+		FC6FB8B2C6C5FBF204D6908C /* LyricPlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPlacement.swift; sourceTree = "<group>"; };
 		FDF90EE62F3B92ADD7ED730F /* Filmstrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Filmstrip.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -162,6 +166,7 @@
 				469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */,
 				D308F2CA6627635889BC272A /* FrameRenderer.swift */,
 				25D2D132D911EE445BA2025B /* LyricLayout.swift */,
+				FC6FB8B2C6C5FBF204D6908C /* LyricPlacement.swift */,
 				7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */,
 				97D242012F97B2217D19F98C /* PreviewController.swift */,
 			);
@@ -193,6 +198,7 @@
 				E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */,
 				1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */,
 				E8497D29B044D92820FCC58A /* LyricModelTests.swift */,
+				726ADC25A13D2E39324D7F7B /* LyricPlacementTests.swift */,
 				9274C7F6E607FAA343E05201 /* MainWindowTests.swift */,
 				DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */,
 				00EAA2C07BF4BE00113F684B /* PreviewPerformanceTests.swift */,
@@ -428,6 +434,7 @@
 				35DD116F2970C41E9FFD9D9D /* InspectorView.swift in Sources */,
 				801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */,
 				AB5C2AE9691112978278C917 /* LyricLayout.swift in Sources */,
+				E15DE66864FDAFE27CA40E64 /* LyricPlacement.swift in Sources */,
 				81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */,
 				F723A3DF86EA6416D4968F51 /* LyricStyleView.swift in Sources */,
 				E595C8588F4292E299228E7B /* MainMenu.swift in Sources */,
@@ -467,6 +474,7 @@
 				70ADDC3D30D50E669727BC66 /* LyricImportTests.swift in Sources */,
 				41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */,
 				3754CD3D955A136263FFECF3 /* LyricModelTests.swift in Sources */,
+				844740FF67B0903A98F485A1 /* LyricPlacementTests.swift in Sources */,
 				5744FF40D09A805C85B912E8 /* MainWindowTests.swift in Sources */,
 				694E32FB938517F8178010A4 /* PreviewGeometryTests.swift in Sources */,
 				A47713E0C9AC27C96F8F700B /* PreviewPerformanceTests.swift in Sources */,
