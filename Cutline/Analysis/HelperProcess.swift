@@ -113,19 +113,23 @@ final class HelperProcess: @unchecked Sendable {
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
                 state.continuation = cont
+                // Done once stdout is drained (every line handled) and the process has exited.
+                let done = DispatchGroup()
+                done.enter(); done.enter()
+                process.terminationHandler = { _ in done.leave() }
+                done.notify(queue: .global()) {
+                    Self.unregister(process)
+                    state.finish(status: process.terminationStatus)
+                }
                 stderr.fileHandleForReading.readabilityHandler = { h in
                     let d = h.availableData
                     if d.isEmpty { h.readabilityHandler = nil } else { state.appendLog(d) }
                 }
-                // Completion is driven by stdout reaching EOF, so every line is handled
-                // before the outcome is decided.
                 stdout.fileHandleForReading.readabilityHandler = { h in
                     let d = h.availableData
                     if d.isEmpty {
                         h.readabilityHandler = nil
-                        process.waitUntilExit()
-                        Self.unregister(process)
-                        state.finish(status: process.terminationStatus)
+                        done.leave()
                         return
                     }
                     for message in state.feed(d) {
@@ -141,6 +145,7 @@ final class HelperProcess: @unchecked Sendable {
                 } catch {
                     stdout.fileHandleForReading.readabilityHandler = nil
                     stderr.fileHandleForReading.readabilityHandler = nil
+                    process.terminationHandler = nil
                     state.fail(error)
                 }
             }
