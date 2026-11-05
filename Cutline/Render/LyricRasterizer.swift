@@ -9,10 +9,15 @@ final class LyricRenderer {
     private static let cache = NSCache<NSString, RasterBox>()
     private final class RasterBox { let raster: LineRaster; init(_ r: LineRaster) { raster = r } }
 
-    init(project: Project) { self.project = project }
+    init(project: Project) {
+        self.project = project
+        platformSafeArea = SafeArea.rect(for: project)
+    }
 
     /// Lyrics are placed independently of the cinemascope bars: the animation never moves them.
-    func safeArea(_ t: Double) -> CGRect? { nil }
+    /// Portrait projects keep automatically placed lines clear of the platform overlays switched on.
+    private let platformSafeArea: CGRect?
+    func safeArea(_ t: Double) -> CGRect? { platformSafeArea }
 
     /// Where each drawn line sits on the canvas at time t (y up), plus its raster and scale.
     struct PlacedLine { let line: LyricLine; let rect: CGRect; let raster: LineRaster; let fit: CGFloat }
@@ -25,7 +30,9 @@ final class LyricRenderer {
         let fontSize = LyricLayout.fontSize(style, canvas: canvas)
         let auto = lines.filter { !$0.hasPosition }
         let origins = LyricLayout.stackOrigins(count: auto.count, style: style, canvas: canvas, safeArea: safeArea(t))
-        let maxWidth = CGFloat(canvas.width) * 0.92
+        let safe = safeArea(t)
+        let maxWidth = (safe?.width ?? CGFloat(canvas.width)) * 0.92
+        let centerX = safe?.midX ?? CGFloat(canvas.width) / 2
         var autoIndex = 0
         var out: [PlacedLine] = []
         for line in lines {
@@ -36,7 +43,7 @@ final class LyricRenderer {
             if let cx = line.centerX, let cy = line.centerY {
                 origin = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
             } else {
-                origin = CGPoint(x: (CGFloat(canvas.width) - size.width) / 2, y: origins[autoIndex])
+                origin = CGPoint(x: centerX - size.width / 2, y: origins[autoIndex])
                 autoIndex += 1
             }
             out.append(PlacedLine(line: line, rect: CGRect(origin: origin, size: size), raster: raster, fit: fit))
