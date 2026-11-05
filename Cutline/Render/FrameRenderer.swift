@@ -58,8 +58,3 @@ enum FrameRenderer {
         return out
     }
 }
-
-/// Animated cinemascope bars. Filled in by the cinemascope feature; identity until then.
-enum Letterbox {
-    static func apply(to image: CIImage, project: Project, at t: Double) -> CIImage { image }
-}
