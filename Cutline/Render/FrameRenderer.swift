@@ -63,7 +63,10 @@ enum FrameRenderer {
         var out: [UUID: CIImage] = [:]
         let used = Set(project.videoTracks.flatMap(\.clips).map(\.assetID))
         for a in project.assets where a.kind == .image && used.contains(a.id) {
-            if let img = CIImage(contentsOf: a.url, options: [.applyOrientationProperty: true]) { out[a.id] = img }
+            if let card = a.dummy {
+                // Drawn by Cutline at the project's size (no file).
+                if let cg = DummyRenderer.image(card, size: project.canvas.cgSize) { out[a.id] = CIImage(cgImage: cg) }
+            } else if let img = CIImage(contentsOf: a.url, options: [.applyOrientationProperty: true]) { out[a.id] = img }
         }
         return out
     }
