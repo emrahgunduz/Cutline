@@ -40,6 +40,7 @@ enum CompositionBuilder {
             .sorted { $0.start < $1.start }
         var loaded: [URL: (AVURLAsset, AVAssetTrack, CGAffineTransform)] = [:]   // asset kept alive while its track is used
         for clip in videoClips {
+            try Task.checkCancellation()   // a superseded preview rebuild stops here
             guard let asset = project.asset(clip.assetID) else { continue }
             let url = mediaURL(asset)
             if loaded[url] == nil {
@@ -111,16 +112,27 @@ enum BlackClip {
             kCVPixelBufferWidthKey as String: 64, kCVPixelBufferHeightKey as String: 64,
         ])
         writer.add(input)
-        writer.startWriting()
+        let failure = { writer.error ?? CocoaError(.fileWriteUnknown) }
+        guard writer.startWriting() else { throw failure() }
         writer.startSession(atSourceTime: .zero)
         for i in 0..<2 {
-            while !input.isReadyForMoreMediaData { usleep(1000) }
+            // Bounded wait: a failed writer never becomes ready, and we hold `lock`.
+            let deadline = Date().addingTimeInterval(5)
+            while !input.isReadyForMoreMediaData {
+                guard writer.status == .writing, Date() < deadline else { writer.cancelWriting(); throw failure() }
+                usleep(1000)
+            }
             var pb: CVPixelBuffer?
-            CVPixelBufferPoolCreatePixelBuffer(nil, adaptor.pixelBufferPool!, &pb)
-            CVPixelBufferLockBaseAddress(pb!, [])
-            memset(CVPixelBufferGetBaseAddress(pb!), 0, CVPixelBufferGetDataSize(pb!))
-            CVPixelBufferUnlockBaseAddress(pb!, [])
-            adaptor.append(pb!, withPresentationTime: CMTime(value: CMTimeValue(i), timescale: 1))
+            guard let pool = adaptor.pixelBufferPool,
+                  CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pb) == kCVReturnSuccess, let pb else {
+                writer.cancelWriting(); throw failure()
+            }
+            CVPixelBufferLockBaseAddress(pb, [])
+            memset(CVPixelBufferGetBaseAddress(pb), 0, CVPixelBufferGetDataSize(pb))
+            CVPixelBufferUnlockBaseAddress(pb, [])
+            guard adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(i), timescale: 1)) else {
+                writer.cancelWriting(); throw failure()
+            }
         }
         input.markAsFinished()
         writer.endSession(atSourceTime: CMTime(value: 2, timescale: 1))

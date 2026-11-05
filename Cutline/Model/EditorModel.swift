@@ -48,6 +48,8 @@ final class EditorModel: ObservableObject {
     private(set) var assetSelectionOrder: [UUID] = []
     @Published var playhead: Double = 0
     @Published var isPlaying = false
+    /// Assets with a proxy encode in flight (main actor only).
+    var proxyJobs: Set<UUID> = []
     /// Bumped on every project change so renderers can rebuild.
     @Published private(set) var revision = 0
 

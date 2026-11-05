@@ -1,10 +1,11 @@
 import AVFoundation
 
 enum ProxyError: LocalizedError {
-    case noVideoTrack, writeFailed(String)
+    case noVideoTrack, writeFailed(String), busy
     var errorDescription: String? {
         switch self {
         case .noVideoTrack: "The file has no video track."
+        case .busy: "A proxy for this file is already being created."
         case .writeFailed(let m): "Proxy encoding failed: \(m)"
         }
     }
@@ -52,25 +53,41 @@ enum ProxyManager {
         writer.add(input)
 
         guard reader.startReading() else { throw ProxyError.writeFailed(reader.error?.localizedDescription ?? "read") }
-        writer.startWriting()
+        guard writer.startWriting() else {
+            reader.cancelReading()
+            try? FileManager.default.removeItem(at: dest)
+            throw ProxyError.writeFailed(writer.error?.localizedDescription ?? "write")
+        }
         writer.startSession(atSourceTime: .zero)
         let total = max(duration.seconds, 0.001)
         let queue = DispatchQueue(label: "proxy.encode")
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            var finished = false
             input.requestMediaDataWhenReady(on: queue) {
-                while input.isReadyForMoreMediaData {
+                while input.isReadyForMoreMediaData && !finished {
                     guard let buffer = output.copyNextSampleBuffer() else {
-                        input.markAsFinished()
-                        cont.resume()
-                        return
+                        finished = true; input.markAsFinished(); cont.resume(); return
                     }
                     progress?(CMSampleBufferGetPresentationTimeStamp(buffer).seconds / total)
-                    input.append(buffer)
+                    if !input.append(buffer) {
+                        finished = true; input.markAsFinished(); cont.resume(); return
+                    }
                 }
             }
         }
+        // A nil sample buffer also means a read failure; never install a truncated proxy.
+        if reader.status == .failed || writer.status == .failed {
+            let message = (reader.error ?? writer.error)?.localizedDescription ?? "read"
+            reader.cancelReading()
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: dest)
+            throw ProxyError.writeFailed(message)
+        }
         await writer.finishWriting()
-        if writer.status != .completed { throw ProxyError.writeFailed(writer.error?.localizedDescription ?? "unknown") }
+        if writer.status != .completed {
+            try? FileManager.default.removeItem(at: dest)
+            throw ProxyError.writeFailed(writer.error?.localizedDescription ?? "unknown")
+        }
     }
 }
 
@@ -86,8 +103,12 @@ extension EditorModel {
     @MainActor
     func createProxy(assetID: UUID, scale: ProxyScale, progress: ((Double) -> Void)? = nil) async throws {
         guard let asset = project.asset(assetID), asset.kind == .video, let dir = folder("proxies") else { return }
+        // Two jobs for one asset would race on the final file; refuse the second.
+        guard proxyJobs.insert(assetID).inserted else { throw ProxyError.busy }
+        defer { proxyJobs.remove(assetID) }
         let name = ProxyManager.fileName(for: assetID)
-        let temp = dir.appendingPathComponent("\(assetID.uuidString)-new.mov")
+        let temp = dir.appendingPathComponent("\(assetID.uuidString)-\(UUID().uuidString).tmp.mov")
+        defer { try? FileManager.default.removeItem(at: temp) }
         try await ProxyManager.encode(source: asset.url, to: temp, scale: scale, codec: proxyCodec, progress: progress)
         let final = dir.appendingPathComponent(name)
         _ = try? FileManager.default.removeItem(at: final)

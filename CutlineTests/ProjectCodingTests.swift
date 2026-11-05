@@ -66,11 +66,17 @@ final class ReopenTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
         _ = await doc.editor.importFiles([wav])
-        try await Task.sleep(nanoseconds: 300_000_000)
+        let id = try XCTUnwrap(doc.editor.project.assets.first?.id)
+        for _ in 0..<250 where doc.editor.waveforms.waveforms[id] == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertNotNil(doc.editor.waveforms.waveforms[id])
         try await doc.save(to: url, ofType: "com.emrahgunduz.cutline.project", for: .saveAsOperation)
+        let plist = url.appendingPathComponent("analysis/waveform-\(id.uuidString).plist")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: plist.path))
 
+        // With the source gone, only the cached plist can produce the waveform.
+        try FileManager.default.removeItem(at: wav)
         let reopened = try ProjectDocument(contentsOf: url, ofType: "com.emrahgunduz.cutline.project")
-        let id = try XCTUnwrap(reopened.editor.project.assets.first?.id)
+        XCTAssertEqual(reopened.editor.project.assets.first?.id, id)
         XCTAssertNil(reopened.editor.waveforms.waveforms[id])
         reopened.editor.warmCaches()
         for _ in 0..<50 where reopened.editor.waveforms.waveforms[id] == nil { try await Task.sleep(nanoseconds: 20_000_000) }

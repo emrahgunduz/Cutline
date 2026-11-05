@@ -109,9 +109,13 @@ final class ExportOptionsTests: XCTestCase {
         XCTAssertGreaterThan(est, 0)
     }
 
-    func testDefaultNameDropsPackageExtension() {
+    func testDefaultNameDropsPackageExtension() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("name-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
         let doc = ProjectDocument(project: Project(type: .ad, canvas: .init(width: 1080, height: 1920)))
-        XCTAssertFalse(ExportSheet.defaultName(doc.editor).lowercased().hasSuffix(".cutline"))
+        try await doc.save(to: dir.appendingPathComponent("My Song.cutline"), ofType: "com.emrahgunduz.cutline.project", for: .saveAsOperation)
+        XCTAssertEqual(ExportSheet.defaultName(doc.editor), "My Song")
     }
 }
 

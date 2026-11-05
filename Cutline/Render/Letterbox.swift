@@ -25,12 +25,6 @@ enum Letterbox {
         return fullBarHeight(project.canvas) * progress(project.cinemascope, at: t)
     }
 
-    /// Visible picture area between the bars (Core Image coordinates, y up).
-    static func visibleRect(project: Project, at t: Double) -> CGRect {
-        let h = barHeight(project: project, at: t)
-        return CGRect(x: 0, y: h, width: Double(project.canvas.width), height: Double(project.canvas.height) - 2 * h)
-    }
-
     static func apply(to image: CIImage, project: Project, at t: Double) -> CIImage {
         let h = barHeight(project: project, at: t)
         guard h > 0.01 else { return image }

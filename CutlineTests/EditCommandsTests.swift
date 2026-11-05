@@ -168,3 +168,97 @@ final class EditPointTests: XCTestCase {
         XCTAssertEqual(e.playhead, 3)
     }
 }
+
+/// Clamping and scoping branches the timeline drag handlers rely on.
+final class EditCommandBranchTests: XCTestCase {
+    private func videoProject() -> (Project, video: UUID, image: UUID) {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        let video = Asset(kind: .video, name: "A", path: "/a", duration: 10, frameRate: 24)
+        let image = Asset(kind: .image, name: "B.png", path: "/b")
+        p.assets = [video, image]
+        return (p, video.id, image.id)
+    }
+
+    private func lyricProject() -> Project {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 25
+        p.lyricTracks[0].lines = [
+            LyricLine(start: 5, end: 9, words: [
+                LyricWord(text: "one", start: 5, end: 6),
+                LyricWord(text: "two", start: 6.2, end: 8.8),
+            ]),
+            LyricLine(start: 10, end: 11, words: [LyricWord(text: "solo", start: 10, end: 11)]),
+        ]
+        return p
+    }
+
+    func testRetimeWordEndBeforeStartKeepsStartAndMinimumLength() {
+        var p = lyricProject()
+        let w = p.lyricTracks[0].lines[0].words[0].id
+        p.retimeWord(w, end: 4)
+        let word = p.lyricTracks[0].lines[0].words[0]
+        XCTAssertEqual(word.start, 5, accuracy: 1e-9)
+        XCTAssertEqual(word.end, 5 + p.frameDuration, accuracy: 1e-9)
+    }
+
+    func testRetimeWordStartAfterEndKeepsEndAndMinimumLength() {
+        var p = lyricProject()
+        let w = p.lyricTracks[0].lines[0].words[0].id
+        p.retimeWord(w, start: 7)
+        let word = p.lyricTracks[0].lines[0].words[0]
+        XCTAssertEqual(word.end, 6, accuracy: 1e-9)
+        XCTAssertEqual(word.start, 6 - p.frameDuration, accuracy: 1e-9)
+    }
+
+    func testRetimeLineEndOnlyKeepsStart() {
+        var p = lyricProject()
+        let id = p.lyricTracks[0].lines[0].id
+        p.retimeLine(id, end: 9.6)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].start, 5)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 9.6, accuracy: 1e-9)
+    }
+
+    func testDeletingLastWordRemovesLineButNotOthers() {
+        var p = lyricProject()
+        p.deleteWord(p.lyricTracks[0].lines[0].words[0].id)
+        XCTAssertEqual(p.lyricTracks[0].lines.count, 2)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words.map(\.text), ["two"])
+        p.deleteWord(p.lyricTracks[0].lines[1].words[0].id)
+        XCTAssertEqual(p.lyricTracks[0].lines.count, 1)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].text, "two")
+    }
+
+    func testSplitWithClipIDSplitsOnlyThatClip() throws {
+        var (p, v, _) = videoProject()
+        p.addVideoTrack()
+        let a = try XCTUnwrap(p.addClip(assetID: v, track: 0, at: 0))
+        _ = try XCTUnwrap(p.addClip(assetID: v, track: 1, at: 0))
+        p.split(at: 5, clipID: a)
+        XCTAssertEqual(p.videoTracks[0].clips.count, 2)
+        XCTAssertEqual(p.videoTracks[1].clips.count, 1)
+    }
+
+    func testSplitAndTrimStartOnImageKeepSourceInAtZero() throws {
+        var (p, _, img) = videoProject()
+        let id = try XCTUnwrap(p.addClip(assetID: img, track: 0, at: 0))   // 0-5
+        p.split(at: 2)
+        XCTAssertEqual(p.videoTracks[0].clips.map(\.sourceIn), [0, 0])
+        let right = p.videoTracks[0].clips[1].id
+        p.trimStart(right, to: 3)
+        XCTAssertEqual(p.videoTracks[0].clips[1].start, 3)
+        XCTAssertEqual(p.videoTracks[0].clips[1].sourceIn, 0)
+        XCTAssertEqual(p.videoTracks[0].clips[0].id, id)
+    }
+
+    func testFrameRateStaysLockedAfterFirstVideo() {
+        var (p, v, img) = videoProject()
+        p.addClip(assetID: img, track: 0, at: 20)       // images never lock the rate
+        XCTAssertFalse(p.fpsLocked)
+        p.addClip(assetID: v, track: 0, at: 0)
+        XCTAssertEqual(p.fps, 24)
+        let other = Asset(kind: .video, name: "C", path: "/c", duration: 4, frameRate: 30)
+        p.assets.append(other)
+        p.addClip(assetID: other.id, track: 0, at: 40)
+        XCTAssertEqual(p.fps, 24)
+    }
+}

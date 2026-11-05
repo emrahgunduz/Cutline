@@ -72,7 +72,10 @@ final class PreviewController: ObservableObject {
         let key = Self.structureKey(project, useProxies: useProxies)
         let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project))
         if key == structureKey, let built, let item = player.currentItem {
-            // Looks-only change: new instruction snapshot, same media.
+            // Looks-only change: new instruction snapshot, same media. A structural rebuild still
+            // in flight is now stale (e.g. a clip dragged back to where it started); drop it.
+            rebuildTask?.cancel()
+            rebuildTask = nil
             let baseID = built.composition.tracks(withMediaType: .video).first?.trackID ?? kCMPersistentTrackID_Invalid
             item.videoComposition = CompositionBuilder.makeVideoComposition(
                 project: project, snapshot: snapshot, baseTrackID: baseID,
@@ -83,7 +86,9 @@ final class PreviewController: ObservableObject {
         rebuildTask?.cancel()
         let useProxies = self.useProxies
         rebuildTask = Task { @MainActor [weak self] in
-            guard let self else { return }
+            // Debounce structural rebuilds (e.g. while dragging a clip): only the latest one runs.
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard let self, !Task.isCancelled else { return }
             do {
                 let b = try await CompositionBuilder.build(project: project, mediaURL: { self.editor.mediaURL(for: $0, useProxies: useProxies) }, snapshot: snapshot)
                 guard !Task.isCancelled else { return }
@@ -95,6 +100,7 @@ final class PreviewController: ObservableObject {
                 self.player.replaceCurrentItem(with: item)
                 self.seek(to: self.editor.playhead)
                 if wasPlaying { self.player.play() }
+            } catch is CancellationError {
             } catch {
                 NSLog("Cutline preview rebuild failed: \(error)")
             }
