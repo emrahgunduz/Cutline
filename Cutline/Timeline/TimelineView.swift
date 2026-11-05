@@ -295,7 +295,16 @@ final class TimelineView: NSView {
             r.fill(using: .sourceAtop)
             return true
         }
-        tinted.draw(in: rect)
+        tinted.draw(in: Self.aspectFit(img.size, in: rect))
+    }
+
+    /// `size` scaled to fit inside `rect` keeping its proportions, centred (symbols such as the
+    /// eye and speaker are wider than tall; drawing them into a square distorts them).
+    static func aspectFit(_ size: CGSize, in rect: CGRect) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return rect }
+        let s = min(rect.width / size.width, rect.height / size.height)
+        let w = size.width * s, h = size.height * s
+        return CGRect(x: rect.midX - w / 2, y: rect.midY - h / 2, width: w, height: h)
     }
 
     private func clipColor(_ selected: Bool) -> NSColor {
