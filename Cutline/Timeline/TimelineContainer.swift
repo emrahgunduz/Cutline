@@ -13,6 +13,7 @@ final class TimelineContainer: NSView {
     private var cinemaButton: NSButton!
     private var analyzeButton: NSButton!
     private var alignButton: NSButton!
+    private var trimButton: NSButton!
     private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
 
@@ -88,6 +89,13 @@ final class TimelineContainer: NSView {
         }
         alignButton.title = "Align Lyrics"
         alignButton.imagePosition = .imageLeading
+        trimButton = button("timeline.selection", "End the project at its length limit, on the last downbeat or lyric-line end before it") { [weak editor] in
+            editor?.trimToLimit()
+        }
+        trimButton.title = "Trim to Limit"
+        trimButton.imagePosition = .imageLeading
+        trimButton.contentTintColor = .systemRed
+        trimButton.isHidden = editor.project.lengthLimit == nil
         let zoomOut = button("minus.magnifyingglass", "Zoom out (−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
         let zoomIn = button("plus.magnifyingglass", "Zoom in (=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
@@ -95,13 +103,14 @@ final class TimelineContainer: NSView {
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
         let items: [NSView] = [addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
-            + [separator(), cinemaButton, separator(), analyzeButton, alignButton, spacer, zoomOut, zoomIn, fit]
+            + [separator(), cinemaButton, separator(), analyzeButton, alignButton, trimButton, spacer, zoomOut, zoomIn, fit]
         for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo
         editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
             self.cinemaButton.state = editor.project.cinemascope.enabled ? .on : .off
             self.updateAnalysisButtons(editor)
+            self.trimButton.isHidden = !editor.project.isOverLimit
         }.store(in: &cancellables)
         editor.audioAnalysis.$state.combineLatest(editor.jobs.$active).receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
