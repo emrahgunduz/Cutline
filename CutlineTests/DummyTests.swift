@@ -241,6 +241,45 @@ final class DummyRendererTests: XCTestCase {
         XCTAssertEqual(back, described)
     }
 
+    // MARK: Cinemascope
+
+    func testTheBarsAreLeftOutOnlyWhenTheProjectDrawsThem() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        XCTAssertEqual(DummyRenderer.barFraction(for: p), 0, "cinemascope off")
+        p.cinemascope.enabled = true
+        XCTAssertEqual(DummyRenderer.barFraction(for: p) * 1080, CGFloat(Letterbox.fullBarHeight(p.canvas)), accuracy: 0.01)
+        var social = Project(type: .social, canvas: .init(width: 1080, height: 1920))
+        social.cinemascope.enabled = true
+        XCTAssertEqual(DummyRenderer.barFraction(for: social), 0, "no bars outside music videos")
+    }
+
+    func testWithBarsTheTextStaysInsideThePicture() {
+        let size = CGSize(width: 1920, height: 1080)
+        let bar = CGFloat(Letterbox.fullBarHeight(CanvasSize(width: 1920, height: 1080)))     // ≈ 131 px
+        let l = DummyRenderer.layout(described, size: size, barFraction: bar / 1080)
+        let titleTop = l.titleOrigin.y + CTFontGetAscent(DummyRenderer.font(card.fontName, size: l.titleSize, bold: true))
+        XCTAssertEqual(titleTop, 1080 - bar - 100, accuracy: 0.5, "100 px under the top bar")
+        let timeBottom = l.timeOrigin.y - CTFontGetDescent(DummyRenderer.font(card.fontName, size: l.timeSize, bold: true))
+        XCTAssertEqual(timeBottom, bar + 100, accuracy: 0.5, "100 px above the bottom bar")
+        XCTAssertGreaterThan(l.descriptionRect.minY, bar + 100)
+        XCTAssertLessThan(l.descriptionRect.maxY, 1080 - bar - 100)
+        XCTAssertEqual(l.titleOrigin.x, 100, "left and right paddings don't change")
+    }
+
+    func testNothingIsDrawnUnderTheBars() throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.cinemascope = Cinemascope(enabled: true, startMarker: 0, endMarker: 0.5)
+        let img = try XCTUnwrap(DummyRenderer.image(described, size: CGSize(width: 1920, height: 1080), barFraction: DummyRenderer.barFraction(for: p)))
+        let ci = CIImage(cgImage: img)
+        let bar = CGFloat(Letterbox.fullBarHeight(p.canvas))
+        let plain = FilterChainTests.meanLuma(ci, CGRect(x: 1700, y: 540, width: 150, height: 60))
+        // The top and bottom bands the bars will cover hold only the background.
+        XCTAssertEqual(FilterChainTests.meanLuma(ci, CGRect(x: 0, y: 1080 - bar, width: 1920, height: bar)), plain, accuracy: 0.005)
+        XCTAssertEqual(FilterChainTests.meanLuma(ci, CGRect(x: 0, y: 0, width: 1920, height: bar)), plain, accuracy: 0.005)
+        // And the title is there, just under the top bar.
+        XCTAssertGreaterThan(FilterChainTests.meanLuma(ci, CGRect(x: 100, y: 1080 - bar - 200, width: 500, height: 100)), plain + 0.05)
+    }
+
     // MARK: In the project
 
     func testPreviewAndExportDrawTheCard() {

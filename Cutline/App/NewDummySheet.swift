@@ -152,7 +152,7 @@ struct NewDummyView: View {
         let h: CGFloat = aspect >= 1 ? Self.contentWidth / aspect : 220
         let w = h * aspect
         return Group {
-            if let img = DummyRenderer.image(card, size: CGSize(width: w * 2, height: h * 2)) {
+            if let img = DummyRenderer.image(card, size: CGSize(width: w * 2, height: h * 2), barFraction: DummyRenderer.barFraction(for: editor.project)) {
                 Image(decorative: img, scale: 2).resizable().aspectRatio(contentMode: .fit)
             } else {
                 Color(cgColor: d.color.cgColor)
