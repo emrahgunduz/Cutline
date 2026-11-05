@@ -1,3 +1,4 @@
+import CoreMedia
 import AVFoundation
 import CoreImage
 import XCTest
@@ -56,5 +57,53 @@ final class CompositionBuilderTests: XCTestCase {
         XCTAssertEqual(doc.editor.playhead, 5.0 / 24, accuracy: 1e-9)
         doc.editor.stepFrame(-1)
         XCTAssertEqual(doc.editor.playhead * 24, 4, accuracy: 1e-9)
+    }
+}
+
+final class FrameGridTests: XCTestCase {
+    private func project(fps: Double) -> (Project, Asset) {
+        var p = Project(type: .musicVideo, canvas: .init(width: 64, height: 36))
+        p.fps = fps
+        p.fpsLocked = true
+        let a = Asset(kind: .image, name: "white", path: "/w")
+        p.assets = [a]
+        return (p, a)
+    }
+
+    func testNTSCClipAppearsOnItsOwnFirstFrameAndLeavesOnTime() throws {
+        for (fps, value, scale) in [(30000.0 / 1001, Int64(1001), Int32(30000)), (24000.0 / 1001, 1001, 24000), (60000.0 / 1001, 1001, 60000), (25.0, 1, 25)] {
+            var (p, a) = project(fps: fps)
+            let id = try XCTUnwrap(p.addClip(assetID: a.id, track: 0, at: 10 / fps))     // starts at frame 10
+            p.trimEnd(id, to: 20 / fps)                                                    // ends before frame 20
+            let white = CIImage(color: .white).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 36))
+            let snap = RenderSnapshot(project: p, images: [a.id: white], lyrics: nil)
+            // Compositor frame times are exact rationals, as AVFoundation hands them over.
+            func luma(_ m: Int64) -> Double {
+                FilterChainTests.meanLuma(FrameRenderer.render(snap, at: CMTime(value: m * value, timescale: scale).seconds) { _ in nil })
+            }
+            XCTAssertEqual(luma(9), 0, accuracy: 0.01, "\(fps)")
+            XCTAssertEqual(luma(10), 1, accuracy: 0.01, "\(fps)")
+            XCTAssertEqual(luma(19), 1, accuracy: 0.01, "\(fps)")
+            XCTAssertEqual(luma(20), 0, accuracy: 0.01, "\(fps)")
+            XCTAssertEqual(p.frameTime, CMTime(value: value, timescale: scale))
+        }
+    }
+
+    func testCompositionTimesLandExactlyOnNTSCFrames() {
+        let fps = 30000.0 / 1001
+        for m in [1, 7, 1799, 107_892] {   // up to an hour
+            let t = CompositionBuilder.time(Double(m) / fps)
+            XCTAssertEqual(t, CMTime(value: Int64(m) * 4004, timescale: 120_000))
+        }
+    }
+
+    func testOldDecimalRateMigratesAndResnaps() {
+        var (p, a) = project(fps: 29.97)
+        p.addClip(assetID: a.id, track: 0, at: 10 / 29.97)
+        XCTAssertTrue(p.migrateFrameRate())
+        XCTAssertEqual(p.fps, 30000.0 / 1001)
+        XCTAssertEqual(p.frameIndex(p.videoTracks[0].clips[0].start), 10)
+        var q = project(fps: 24).0
+        XCTAssertFalse(q.migrateFrameRate())
     }
 }

@@ -2,10 +2,47 @@ import Foundation
 
 /// Pure timeline edits on the project value. `EditorModel.edit` wraps each in an undo step.
 extension Project {
-    static let standardRates: [Double] = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]
+    /// Supported frame rates. NTSC rates are exact (24000/1001 rather than 23.976) so the
+    /// editor's frame grid and the compositor's frame times are the same numbers.
+    static let standardRates: [Double] = [24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60000.0 / 1001, 60]
 
     static func standardRate(near rate: Double) -> Double {
         standardRates.min { abs($0 - rate) < abs($1 - rate) } ?? 30
+    }
+
+    /// Move every timeline time onto the current frame grid (after a frame-rate migration).
+    mutating func snapAllToFrameGrid() {
+        for t in videoTracks.indices {
+            for c in videoTracks[t].clips.indices {
+                let start = quantize(videoTracks[t].clips[c].start), end = quantize(videoTracks[t].clips[c].end)
+                videoTracks[t].clips[c].start = start
+                videoTracks[t].clips[c].duration = max(frameDuration, end - start)
+            }
+        }
+        for t in lyricTracks.indices {
+            for l in lyricTracks[t].lines.indices {
+                lyricTracks[t].lines[l].start = quantize(lyricTracks[t].lines[l].start)
+                lyricTracks[t].lines[l].end = quantize(lyricTracks[t].lines[l].end)
+                for w in lyricTracks[t].lines[l].words.indices {
+                    lyricTracks[t].lines[l].words[w].start = quantize(lyricTracks[t].lines[l].words[w].start)
+                    lyricTracks[t].lines[l].words[w].end = quantize(lyricTracks[t].lines[l].words[w].end)
+                }
+            }
+        }
+        if var a = audio { a.start = quantize(a.start); audio = a }
+        cinemascope.startMarker = quantize(cinemascope.startMarker)
+        cinemascope.endMarker = quantize(cinemascope.endMarker)
+    }
+
+    /// Older projects stored NTSC rates as rounded decimals (29.97). Map them to the exact
+    /// rate and re-snap times. Returns true when anything changed.
+    @discardableResult
+    mutating func migrateFrameRate() -> Bool {
+        let exact = Self.standardRate(near: fps)
+        guard abs(exact - fps) > 1e-9, abs(exact - fps) < 0.05 else { return false }
+        fps = exact
+        snapAllToFrameGrid()
+        return true
     }
 
     /// The first video clip added fixes the project frame rate.
