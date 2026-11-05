@@ -53,8 +53,8 @@ enum Shortcuts {
             ("Drag empty area", "Pan when zoomed"),
             ("Drag clip / corner", "Move / scale clip"),
             ("⇧-drag", "Move along one axis only"),
-            ("← → ↑ ↓", "Nudge the selected clip or lines 1 px"),
-            ("⇧← → ↑ ↓", "Nudge by the ⇧ Nudge step (inspector, default 10 px)"),
+            ("← → ↑ ↓", "Nudge the selected clip or lines 1 px (after clicking the preview or inspector)"),
+            ("⇧← → ↑ ↓", "Nudge by the ⇧ step (inspector > Nudge, default 10 px)"),
             ("Click lyric", "Select the whole line"),
         ]),
         ShortcutGroup(section: "Project", icon: "doc", items: [

@@ -37,8 +37,12 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         let assets = NSHostingView(rootView: AssetsPanelView().environmentObject(editor))
         assetsPanel = assets
         horizontal.addArrangedSubview(assets)
-        horizontal.addArrangedSubview(PreviewContainer.make(editor: editor))
-        horizontal.addArrangedSubview(NSHostingView(rootView: InspectorView().environmentObject(editor)))
+        let preview = PreviewContainer.make(editor: editor)
+        previewPanel = preview
+        horizontal.addArrangedSubview(preview)
+        let inspector = NSHostingView(rootView: InspectorView().environmentObject(editor))
+        inspectorPanel = inspector
+        horizontal.addArrangedSubview(inspector)
         vertical.addArrangedSubview(horizontal)
         vertical.addArrangedSubview(TimelineContainer.make(editor: editor))
 
@@ -73,6 +77,20 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
     private var clickMonitor: Any?
     private var toolbar: WindowToolbar?
     private weak var assetsPanel: NSView?
+    private weak var previewPanel: NSView?
+    private weak var inspectorPanel: NSView?
+    /// The last click was in the inspector: arrow keys then nudge the selection in the preview
+    /// (the timeline keeps them for stepping frames when it was clicked last).
+    private var lastClickInInspector = false
+
+    private var previewCanvas: PreviewCanvasView? {
+        func find(_ v: NSView) -> PreviewCanvasView? {
+            if let c = v as? PreviewCanvasView { return c }
+            for s in v.subviews { if let c = find(s) { return c } }
+            return nil
+        }
+        return previewPanel.flatMap(find)
+    }
 
     /// The last click was in the assets panel: Backspace then deletes the selected assets.
     private var lastClickInAssets = false
@@ -90,6 +108,7 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
             guard let self, let window = self.window, event.window === window, let content = window.contentView else { return event }
             let hit = content.hitTest(content.convert(event.locationInWindow, from: nil))
             if let panel = self.assetsPanel { self.lastClickInAssets = hit?.isDescendant(of: panel) ?? false }
+            if let panel = self.inspectorPanel { self.lastClickInInspector = hit?.isDescendant(of: panel) ?? false }
             guard let editing = window.firstResponder as? NSText, let field = editing.delegate as? NSView else { return event }
             if let hit, hit === field || hit.isDescendant(of: field) || hit === editing { return event }
             window.makeFirstResponder(nil)
@@ -116,8 +135,9 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
                 default: break
                 }
             }
-            // With the preview focused (clicked last), arrows nudge the selected clip or lines.
-            if let canvas = self.window?.firstResponder as? PreviewCanvasView,
+            // With the preview or the inspector clicked last, arrows nudge the selected clip or lines.
+            let focused = self.window?.firstResponder as? PreviewCanvasView ?? (self.lastClickInInspector ? self.previewCanvas : nil)
+            if let canvas = focused,
                let (dx, dy) = PreviewCanvasView.nudgeDelta(keyCode: event.keyCode, flags: event.modifierFlags),
                canvas.nudge(dx: dx, dy: dy) { return nil }
             switch (event.keyCode, flags) {
