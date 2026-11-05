@@ -3,7 +3,9 @@ import CoreGraphics
 import CoreMedia
 
 /// Current on-disk schema version of `project.json`.
-let projectSchemaVersion = 1
+/// 2: lyric lines have a layout (single line or wrapped, text alignment); a line's x is its
+/// alignment anchor.
+let projectSchemaVersion = 2
 
 struct Project: Codable, Equatable {
     var schemaVersion: Int = projectSchemaVersion
@@ -179,11 +181,41 @@ struct LyricLine: Codable, Equatable, Identifiable {
     var words: [LyricWord]
     /// Stanza index from the TXT (blank lines separate stanzas).
     var stanza: Int = 0
-    /// Explicit position: center of the line on the canvas (pixels, y up). nil = automatic stack.
+    /// Explicit position on the canvas (pixels, y up); nil = automatic stack. `centerY` is the
+    /// middle of the line's box. `centerX` is its anchor, set by the text alignment: the box's
+    /// left edge for left-aligned text, its middle for centred text, its right edge for
+    /// right-aligned text (so the text grows away from the anchor when it changes).
     var centerX: Double?
     var centerY: Double?
+    /// Single line or wrapped at a width, and the text alignment. nil = the defaults.
+    var layoutValue: LineLayout?
     var hasPosition: Bool { centerX != nil && centerY != nil }
     var text: String { words.map(\.text).joined(separator: " ") }
+    var layout: LineLayout { get { layoutValue ?? LineLayout() } set { layoutValue = newValue == LineLayout() ? nil : newValue } }
+
+    enum CodingKeys: String, CodingKey { case id, start, end, words, stanza, centerX, centerY, layoutValue = "layout" }
+}
+
+/// How one lyric line is laid out (per line).
+struct LineLayout: Codable, Equatable, Hashable {
+    enum Mode: String, Codable, CaseIterable { case singleLine, wrapped }
+    enum Align: String, Codable, CaseIterable { case left, center, right }
+
+    /// Single line: as wide as the text (it may be wider than the frame), as tall as the font.
+    /// Wrapped: the text wraps at `width` and the line is as tall as its rows.
+    var mode: Mode = .singleLine
+    /// Wrap width in canvas pixels (wrapped mode). A word longer than this keeps its own row.
+    var width: Double = 800
+    var align: Align = .left
+
+    init(mode: Mode = .singleLine, width: Double = 800, align: Align = .left) {
+        self.mode = mode
+        self.width = max(0, width)
+        self.align = align
+    }
+
+    /// The wrap width, or nil for a single line.
+    var wrapWidth: Double? { mode == .wrapped ? width : nil }
 }
 
 struct LyricWord: Codable, Equatable, Identifiable {
