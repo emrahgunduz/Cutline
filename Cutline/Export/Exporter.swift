@@ -63,7 +63,7 @@ final class Exporter {
         videoOut.videoComposition = built.videoComposition
         videoOut.alwaysCopiesSampleData = false
         reader.add(videoOut)
-        let audioTracks = includeAudio ? built.composition.tracks(withMediaType: .audio) : []
+        let audioTracks = includeAudio && project.audio?.isMuted != true ? built.composition.tracks(withMediaType: .audio) : []
         var audioOut: AVAssetReaderAudioMixOutput?
         if !audioTracks.isEmpty {
             let o = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM])
