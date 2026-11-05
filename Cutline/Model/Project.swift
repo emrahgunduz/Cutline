@@ -154,6 +154,10 @@ struct LyricLine: Codable, Equatable, Identifiable {
     var words: [LyricWord]
     /// Stanza index from the TXT (blank lines separate stanzas).
     var stanza: Int = 0
+    /// Explicit position: center of the line on the canvas (pixels, y up). nil = automatic stack.
+    var centerX: Double?
+    var centerY: Double?
+    var hasPosition: Bool { centerX != nil && centerY != nil }
     var text: String { words.map(\.text).joined(separator: " ") }
 }
 

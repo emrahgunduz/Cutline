@@ -14,28 +14,58 @@ final class LyricRenderer {
     /// Optional bounds the lyric block must stay inside (canvas coordinates, CI orientation).
     var safeArea: (Double) -> CGRect? = { _ in nil }
 
-    func image(at t: Double) -> CIImage? {
+    /// Where each drawn line sits on the canvas at time t (y up), plus its raster and scale.
+    struct PlacedLine { let line: LyricLine; let rect: CGRect; let raster: LineRaster; let fit: CGFloat }
+
+    func placedLines(at t: Double) -> [PlacedLine] {
         let style = project.lyricStyle
         let canvas = project.canvas
         let lines = drawnLines(at: t)
-        guard !lines.isEmpty else { return nil }
+        guard !lines.isEmpty else { return [] }
         let fontSize = LyricLayout.fontSize(style, canvas: canvas)
-        let origins = LyricLayout.stackOrigins(count: lines.count, style: style, canvas: canvas, safeArea: safeArea(t))
+        let auto = lines.filter { !$0.hasPosition }
+        let origins = LyricLayout.stackOrigins(count: auto.count, style: style, canvas: canvas, safeArea: safeArea(t))
         let maxWidth = CGFloat(canvas.width) * 0.92
-
-        var text = CIImage.empty()
-        for (i, line) in lines.enumerated() {
+        var autoIndex = 0
+        var out: [PlacedLine] = []
+        for line in lines {
             guard let raster = raster(for: line, style: style, fontSize: fontSize) else { continue }
             let fit = min(1, maxWidth / raster.size.width)
-            let x = (CGFloat(canvas.width) - raster.size.width * fit) / 2
-            let base = CIImage(cgImage: raster.image)
-            for (w, word) in line.words.enumerated() where w < raster.wordRects.count {
+            let size = CGSize(width: raster.size.width * fit, height: raster.size.height * fit)
+            let origin: CGPoint
+            if let cx = line.centerX, let cy = line.centerY {
+                origin = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
+            } else {
+                origin = CGPoint(x: (CGFloat(canvas.width) - size.width) / 2, y: origins[autoIndex])
+                autoIndex += 1
+            }
+            out.append(PlacedLine(line: line, rect: CGRect(origin: origin, size: size), raster: raster, fit: fit))
+        }
+        return out
+    }
+
+    /// Canvas size of a line's text block (for alignment).
+    func size(of line: LyricLine) -> CGSize? {
+        let style = project.lyricStyle
+        guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas)) else { return nil }
+        let fit = min(1, CGFloat(project.canvas.width) * 0.92 / r.size.width)
+        return CGSize(width: r.size.width * fit, height: r.size.height * fit)
+    }
+
+    func image(at t: Double) -> CIImage? {
+        let style = project.lyricStyle
+        let placed = placedLines(at: t)
+        guard !placed.isEmpty else { return nil }
+        var text = CIImage.empty()
+        for p in placed {
+            let base = CIImage(cgImage: p.raster.image)
+            for (w, word) in p.line.words.enumerated() where w < p.raster.wordRects.count {
                 let a = LyricLayout.alpha(of: word, at: t, fps: project.fps)
                 guard a > 0 else { continue }
-                var piece = base.cropped(to: raster.wordRects[w])
+                var piece = base.cropped(to: p.raster.wordRects[w])
                 piece = FilterChain.withOpacity(piece, a)
-                piece = piece.transformed(by: CGAffineTransform(scaleX: fit, y: fit))
-                    .transformed(by: CGAffineTransform(translationX: x, y: origins[i]))
+                piece = piece.transformed(by: CGAffineTransform(scaleX: p.fit, y: p.fit))
+                    .transformed(by: CGAffineTransform(translationX: p.rect.minX, y: p.rect.minY))
                 text = piece.composited(over: text)
             }
         }
