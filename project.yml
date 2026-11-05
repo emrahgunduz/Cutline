@@ -46,6 +46,24 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: NO
         GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      - name: Bundle analysis runtime
+        basedOnDependencyAnalysis: false
+        script: |
+          # Copies the Python runtime, models (build/ml, made by scripts/build_python_runtime.sh)
+          # and the helper source into Contents/Resources/ml.
+          SRC="$SRCROOT/build/ml"
+          DST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml"
+          if [ ! -x "$SRC/python/bin/python3" ] || [ ! -f "$SRC/models/manifest.json" ]; then
+            echo "warning: build/ml is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build."
+            rm -rf "$DST"
+            exit 0
+          fi
+          mkdir -p "$DST/helper"
+          rsync -a --delete "$SRC/python/" "$DST/python/"
+          rsync -a --delete "$SRC/models/" "$DST/models/"
+          rsync -a --delete --exclude __pycache__ "$SRCROOT/helper/cutline_helper/" "$DST/helper/cutline_helper/"
   CutlineTests:
     type: bundle.unit-test
     platform: macOS

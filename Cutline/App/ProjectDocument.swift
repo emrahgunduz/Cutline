@@ -8,6 +8,8 @@ struct LayoutState: Codable, Equatable {
     /// Timeline row heights keyed by track id ("audio" for the audio row).
     var trackHeights: [String: Double]?
     var snapping: Bool?
+    /// Snap-target groups that are on (nil = all).
+    var snapGroups: [SnapGroup]?
 }
 
 enum ProjectFileError: LocalizedError {
@@ -101,6 +103,20 @@ final class ProjectDocument: NSDocument {
     }
 
     // MARK: Reading
+
+    /// Opening or saving a project puts it at the top of the recent projects list.
+    override var fileURL: URL? {
+        didSet {
+            guard let fileURL, !AppDelegate.isTestHost else { return }
+            DispatchQueue.main.async { RecentProjects.note(fileURL) }
+        }
+    }
+
+    /// Closing the project stops its analysis and alignment jobs (and their helper processes).
+    override func close() {
+        MainActor.assumeIsolated { editor.cancelJobs() }
+        super.close()
+    }
 
     override func read(from url: URL, ofType typeName: String) throws {
         let (project, layout) = try Self.load(from: url)

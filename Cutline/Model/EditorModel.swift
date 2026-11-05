@@ -65,6 +65,15 @@ final class EditorModel: ObservableObject {
     weak var document: ProjectDocument?
     private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
+    /// Analysis jobs on the bundled helper (progress shown in the status bar).
+    lazy var jobs = JobRunner()   // replaceable in tests
+    private(set) lazy var audioAnalysis = AudioAnalysisStore(folder: { [weak self] in self?.folder("analysis") },
+                                                            analyzer: AudioAnalysisStore.helperAnalyzer(jobs))
+    /// Analyse the song automatically when it is added or replaced (off in unit tests).
+    var autoAnalyze = !AppDelegate.isTestHost
+    private var analysisWatch: AnyCancellable?
+    /// The running lyric alignment, if any (see LyricAlignment).
+    var alignmentTask: Task<Void, Never>?
 
     init(document: ProjectDocument?) {
         self.document = document
@@ -76,6 +85,7 @@ final class EditorModel: ObservableObject {
     /// Load cached thumbnails and waveforms (or build them) for every asset, e.g. after opening.
     @MainActor
     func warmCaches() {
+        watchSong()
         for a in project.assets {
             switch a.kind {
             case .video, .image: Task { await thumbnails.ensureThumbnail(for: a) }
@@ -85,7 +95,29 @@ final class EditorModel: ObservableObject {
         }
     }
 
+    /// Keep the song's analysis and loud/quiet regions in step with the audio row.
+    @MainActor
+    func watchSong() {
+        guard analysisWatch == nil else { return }
+        analysisWatch = $project.map { $0.audio?.assetID }.removeDuplicates()
+            .combineLatest(waveforms.$waveforms)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] id, wfs in
+                guard let self else { return }
+                let asset = id.flatMap { self.project.asset($0) }
+                if self.autoAnalyze { self.audioAnalysis.ensure(for: asset) }
+                self.audioAnalysis.updateLoudness(id.flatMap { wfs[$0] })
+            }
+    }
+
+    /// Analysis with the user's corrections, for drawing and snapping.
+    @MainActor var resolvedBeats: ResolvedBeats? {
+        audioAnalysis.analysis.map { ResolvedBeats($0, project.beatCorrections) }
+    }
+
     func replaceWithoutUndo(_ p: Project) {
+        var p = p
+        p.keepLinesAroundWords()
         project = p
         revision += 1
     }
@@ -98,6 +130,7 @@ final class EditorModel: ObservableObject {
         if liveOriginal == nil { liveOriginal = project }
         var next = project
         change(&next)
+        next.keepLinesAroundWords()
         guard next != project else { return }
         project = next
         revision += 1
@@ -116,6 +149,7 @@ final class EditorModel: ObservableObject {
     func edit(_ actionName: String, _ change: (inout Project) -> Void) {
         var next = project
         change(&next)
+        next.keepLinesAroundWords()
         guard next != project else { return }
         apply(next, actionName: actionName)
     }
@@ -186,4 +220,14 @@ final class EditorModel: ObservableObject {
 final class TransportState: ObservableObject {
     @Published var playhead: Double = 0
     @Published var isPlaying = false
+    /// Playback repeats this range while set (next-unsure-word loop).
+    @Published var loop: ClosedRange<Double>?
+    /// Playback speed; below 1 keeps the pitch (tap mode).
+    @Published var rate: Float = 1
+    /// Tap mode: the word the next tap times (nil = off).
+    @Published var tapWordID: UUID?
+    /// Playback pauses when it reaches this time (the tail after the last tapped word).
+    @Published var stopAt: Double?
+    /// Song time right now, read from the player (exact even between 60 Hz playhead updates).
+    var currentTime: () -> Double = { 0 }
 }
