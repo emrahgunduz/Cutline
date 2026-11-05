@@ -66,7 +66,7 @@ final class EditorModel: ObservableObject {
     private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
     /// Analysis jobs on the bundled helper (progress shown in the status bar).
-    private(set) lazy var jobs = JobRunner()
+    lazy var jobs = JobRunner()   // replaceable in tests
     private(set) lazy var audioAnalysis = AudioAnalysisStore(folder: { [weak self] in self?.folder("analysis") },
                                                             analyzer: AudioAnalysisStore.helperAnalyzer(jobs))
     /// Analyse the song automatically when it is added or replaced (off in unit tests).

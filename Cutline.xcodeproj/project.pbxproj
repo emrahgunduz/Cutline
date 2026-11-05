@@ -24,6 +24,7 @@
 		35DD116F2970C41E9FFD9D9D /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97E38B962C1BCFAC09AAE54 /* InspectorView.swift */; };
 		37239B0E5F339867D8C45CDB /* ThumbnailGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C182DB0059761B881EC2E6 /* ThumbnailGenerator.swift */; };
 		3754CD3D955A136263FFECF3 /* LyricModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8497D29B044D92820FCC58A /* LyricModelTests.swift */; };
+		37B7FDF86356376A202618F2 /* AlignmentJobTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5D14BEC903BF5ADAD1A0F5 /* AlignmentJobTests.swift */; };
 		392F596D7B0F84402A9D850D /* AssetLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B9F6AE38DC41DC924985AC /* AssetLibrary.swift */; };
 		3A111F1D9BE53268BAA2D296 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86364879801D464F4CA7B592 /* Timecode.swift */; };
 		3EBA4E8AC241E3CB2ABA4ECF /* AnchorStretchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B084E27EC3425CDB516EB4 /* AnchorStretchTests.swift */; };
@@ -156,6 +157,7 @@
 		9E1CD2C7867C9E87D828B4A0 /* AssetUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetUsageTests.swift; sourceTree = "<group>"; };
 		9EB71F1E5EFB9D8BC6E0A8F9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A8B9F6AE38DC41DC924985AC /* AssetLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLibrary.swift; sourceTree = "<group>"; };
+		AB5D14BEC903BF5ADAD1A0F5 /* AlignmentJobTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlignmentJobTests.swift; sourceTree = "<group>"; };
 		B03892639E2E3D5B2E4A564E /* LyricCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricCorrection.swift; sourceTree = "<group>"; };
 		B1AA1B8DEDFF49AC4A55FCCF /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
 		B57241241CDE82184DC86E55 /* EditCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCommands.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 		1EFB22C6FFA5935479B39FA6 /* CutlineTests */ = {
 			isa = PBXGroup;
 			children = (
+				AB5D14BEC903BF5ADAD1A0F5 /* AlignmentJobTests.swift */,
 				00B084E27EC3425CDB516EB4 /* AnchorStretchTests.swift */,
 				9E1CD2C7867C9E87D828B4A0 /* AssetUsageTests.swift */,
 				0D74D2A22F1B2518333F17AD /* AudioAnalysisTests.swift */,
@@ -565,6 +568,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				37B7FDF86356376A202618F2 /* AlignmentJobTests.swift in Sources */,
 				3EBA4E8AC241E3CB2ABA4ECF /* AnchorStretchTests.swift in Sources */,
 				BE6C3603C812D9ED98C2C650 /* AssetUsageTests.swift in Sources */,
 				513B89330068F45D35E5239C /* AudioAnalysisTests.swift in Sources */,
