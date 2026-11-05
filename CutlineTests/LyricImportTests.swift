@@ -37,6 +37,7 @@ final class LyricImportTests: XCTestCase {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         p.fps = 24
         p.lyricTracks[0].lines = LyricImport.roughlyTimed(LyricImport.parse("Kör aynalarda\nYüzümü kaybedişim"), start: 0, end: 20, fps: 24)
+        p.lyricStyle.leadIn = 0
         return p
     }
 
@@ -82,5 +83,51 @@ final class LyricImportTests: XCTestCase {
     func testLanguageHint() {
         XCTAssertEqual(LyricAlignment.language(for: ["Kör", "aynalarda"]), "tr")
         XCTAssertNil(LyricAlignment.language(for: ["hello", "world"]))
+    }
+
+    // MARK: Lead-in
+
+    func testLeadInShowsAlignedWordsEarlier() {
+        var p = placed()
+        p.lyricStyle.leadIn = 0.25
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        let w = p.lyricTracks[0].lines[0].words[0]
+        XCTAssertEqual(w.start, p.quantize(9.75))
+        XCTAssertEqual(w.end, p.quantize(10.25))
+        XCTAssertEqual(w.alignedStart, 10)
+        XCTAssertEqual(p.lyricTracks[0].lines[0].start, w.start)
+    }
+
+    func testChangingLeadInMovesOnlyAlignedUnconfirmedWords() {
+        var p = placed()
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        p.lyricTracks[0].lines[1].words[0].confirmed = true
+        let handPlaced = p.lyricTracks[0].lines[0].words[1].id
+        p.retimeWord(handPlaced, start: 11.5, confirm: false)
+        p.lyricStyle.leadIn = 0.5
+        p.applyLeadIn()
+        let l = p.lyricTracks[0].lines
+        XCTAssertEqual(l[0].words[0].start, p.quantize(9.5))
+        XCTAssertEqual(l[0].words[1].start, p.quantize(11.5), "a hand-placed word keeps its time")
+        XCTAssertEqual(l[1].words[0].start, 20, "a confirmed word keeps its time")
+        XCTAssertEqual(l[1].words[1].start, p.quantize(20.5))
+        XCTAssertEqual(l[0].start, l[0].words[0].start, "the line still hugs its words")
+        p.lyricStyle.leadIn = 0
+        p.applyLeadIn()
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 10, "lead-in is reversible")
+    }
+
+    func testAlignedTimesFollowLineAndAudioMoves() {
+        var p = placed()
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        let line = p.lyricTracks[0].lines[0]
+        p.moveLine(line.id, toTrack: 0, start: line.start + 1)
+        XCTAssertEqual(p.lyricTracks[0].lines.first { $0.id == line.id }!.words[0].alignedStart, 11)
+    }
+
+    func testOldProjectsDefaultToAShortLeadIn() throws {
+        XCTAssertEqual(LyricStyle().leadIn, 0.15)
+        let w = try JSONDecoder().decode(LyricWord.self, from: Data(#"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","text":"a","start":1,"end":2,"confidence":1,"confirmed":false}"#.utf8))
+        XCTAssertNil(w.alignedStart)
     }
 }

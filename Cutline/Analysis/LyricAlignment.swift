@@ -25,14 +25,17 @@ extension Project {
     mutating func applyAlignment(_ r: LyricAlignment.Result, track: Int, audioStart: Double, keepConfirmed: Bool) {
         guard lyricTracks.indices.contains(track) else { return }
         let f = frameDuration
+        let lead = lyricStyle.leadIn
         var lines = lyricTracks[track].lines.sorted { $0.start < $1.start }
         for (li, aligned) in r.lines.enumerated() where lines.indices.contains(li) && lines[li].words.count == aligned.count {
             for (wi, a) in aligned.enumerated() {
                 if keepConfirmed && lines[li].words[wi].confirmed { continue }
-                let s = quantize(max(0, audioStart + a.start))
+                let s = quantize(max(0, audioStart + a.start - lead))
                 lines[li].words[wi].start = s
-                lines[li].words[wi].end = max(s + f, quantize(audioStart + a.end))
+                lines[li].words[wi].end = max(s + f, quantize(audioStart + a.end - lead))
                 lines[li].words[wi].confidence = a.confidence
+                lines[li].words[wi].alignedStart = audioStart + a.start
+                lines[li].words[wi].alignedEnd = audioStart + a.end
             }
             // Words never overlap after quantizing.
             for wi in lines[li].words.indices.dropFirst() where lines[li].words[wi].start < lines[li].words[wi - 1].end {
@@ -44,6 +47,29 @@ extension Project {
             lines[li].end = lines[li].words.last!.end
         }
         lyricTracks[track].lines = lines
+    }
+
+    /// Re-place aligned, unconfirmed words for the current lead-in. Lines that hugged their
+    /// words keep hugging them; lines the user widened keep their edges if they still fit.
+    mutating func applyLeadIn() {
+        let f = frameDuration, lead = lyricStyle.leadIn
+        for t in lyricTracks.indices {
+            for l in lyricTracks[t].lines.indices {
+                var line = lyricTracks[t].lines[l]
+                guard !line.words.isEmpty else { continue }
+                let tightStart = line.start == line.words.first!.start, tightEnd = line.end == line.words.last!.end
+                for i in line.words.indices where !line.words[i].confirmed {
+                    guard let a = line.words[i].alignedStart, let b = line.words[i].alignedEnd else { continue }
+                    let s = quantize(max(0, a - lead))
+                    line.words[i].start = s
+                    line.words[i].end = max(s + f, quantize(b - lead))
+                }
+                let first = line.words.map(\.start).min()!, last = line.words.map(\.end).max()!
+                line.start = tightStart ? first : min(line.start, first)
+                line.end = tightEnd ? last : max(line.end, last)
+                lyricTracks[t].lines[l] = line
+            }
+        }
     }
 }
 

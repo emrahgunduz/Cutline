@@ -181,6 +181,10 @@ struct LyricWord: Codable, Equatable, Identifiable {
     var end: Double
     var confidence: Double = 1
     var confirmed = false
+    /// Timeline times found by alignment, before the lead-in. Cleared when the word is
+    /// edited by hand; then the lead-in no longer moves it.
+    var alignedStart: Double?
+    var alignedEnd: Double?
 }
 
 struct RGBA: Codable, Equatable {
@@ -208,6 +212,9 @@ struct LyricStyle: Codable, Equatable {
     var letterByLetterValue: Bool?
     /// How much consecutive letter fades overlap (0 = one after another, 1 = all together).
     var letterOverlapValue: Double?
+    /// Aligned words are shown this many seconds early (they read better slightly ahead of the voice).
+    var leadInValue: Double?
+    var leadIn: Double { get { leadInValue ?? 0.15 } set { leadInValue = newValue } }
     var letterByLetter: Bool { get { letterByLetterValue ?? false } set { letterByLetterValue = newValue } }
     var letterOverlap: Double { get { letterOverlapValue ?? 0.5 } set { letterOverlapValue = newValue } }
 
