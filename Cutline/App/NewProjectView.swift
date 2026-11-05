@@ -10,6 +10,8 @@ enum NewProjectPrompt {
     static func run() -> NewProjectChoice? {
         var result: NewProjectChoice?
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+        // Swift owns it; AppKit releasing it on close as well crashes the app.
+        window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true

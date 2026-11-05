@@ -36,10 +36,11 @@ enum FrameRenderer {
                 out = img.composited(over: out)
             }
         }
+        // The bars cover the picture only: lyrics (and their shadow) are drawn over them.
+        out = Letterbox.apply(to: out, project: snap.project, at: t)
         if let lyrics = snap.lyrics, let layer = lyrics.image(at: t) {
             out = layer.composited(over: out)
         }
-        out = Letterbox.apply(to: out, project: snap.project, at: t)
         return out.cropped(to: canvas)
     }
 

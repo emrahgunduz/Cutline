@@ -16,6 +16,8 @@ enum ResetCachesSheet {
             return
         }
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        // Swift owns it; AppKit releasing it on close as well crashes the app.
+        sheet.isReleasedWhenClosed = false
         let host = NSHostingController(rootView: ResetCachesView(editor: editor) { choice in
             window.endSheet(sheet)
             guard let choice, !choice.kinds.isEmpty else { return }

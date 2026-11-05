@@ -35,6 +35,20 @@ final class LetterboxTests: XCTestCase {
         XCTAssertEqual(FilterChainTests.meanLuma(out, CGRect(x: 0, y: 500, width: 1920, height: 80)), 1, accuracy: 0.01)
     }
 
+    func testLyricsAreDrawnOverTheBars() throws {
+        var p = project()
+        p.fps = 24
+        p.lyricStyle.verticalPosition = 0.95            // inside the bottom bar
+        p.lyricStyle.shadowEnabled = false
+        p.lyricTracks[0].lines = [LyricLine(start: 0, end: 20, words: [LyricWord(text: "Aynı kıyıdan", start: 0, end: 20)])]
+        let lyrics = LyricRenderer(project: p)
+        let rect = try XCTUnwrap(lyrics.placedLines(at: 10).first?.rect)
+        XCTAssertLessThan(rect.minY, Letterbox.fullBarHeight(p.canvas), "the test line sits in the bar")
+        let frame = FrameRenderer.render(RenderSnapshot(project: p, images: [:], lyrics: lyrics), at: 10) { _ in nil }
+        let bar = rect.intersection(CGRect(x: 0, y: 0, width: 1920, height: Letterbox.fullBarHeight(p.canvas)))
+        XCTAssertGreaterThan(FilterChainTests.meanLuma(frame, bar), 0.05, "white text shows on the black bar")
+    }
+
     func testBarsDoNotMoveLyrics() {
         var p = project()
         p.fps = 24
