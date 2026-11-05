@@ -9,6 +9,8 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeIconFile</key>
+			<string>CutlineDocument</string>
 			<key>CFBundleTypeName</key>
 			<string>Cutline Project</string>
 			<key>CFBundleTypeRole</key>
@@ -53,6 +55,8 @@
 			</array>
 			<key>UTTypeDescription</key>
 			<string>Cutline Project</string>
+			<key>UTTypeIconFile</key>
+			<string>CutlineDocument</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.emrahgunduz.cutline.project</string>
 			<key>UTTypeTagSpecification</key>
