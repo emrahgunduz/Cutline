@@ -30,9 +30,9 @@ enum SectionLane {
     static let loudColor = NSColor.systemOrange
     static let quietColor = NSColor(calibratedRed: 0.35, green: 0.6, blue: 1, alpha: 1)
 
-    /// Loudness over the waveform: tinted patches for loud (orange) and quiet (blue) stretches,
-    /// the loudness curve they come from, and the two levels it is measured against (dashed).
-    /// A patch is where the curve stays above the loud line or below the quiet line.
+    /// Loud (orange) and quiet (blue) stretches, drawn over the waveform so they stay visible:
+    /// a light tint across the stretch, a solid bar along its bottom edge and its label. A
+    /// stretch is where the loudness curve stays above the loud line or below the quiet line.
     static func drawLoudness(_ regions: [Loudness.Region], audioStart: Double, in wave: CGRect,
                              visible: ClosedRange<CGFloat>, x: (Double) -> CGFloat) {
         let font = NSFont.systemFont(ofSize: 8, weight: .bold)
@@ -40,13 +40,19 @@ enum SectionLane {
             let x0 = max(wave.minX, x(audioStart + r.start)), x1 = min(wave.maxX, x(audioStart + r.end))
             guard x1 > x0 else { continue }
             let c = r.kind == .loud ? loudColor : quietColor
-            c.withAlphaComponent(0.14).setFill()
+            c.withAlphaComponent(0.18).setFill()
             CGRect(x: x0, y: wave.minY, width: x1 - x0, height: wave.height).fill()
+            c.withAlphaComponent(0.9).setFill()
+            CGRect(x: x0, y: wave.maxY - 3, width: x1 - x0, height: 3).fill()
             let label = (r.kind == .loud ? "LOUD" : "QUIET") as NSString
-            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: c.withAlphaComponent(0.95)]
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
             let size = label.size(withAttributes: attrs)
-            if x1 - x0 > size.width + 8 {
-                label.draw(at: CGPoint(x: max(x0, visible.lowerBound) + 3, y: wave.maxY - size.height - 1), withAttributes: attrs)
+            if x1 - x0 > size.width + 10 {
+                // A small solid tag so the text reads over the waveform.
+                let tag = CGRect(x: max(x0, visible.lowerBound) + 2, y: wave.maxY - 3 - size.height - 2, width: size.width + 6, height: size.height + 1)
+                c.withAlphaComponent(0.9).setFill()
+                NSBezierPath(roundedRect: tag, xRadius: 2, yRadius: 2).fill()
+                label.draw(at: CGPoint(x: tag.minX + 3, y: tag.minY), withAttributes: attrs)
             }
         }
     }
