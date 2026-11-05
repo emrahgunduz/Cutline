@@ -752,13 +752,13 @@ final class TimelineView: NSView {
 
     /// Snap `time` to nearby targets unless snapping is off or ⌘ is held.
     private func snapped(_ time: Double, excluding ids: Set<UUID>, event: NSEvent?) -> Double {
-        guard snappingEnabled, !(event?.modifierFlags.contains(.command) ?? false) else { snapGuide = nil; return time }
-        let targets = Snapping.targets(in: drag.map { if case .edit(_, let o) = $0.kind { return o } else { return project } } ?? project,
-                                       playhead: editor.playhead, excluding: ids, includeAudio: !draggingAudio,
-                                       beats: editor.resolvedBeats, groups: snapGroups)
-        if let s = Snapping.snap(time, targets: targets, pixelsPerSecond: Double(pixelsPerSecond)) { snapGuide = s.time; return s.time }
-        snapGuide = nil
-        return time
+        let source = drag.map { if case .edit(_, let o) = $0.kind { return o } else { return project } } ?? project
+        let result = Snapping.resolve(time, enabled: snappingEnabled, bypass: event?.modifierFlags.contains(.command) ?? false,
+                                      targets: Snapping.targets(in: source, playhead: editor.playhead, excluding: ids,
+                                                                includeAudio: !draggingAudio, beats: editor.resolvedBeats, groups: snapGroups),
+                                      pixelsPerSecond: Double(pixelsPerSecond))
+        snapGuide = result.target?.time
+        return result.time
     }
 
     /// New start for an item being moved: snap its start, or failing that its end.

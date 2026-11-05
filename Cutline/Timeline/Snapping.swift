@@ -54,6 +54,14 @@ enum Snapping {
         return out
     }
 
+    /// Where a dragged time lands: on the best target in reach, unless snapping is off or
+    /// bypassed (⌘ held). Nil target means it stays where it is.
+    static func resolve(_ time: Double, enabled: Bool, bypass: Bool, targets: @autoclosure () -> [SnapTarget],
+                        pixelsPerSecond: Double) -> (time: Double, target: SnapTarget?) {
+        guard enabled, !bypass, let hit = snap(time, targets: targets(), pixelsPerSecond: pixelsPerSecond) else { return (time, nil) }
+        return (hit.time, hit)
+    }
+
     /// The target nearest to `time` within the pixel radius, if any.
     static func snap(_ time: Double, targets: [Double], pixelsPerSecond: Double) -> Double? {
         snap(time, targets: targets.map { SnapTarget(time: $0, group: .edges) }, pixelsPerSecond: pixelsPerSecond)?.time
