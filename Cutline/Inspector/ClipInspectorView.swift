@@ -20,6 +20,15 @@ struct ClipInspectorView: View {
                         row("Scale", clip.transform.scale, 0.05...max(4, fill * 1.5), step: 0.01, reset: fill) { $0.transform.scale = $1 }
                         row("X", clip.transform.offsetX, -Double(editor.project.canvas.width)...Double(editor.project.canvas.width), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetX = $1 }
                         row("Y", clip.transform.offsetY, -Double(editor.project.canvas.height)...Double(editor.project.canvas.height), step: 1, format: "%.0f", reset: 0) { $0.transform.offsetY = $1 }
+                        // Mirroring a dummy would mirror its text, so dummies don't offer it.
+                        if editor.project.asset(clip.assetID)?.isDummy != true {
+                            Toggle(isOn: toggle(clip.transform.isFlippedH, "Horizontal Flip") { $0.transform.flipH = $1 ? true : nil }) {
+                                Label("Flip horizontal", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                                    .font(.system(size: 12))
+                            }
+                            .toggleStyle(.checkbox)
+                            .help("Mirror the clip left to right")
+                        }
                         HStack {
                             Spacer()
                             // Fill covers the whole frame (cropping the overflow); Fit shows the whole picture.
