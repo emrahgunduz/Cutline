@@ -13,7 +13,7 @@ final class LetterboxTests: XCTestCase {
         let p = project()
         XCTAssertEqual(Letterbox.fullBarHeight(p.canvas), 131.49, accuracy: 0.01)
         XCTAssertEqual(Letterbox.barHeight(project: p, at: 1), 0)
-        XCTAssertEqual(Letterbox.barHeight(project: p, at: 4), 131.49 / 2, accuracy: 0.01)
+        XCTAssertEqual(Letterbox.barHeight(project: p, at: 4), 131.49 * 0.875, accuracy: 0.01)   // ease-out: 87.5% at the midpoint
         XCTAssertEqual(Letterbox.barHeight(project: p, at: 6), 131.49, accuracy: 0.01)
         XCTAssertEqual(Letterbox.barHeight(project: p, at: 100), 131.49, accuracy: 0.01)
     }
@@ -35,17 +35,13 @@ final class LetterboxTests: XCTestCase {
         XCTAssertEqual(FilterChainTests.meanLuma(out, CGRect(x: 0, y: 500, width: 1920, height: 80)), 1, accuracy: 0.01)
     }
 
-    func testLyricsStayAboveTheBottomBar() {
+    func testBarsDoNotMoveLyrics() {
         var p = project()
         p.fps = 24
-        p.lyricStyle.verticalPosition = 0.97            // would sit under the bar
-        p.addLyricTrack()
-        p.lyricTracks[0].lines = [LyricLine(start: 8, end: 10, words: [LyricWord(text: "Kör", start: 8, end: 10)])]
-        p.lyricTracks[1].lines = [LyricLine(start: 8, end: 10, words: [LyricWord(text: "aynalarda", start: 8, end: 10)])]
-        let placed = LyricRenderer(project: p).placedLines(at: 9)
-        XCTAssertEqual(placed.count, 2)
-        let bar = Letterbox.fullBarHeight(p.canvas)
-        XCTAssertTrue(placed.allSatisfy { $0.rect.minY >= bar })
-        XCTAssertTrue(placed.allSatisfy { $0.rect.maxY <= 1080 - bar })
+        p.lyricTracks[0].lines = [LyricLine(start: 1, end: 10, words: [LyricWord(text: "Kör", start: 1, end: 10)])]
+        let r = LyricRenderer(project: p)
+        let before = r.placedLines(at: 1.5)[0].rect, during = r.placedLines(at: 4)[0].rect, after = r.placedLines(at: 9)[0].rect
+        XCTAssertEqual(before, during)
+        XCTAssertEqual(before, after)
     }
 }

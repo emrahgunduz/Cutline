@@ -11,14 +11,8 @@ final class LyricRenderer {
 
     init(project: Project) { self.project = project }
 
-    /// Margin kept between lyrics and the cinemascope bars.
-    static let barMargin: CGFloat = 12
-
-    /// Area the lyrics must stay inside: the picture left visible by the cinemascope bars.
-    func safeArea(_ t: Double) -> CGRect? {
-        guard Letterbox.barHeight(project: project, at: t) > 0 else { return nil }
-        return Letterbox.visibleRect(project: project, at: t).insetBy(dx: 0, dy: Self.barMargin)
-    }
+    /// Lyrics are placed independently of the cinemascope bars: the animation never moves them.
+    func safeArea(_ t: Double) -> CGRect? { nil }
 
     /// Where each drawn line sits on the canvas at time t (y up), plus its raster and scale.
     struct PlacedLine { let line: LyricLine; let rect: CGRect; let raster: LineRaster; let fit: CGFloat }
@@ -40,12 +34,7 @@ final class LyricRenderer {
             let size = CGSize(width: raster.size.width * fit, height: raster.size.height * fit)
             let origin: CGPoint
             if let cx = line.centerX, let cy = line.centerY {
-                var o = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
-                // Placed lines are pushed out from under the bars too.
-                if let safe = safeArea(t) {
-                    o.y = min(max(o.y, safe.minY), max(safe.minY, safe.maxY - size.height))
-                }
-                origin = o
+                origin = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
             } else {
                 origin = CGPoint(x: (CGFloat(canvas.width) - size.width) / 2, y: origins[autoIndex])
                 autoIndex += 1
