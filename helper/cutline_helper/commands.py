@@ -96,6 +96,26 @@ def analyze_audio(args: dict, output_dir: str, ch: Channel) -> dict:
     }
 
 
+@command("align_lyrics")
+def align_lyrics(args: dict, output_dir: str, ch: Channel) -> dict:
+    """Time known lyric words on the vocal stem.
+
+    args: vocals (path), lines ([[word, ...], ...]), language ("tr" default).
+    Returns lines of {text, start, end, confidence, source} in audio-file seconds.
+    """
+    from . import align
+    vocals = args.get("vocals")
+    lines = args.get("lines")
+    if not isinstance(vocals, str) or not os.path.exists(vocals):
+        raise HelperError("bad_request", f"vocal stem not found: {vocals}")
+    if not isinstance(lines, list) or not all(isinstance(l, list) for l in lines):
+        raise HelperError("bad_request", "'lines' must be a list of word lists")
+    models_dir = os.environ.get("CUTLINE_MODELS", "")
+    result = align.align(lines, vocals, args.get("language") or "tr", models_dir, ch.progress)
+    ch.progress(1.0, "Done")
+    return {"lines": result}
+
+
 def run(name: str, args: dict, output_dir: str, ch: Channel) -> dict:
     fn = COMMANDS.get(name)
     if fn is None:

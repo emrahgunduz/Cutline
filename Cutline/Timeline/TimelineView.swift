@@ -464,6 +464,15 @@ final class TimelineView: NSView {
                 let selected = editor.isSelected(.lyricWord(wd.id))
                 (selected ? NSColor.controlAccentColor : Self.wordColor).setFill()
                 NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
+                if LyricAlignment.isLow(wd) {
+                    // Unsure timing (R22): an orange outline and a bar along the bottom.
+                    NSColor.systemOrange.setStroke()
+                    let outline = NSBezierPath(roundedRect: wr.insetBy(dx: 0.75, dy: 0.75), xRadius: 2, yRadius: 2)
+                    outline.lineWidth = 1.5
+                    outline.stroke()
+                    NSColor.systemOrange.setFill()
+                    CGRect(x: wr.minX + 1, y: wr.maxY - 3, width: max(0, wr.width - 2), height: 2).fill()
+                }
                 if wr.width > 14 && wr.height >= 10 {
                     (wd.text as NSString).draw(in: wr.insetBy(dx: 3, dy: 0),
                                                withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.black.withAlphaComponent(0.8)])
@@ -992,6 +1001,10 @@ final class TimelineView: NSView {
             if t < project.videoTracks.count - 1 { item("Move Up") { self.editor.edit("Move Track") { $0.moveVideoTrack(from: t, to: t + 1) } } }
             if t > 0 { item("Move Down") { self.editor.edit("Move Track") { $0.moveVideoTrack(from: t, to: t - 1) } } }
         case .lyric(let t):
+            if !project.lyricTracks[t].lines.isEmpty, project.audio != nil {
+                item("Align Words to Song") { self.editor.alignLyrics(track: t, window: self.window) }
+                menu.addItem(.separator())
+            }
             item("Add Lyrics Track Below") { self.headerAction(row, .add) }
             if project.lyricTracks.count > 1 { item("Remove \(title(row))") { self.headerAction(row, .remove) } }
             if t > 0 { item("Move Up") { self.editor.edit("Move Track") { $0.moveLyricTrack(from: t, to: t - 1) } } }

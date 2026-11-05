@@ -152,7 +152,36 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         AssetImporter.presentOpenPanel(for: projectDocument.editor, window: window)
     }
 
+    /// Aligns the lyrics track of the selected line or word, else the first track with lines.
+    @objc func alignLyrics(_ sender: Any?) {
+        let editor = projectDocument.editor
+        let p = editor.project
+        let selected: Int? = switch editor.selection {
+        case .lyricLine(let id): p.lineLocation(id)?.track
+        case .lyricWord(let id): p.wordLocation(id)?.track
+        default: nil
+        }
+        guard let track = selected ?? p.lyricTracks.firstIndex(where: { !$0.lines.isEmpty }) else { return }
+        editor.alignLyrics(track: track, window: window)
+    }
+
+    @objc func analyzeSongAgain(_ sender: Any?) {
+        let editor = projectDocument.editor
+        editor.audioAnalysis.ensure(for: editor.project.audio.flatMap { editor.project.asset($0.assetID) }, force: true)
+    }
+
     @objc func showExport(_ sender: Any?) {
         ExportSheet.present(editor: projectDocument.editor, window: window)
+    }
+}
+
+extension MainWindowController: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let p = projectDocument.editor.project
+        switch item.action {
+        case #selector(alignLyrics(_:)): return p.audio != nil && p.lyricTracks.contains { !$0.lines.isEmpty }
+        case #selector(analyzeSongAgain(_:)): return p.audio != nil && projectDocument.editor.audioAnalysis.state != .unavailable
+        default: return responds(to: item.action)
+        }
     }
 }
