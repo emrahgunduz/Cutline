@@ -37,3 +37,10 @@ final class LyricPlacementTests: XCTestCase {
         XCTAssertFalse(e.project.lyricTracks.flatMap(\.lines).contains { $0.hasPosition })
     }
 }
+
+final class NegativeGapTests: XCTestCase {
+    func testNegativeGapOverlapsLines() {
+        let ys = LyricPlacement.stackedY(.bottom, heights: [80, 80], canvas: CGSize(width: 1920, height: 1080), padding: 60, gap: -20)
+        XCTAssertEqual(ys[0] - ys[1], 60)      // 80 tall lines, 20 px closer than touching
+    }
+}
