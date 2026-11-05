@@ -102,17 +102,23 @@ extension EditorModel {
     /// Create (or replace) the asset's proxy at the given scale.
     @MainActor
     func createProxy(assetID: UUID, scale: ProxyScale, progress: ((Double) -> Void)? = nil) async throws {
-        guard let asset = project.asset(assetID), asset.kind == .video, let dir = folder("proxies") else { return }
+        guard let asset = project.asset(assetID), asset.kind == .video, let dir = folder("proxies") else { proxyProgress[assetID] = nil; return }
         // Two jobs for one asset would race on the final file; refuse the second.
         guard proxyJobs.insert(assetID).inserted else { throw ProxyError.busy }
-        defer { proxyJobs.remove(assetID) }
+        proxyProgress[assetID] = 0
+        defer { proxyJobs.remove(assetID); proxyProgress[assetID] = nil }
         let name = ProxyManager.fileName(for: assetID)
         let temp = dir.appendingPathComponent("\(assetID.uuidString)-\(UUID().uuidString).tmp.mov")
         defer { try? FileManager.default.removeItem(at: temp) }
-        try await ProxyManager.encode(source: asset.url, to: temp, scale: scale, codec: proxyCodec, progress: progress)
+        try await ProxyManager.encode(source: asset.url, to: temp, scale: scale, codec: proxyCodec) { [weak self] p in
+            progress?(p)
+            Task { @MainActor in if self?.proxyJobs.contains(assetID) == true { self?.proxyProgress[assetID] = p } }
+        }
         let final = dir.appendingPathComponent(name)
         _ = try? FileManager.default.removeItem(at: final)
         try FileManager.default.moveItem(at: temp, to: final)
+        // Preview frames rendered from the original (or the old proxy) are no longer needed.
+        FrameCache.shared.removeAll()
         edit("Create Proxy") { p in
             if let i = p.assets.firstIndex(where: { $0.id == assetID }) { p.assets[i].proxy = ProxyInfo(scale: scale, fileName: name) }
         }
@@ -122,6 +128,7 @@ extension EditorModel {
     func deleteProxy(assetID: UUID) {
         guard let asset = project.asset(assetID), let url = proxyURL(for: asset) else { return }
         try? FileManager.default.removeItem(at: url)
+        FrameCache.shared.removeAll()
         edit("Delete Proxy") { p in
             if let i = p.assets.firstIndex(where: { $0.id == assetID }) { p.assets[i].proxy = nil }
         }

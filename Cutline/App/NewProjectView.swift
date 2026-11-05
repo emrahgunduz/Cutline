@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The "New Project" window: pick what you're making as a card, then a resolution.
 enum NewProjectChoice { case create(Project), open, openRecent(URL), importFrom(URL, ProjectType, CanvasSize) }
@@ -121,8 +122,10 @@ struct NewProjectView: View {
         let panel = NSOpenPanel()
         panel.message = "Choose the project to copy the song, lyrics and clips from"
         panel.prompt = "Import"
-        panel.allowedContentTypes = [.init(filenameExtension: "cutline")].compactMap { $0 }
+        // The exported document type: a type made from the extension doesn't match packages.
+        panel.allowedContentTypes = [UTType("com.emrahgunduz.cutline.project") ?? .package]
         panel.treatsFilePackagesAsDirectories = false
+        panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         finish(.importFrom(url, type, canvas))
     }

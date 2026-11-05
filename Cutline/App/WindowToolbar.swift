@@ -34,7 +34,7 @@ final class WindowToolbar: NSObject, NSToolbarDelegate, NSToolbarItemValidation 
 
     func install(on window: NSWindow) {
         // A new identifier so the saved layout from before the cache buttons doesn't hide them.
-        let toolbar = NSToolbar(identifier: "CutlineMain2")
+        let toolbar = NSToolbar(identifier: "CutlineMain3")
         toolbar.delegate = self
         toolbar.displayMode = .iconAndLabel
         toolbar.allowsUserCustomization = true
@@ -53,11 +53,11 @@ final class WindowToolbar: NSObject, NSToolbarDelegate, NSToolbarItemValidation 
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [ID.importMedia, .space, ID.undo, ID.redo, .space, ID.split, ID.delete, ID.addVideo, ID.addLyrics,
-         .flexibleSpace, ID.info, .flexibleSpace, ID.clearCache, ID.resetCaches, ID.export]
+         .flexibleSpace, ID.clearCache, ID.resetCaches, ID.export]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar) + [.space, .flexibleSpace]
+        toolbarDefaultItemIdentifiers(toolbar) + [ID.info, .space, .flexibleSpace]
     }
 
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
@@ -106,7 +106,7 @@ final class WindowToolbar: NSObject, NSToolbarDelegate, NSToolbarItemValidation 
         case ID.delete: return editor.selection != .none
         case ID.split: return !editor.project.videoTracks.flatMap(\.clips).isEmpty
         case ID.export: return editor.project.duration > 0
-        case ID.resetCaches: return editor.mediaResetMessage == nil
+        case ID.resetCaches: return true
         default: return true
         }
     }

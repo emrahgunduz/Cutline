@@ -59,6 +59,10 @@ final class EditorModel: ObservableObject {
     }
     /// Assets with a proxy encode in flight (main actor only).
     var proxyJobs: Set<UUID> = []
+    /// Proxies being encoded and how far along they are (shown on the asset tiles).
+    @Published var proxyProgress: [UUID: Double] = [:]
+    /// The running Reset Media Caches job (it can be stopped).
+    var mediaResetTask: Task<Void, Never>?
     /// Bumped on every project change so renderers can rebuild.
     @Published private(set) var revision = 0
 
@@ -72,6 +76,7 @@ final class EditorModel: ObservableObject {
     /// Analyse the song automatically when it is added or replaced (off in unit tests).
     var autoAnalyze = !AppDelegate.isTestHost
     private var analysisWatch: AnyCancellable?
+    private var presetsWatch: AnyCancellable?
     /// What Reset Media Caches is doing right now (nil when idle).
     @Published var mediaResetMessage: String?
     /// Export segment files in `cache/segments/` (see CacheStrip).
@@ -90,6 +95,9 @@ final class EditorModel: ObservableObject {
     @MainActor
     func warmCaches() {
         watchSong()
+        // A changed length limit redraws the limit line, the budget bar and the trim button.
+        presetsWatch = presetsWatch ?? NotificationCenter.default.publisher(for: Presets.didChange)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.revision += 1 }
         segmentCacheChanged()
         for a in project.assets {
             switch a.kind {
@@ -127,6 +135,14 @@ final class EditorModel: ObservableObject {
         revision += 1
     }
 
+    /// Remember the export sheet's choices for this project (saved, not undoable).
+    func rememberExportSettings(_ s: ExportSettings) {
+        guard project.exportSettings != s else { return }
+        project.exportSettings = s
+        revision += 1
+        document?.updateChangeCount(.changeDone)
+    }
+
     // MARK: Live edits (slider drags): many updates, one undo step.
 
     private var liveOriginal: Project?
@@ -161,6 +177,9 @@ final class EditorModel: ObservableObject {
 
     private func apply(_ next: Project, actionName: String) {
         let previous = project
+        var next = next
+        // Export choices aren't part of undo: undoing an edit keeps the current ones.
+        next.exportSettings = project.exportSettings
         project = next
         revision += 1
         if let um = undoManager {

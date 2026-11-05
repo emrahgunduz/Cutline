@@ -48,7 +48,7 @@ extension Project {
             // New timing: every word ends with the line (the last word's end); each word's end
             // can be changed afterwards.
             if let lineEnd = aligned.map(\.end).max() {
-                let e = max(quantize(audioStart + lineEnd - lead), (line.words.map(\.start).max() ?? 0) + f)
+                let e = max(quantize(audioStart + lineEnd - lead + lyricStyle.leadOut), (line.words.map(\.start).max() ?? 0) + f)
                 for wi in line.words.indices where !(keepConfirmed && line.words[wi].confirmed) {
                     line.words[wi].end = max(e, line.words[wi].start + f)
                     line.words[wi].alignedEnd = audioStart + lineEnd
@@ -58,6 +58,25 @@ extension Project {
             lyricTracks[loc.track].lines[loc.index] = line
         }
         for t in lyricTracks.indices { lyricTracks[t].lines.sort { $0.start < $1.start } }
+        endLinesBeforeTheirNeighbours()
+    }
+
+    /// Lines on one track never overlap: a line (and its words) that runs into the next line
+    /// on its track ends where that one starts, but never before its own last word starts.
+    mutating func endLinesBeforeTheirNeighbours() {
+        let f = frameDuration
+        for t in lyricTracks.indices {
+            lyricTracks[t].lines.sort { $0.start < $1.start }
+            for i in lyricTracks[t].lines.indices.dropLast() {
+                let next = lyricTracks[t].lines[i + 1].start
+                var line = lyricTracks[t].lines[i]
+                guard line.end > next else { continue }
+                let e = max(next, (line.words.map(\.start).max() ?? line.start) + f)
+                line.end = e
+                for w in line.words.indices where line.words[w].end > e { line.words[w].end = max(e, line.words[w].start + f) }
+                lyricTracks[t].lines[i] = line
+            }
+        }
     }
 
     /// Re-place aligned, unconfirmed words for the current lead-in. Lines that hugged their
@@ -73,7 +92,7 @@ extension Project {
                     guard let a = line.words[i].alignedStart, let b = line.words[i].alignedEnd else { continue }
                     let s = quantize(max(0, a - lead))
                     line.words[i].start = s
-                    line.words[i].end = max(s + f, quantize(b - lead))
+                    line.words[i].end = max(s + f, quantize(b - lead + lyricStyle.leadOut))
                 }
                 let first = line.words.map(\.start).min()!, last = line.words.map(\.end).max()!
                 line.start = tightStart ? first : min(line.start, first)
@@ -81,6 +100,7 @@ extension Project {
                 lyricTracks[t].lines[l] = line
             }
         }
+        endLinesBeforeTheirNeighbours()
     }
 }
 

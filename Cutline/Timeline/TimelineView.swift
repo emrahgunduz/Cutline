@@ -829,10 +829,17 @@ final class TimelineView: NSView {
         case .group(let original, let clips, let lines):
             guard abs(p.x - d.startPoint.x) > 2 || d.didEdit else { return }
             var dt = Double((p.x - d.startPoint.x) / l.pixelsPerSecond)
-            // Never push any member before 0.
-            let earliest = (original.videoTracks.flatMap(\.clips).filter { clips.contains($0.id) }.map(\.start)
-                            + original.lyricTracks.flatMap(\.lines).filter { lines.contains($0.id) }.map(\.start)).min() ?? 0
-            dt = max(dt, -earliest)
+            // The first item snaps; the others keep their distance from it.
+            let members: [(start: Double, duration: Double)] =
+                original.videoTracks.flatMap(\.clips).filter { clips.contains($0.id) }.map { ($0.start, $0.duration) }
+                + original.lyricTracks.flatMap(\.lines).filter { lines.contains($0.id) }.map { ($0.start, $0.end - $0.start) }
+            if let first = members.min(by: { $0.start < $1.start }) {
+                let ids = Set(clips + lines + original.lyricTracks.flatMap(\.lines).filter { lines.contains($0.id) }.flatMap { $0.words.map(\.id) })
+                dt = snappedMove(start: first.start + dt, duration: first.duration, excluding: ids, event: event) - first.start
+                // Never push any member before 0.
+                dt = max(dt, -first.start)
+            }
+            dt = original.clampLineShift(dt, lines: Set(lines))
             var next = original
             for id in clips { if let loc = original.clipLocation(id), let c = original.videoTracks[loc.track].clips.first(where: { $0.id == id }) { next.moveClip(id, toTrack: loc.track, start: c.start + dt) } }
             for id in lines { if let loc = original.lineLocation(id), let ln = original.lyricTracks[loc.track].lines.first(where: { $0.id == id }) { next.moveLine(id, toTrack: loc.track, start: ln.start + dt) } }
@@ -858,20 +865,36 @@ final class TimelineView: NSView {
             case .line(let id, let edge):
                 guard let line = original.lyricTracks.flatMap(\.lines).first(where: { $0.id == id }) else { return }
                 let ids = Set([id] + line.words.map(\.id))
+                // Lines on one track never overlap: edges stop at the neighbours, and a moved
+                // line stays against a neighbour until the pointer is past its middle.
+                let limits = original.lineEdgeLimits(id)
                 switch edge {
-                case .left: next.retimeLine(id, start: snapped(line.start + dt, excluding: ids, event: event))
-                case .right: next.retimeLine(id, end: snapped(line.end + dt, excluding: ids, event: event))
+                case .left: next.retimeLine(id, start: max(limits.minStart, snapped(line.start + dt, excluding: ids, event: event)))
+                case .right: next.retimeLine(id, end: min(limits.maxEnd, snapped(line.end + dt, excluding: ids, event: event)))
                 case .body:
-                    var track = original.lineLocation(id)!.track
+                    let home = original.lineLocation(id)!.track
+                    var track = home
                     if case .lyric(let t)? = l.row(atY: p.y) { track = t }
-                    next.moveLine(id, toTrack: track, start: snapped(line.start + dt, excluding: ids, event: event))
+                    let want = snapped(line.start + dt, excluding: ids, event: event)
+                    let duration = line.end - line.start
+                    if let s = original.freeLineStart(want, duration: duration, track: track, ignoring: [id]) {
+                        next.moveLine(id, toTrack: track, start: s)
+                    } else if track != home, let s = original.freeLineStart(want, duration: duration, track: home, ignoring: [id]) {
+                        next.moveLine(id, toTrack: home, start: s)
+                    }
                 }
             case .word(let id, let edge):
-                guard let w = original.lyricTracks.flatMap(\.lines).flatMap(\.words).first(where: { $0.id == id }) else { return }
+                guard let w = original.lyricTracks.flatMap(\.lines).flatMap(\.words).first(where: { $0.id == id }),
+                      let loc = original.wordLocation(id) else { return }
+                // A word dragged past its line's edge grows the line, up to the neighbouring lines.
+                let limits = original.lineEdgeLimits(original.lyricTracks[loc.track].lines[loc.line].id)
                 switch edge {
-                case .left: next.retimeWord(id, start: min(snapped(w.start + dt, excluding: [id], event: event), w.end - next.frameDuration))
-                case .right: next.retimeWord(id, end: max(snapped(w.end + dt, excluding: [id], event: event), w.start + next.frameDuration))
-                case .body: next.moveWord(id, start: snapped(w.start + dt, excluding: [id], event: event))
+                case .left: next.retimeWord(id, start: max(limits.minStart, min(snapped(w.start + dt, excluding: [id], event: event), w.end - next.frameDuration)))
+                case .right: next.retimeWord(id, end: min(limits.maxEnd, max(snapped(w.end + dt, excluding: [id], event: event), w.start + next.frameDuration)))
+                case .body:
+                    let len = w.end - w.start
+                    let s = min(max(limits.minStart, snapped(w.start + dt, excluding: [id], event: event)), limits.maxEnd - len)
+                    next.moveWord(id, start: s)
                 }
             case .audio:
                 guard let a = original.audio else { return }

@@ -94,11 +94,16 @@ final class ProjectImportTests: XCTestCase {
         XCTAssertEqual(src.lyricTracks[0].lines[0].words[0].start, 3.5)
     }
 
-    func testImportedClipsAreCentredOn1080x1920AtTheirOriginalScale() {
+    func testImportedClipsAreCentredAndFill1080x1920() {
         let src = musicVideo()
         let p = ProjectImport.make(from: src, type: .ad, canvas: .init(width: 1080, height: 1920)).project
         let clips = p.videoTracks.flatMap(\.clips)
-        XCTAssertEqual(clips.map(\.transform), [ClipTransform(scale: 1.4), ClipTransform(scale: 0.3)])
+        // 1.4 × the old fit filled the 16:9 frame (fill there is 1); on 9:16 it becomes 1.4 × fill.
+        let fill = (16.0 / 9) * (16.0 / 9)
+        XCTAssertEqual(clips[0].transform.scale, 1.4 * fill, accuracy: 1e-9)
+        XCTAssertEqual(clips[0].transform.offsetX, 0)
+        XCTAssertEqual(clips[0].transform.offsetY, 0)
+        XCTAssertEqual(clips[1].transform, ClipTransform(scale: 0.3), "images keep their scale")
         XCTAssertEqual(clips.map(\.start), [0, 2])
         XCTAssertEqual(clips.map(\.duration), [10, 4])
         XCTAssertEqual(clips[0].sourceIn, 2)
@@ -109,7 +114,7 @@ final class ProjectImportTests: XCTestCase {
         let rect = FrameRenderer.place(image, transform: clips[0].transform, canvas: canvas).extent
         XCTAssertEqual(rect.midX, canvas.midX, accuracy: 0.5)
         XCTAssertEqual(rect.midY, canvas.midY, accuracy: 0.5)
-        XCTAssertEqual(rect.width, 1080 * 1.4, accuracy: 0.5, "same scale relative to the fit")
+        XCTAssertGreaterThanOrEqual(rect.height, canvas.height - 0.5, "covers the portrait frame top to bottom")
     }
 
     func testLinePositionsResetAndCinemascopeOnlyForMusicVideos() {
