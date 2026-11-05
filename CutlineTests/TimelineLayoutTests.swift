@@ -79,3 +79,22 @@ final class TimelineClampTests: XCTestCase {
         XCTAssertLessThan(view.contentDuration, 80)
     }
 }
+
+final class LyricRowTests: XCTestCase {
+    func testOneRowPerWordWithCappedHeight() {
+        let rect = CGRect(x: 0, y: 0, width: 500, height: 200)
+        let two = TimelineView.lyricParts(rect, wordCount: 2)
+        let five = TimelineView.lyricParts(rect, wordCount: 5)
+        XCTAssertEqual(two.words.count, 2)
+        XCTAssertEqual(five.words.count, 5)
+        XCTAssertEqual(two.words[0].height, TimelineView.maxWordRowHeight)
+        XCTAssertEqual(five.words[0].height, two.words[0].height)          // same look
+        XCTAssertTrue(zip(five.words, five.words.dropFirst()).allSatisfy { $0.maxY < $1.minY })
+    }
+
+    func testRowsShrinkInShortTracksAndHideWhenTooSmall() {
+        let short = TimelineView.lyricParts(CGRect(x: 0, y: 0, width: 500, height: 60), wordCount: 5)
+        XCTAssertTrue(short.words.isEmpty || short.words[0].height < TimelineView.maxWordRowHeight)
+        XCTAssertTrue(TimelineView.lyricParts(CGRect(x: 0, y: 0, width: 500, height: 22), wordCount: 3).words.isEmpty)
+    }
+}
