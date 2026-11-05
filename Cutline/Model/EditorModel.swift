@@ -46,8 +46,17 @@ final class EditorModel: ObservableObject {
     }
     /// The selected assets in the order they were clicked (used when dropping several at once).
     private(set) var assetSelectionOrder: [UUID] = []
-    @Published var playhead: Double = 0
-    @Published var isPlaying = false
+    /// Playback state lives in its own object so the 60 Hz playhead ticks don't
+    /// fire `objectWillChange` on the whole editor (and redraw every panel).
+    let transport = TransportState()
+    var playhead: Double {
+        get { transport.playhead }
+        set { transport.playhead = newValue }
+    }
+    var isPlaying: Bool {
+        get { transport.isPlaying }
+        set { transport.isPlaying = newValue }
+    }
     /// Assets with a proxy encode in flight (main actor only).
     var proxyJobs: Set<UUID> = []
     /// Bumped on every project change so renderers can rebuild.
@@ -171,4 +180,10 @@ final class EditorModel: ObservableObject {
     var selectedClip: Clip? { if case .clip(let id) = selection { return clip(id) }; return nil }
 
     func folder(_ name: String) -> URL? { document?.folder(name) }
+}
+
+/// Playhead and play/pause, observed separately from the editor model.
+final class TransportState: ObservableObject {
+    @Published var playhead: Double = 0
+    @Published var isPlaying = false
 }
