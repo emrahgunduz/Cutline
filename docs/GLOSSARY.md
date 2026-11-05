@@ -100,3 +100,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Target size** | Export rate mode for social and ads: give a maximum size in MB; Cutline picks the bitrate, checks the finished file and re-encodes automatically (up to twice) if it came out too big. |
 | **Budget bar** | Status bar: project length against the limit, and the size target (or the estimated size at the saved bitrate) against it. |
 | **Format presets** | Cutline > Settings… (⌘,): each project type's length limit, codec, default bitrate and default size target. |
+| **Render cache** | Preview frames (in memory) and export segments (2 s pieces in the project's `cache/segments/`), keyed by everything that changes their pixels. A re-export encodes only the segments an edit changed; a cancelled export keeps the finished ones. |
+| **Cache strip** | The thin line along the bottom of the ruler: green where the export segment is cached, orange where an edit or setting change made it stale. |
+| **Clear Cache** | Toolbar (shows the size) or File > Clear Render Cache: empties the render cache. Proxies, thumbnails, waveforms and analysis are kept. |
+| **Reset Media Caches** | Toolbar Reset Caches or File > Reset Media Caches…: pick thumbnails & waveforms, music analysis and/or proxies to delete and rebuild. Proxies are re-encoded at their current scale. |

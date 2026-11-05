@@ -90,7 +90,8 @@ final class PreviewController: ObservableObject {
     private func scheduleRebuild() {
         let project = editor.project
         let key = Self.structureKey(project, useProxies: useProxies)
-        let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project))
+        let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project),
+                                      cachesFrames: true, usesProxies: useProxies)
         if key == structureKey, let built, let item = player.currentItem {
             // Looks-only change: new instruction snapshot, same media. A structural rebuild still
             // in flight is now stale (e.g. a clip dragged back to where it started); drop it.

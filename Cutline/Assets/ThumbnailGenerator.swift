@@ -11,6 +11,10 @@ final class ThumbnailGenerator: ObservableObject {
 
     func url(for id: UUID) -> URL? { folder()?.appendingPathComponent("\(id.uuidString).png") }
 
+    /// Forget the thumbnails in memory (Reset Media Caches rebuilds them).
+    @MainActor
+    func removeAll() { images = [:] }
+
     @MainActor
     func ensureThumbnail(for asset: Asset) async {
         if images[asset.id] != nil { return }

@@ -35,8 +35,12 @@ struct Project: Codable, Equatable {
         self.canvas = canvas
     }
 
+    /// Set only on render excerpts (one export segment, a size probe): their exact length.
+    var renderLength: Double?
+
     /// Project length: whichever ends later, the audio or the last video clip.
     var duration: Double {
+        if let renderLength { return renderLength }
         let audioEnd = audio?.end ?? 0
         let videoEnd = videoTracks.flatMap(\.clips).map(\.end).max() ?? 0
         return max(audioEnd, videoEnd)
