@@ -158,7 +158,8 @@ final class SizeTargetedExportTests: XCTestCase {
         let out = TestMedia.tempURL("mp4")
         defer { try? FileManager.default.removeItem(at: out) }
         let note = try await ExportSheet.exportToSize(project: e.project, settings: settings, targetMB: 3, to: out,
-                                                      exporter: Exporter(), model: ExportProgressModel())
+                                                      exporter: SegmentExporter(cacheDir: FileManager.default.temporaryDirectory.appendingPathComponent("seg-\(UUID())")),
+                                                      model: ExportProgressModel())
         let bytes = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: out.path)[.size] as? NSNumber).doubleValue
         XCTAssertLessThanOrEqual(bytes, 3_000_000, note)
         XCTAssertGreaterThan(bytes, 3_000_000 * 0.6, "uses most of the budget: \(note)")

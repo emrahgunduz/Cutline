@@ -351,9 +351,12 @@ extension Project {
                 return n.duration > 0 ? n : nil
             }
         }
+        let animation = LyricAnimation(style: lyricStyle, fps: fps)
         for t in p.lyricTracks.indices {
             p.lyricTracks[t].lines = p.lyricTracks[t].lines.compactMap { l in
-                guard l.end > start, l.start < end else { return nil }
+                // Keep lines still fading out at the start of the excerpt.
+                let drawnEnd = max(l.end, l.words.map { LyricLayout.visibleEnd(of: $0, letters: $0.text.count, animation: animation) }.max() ?? l.end)
+                guard drawnEnd > start, l.start < end else { return nil }
                 var n = l
                 n.start -= start; n.end -= start
                 n.words = l.words.map { var w = $0; w.start -= start; w.end -= start; return w }
@@ -362,7 +365,7 @@ extension Project {
         }
         p.cinemascope.startMarker -= start
         p.cinemascope.endMarker -= start
-        _ = len
+        p.renderLength = len
         return p
     }
 }

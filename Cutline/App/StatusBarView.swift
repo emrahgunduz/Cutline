@@ -18,6 +18,10 @@ struct StatusBarView: View {
                     divider
                     Label("\(proxyCount) proxied", systemImage: "bolt.horizontal").help("Videos playing from preview proxies")
                 }
+                if let reset = editor.mediaResetMessage {
+                    divider
+                    HStack(spacing: 6) { ProgressView().controlSize(.mini); Text(reset) }
+                }
                 CorrectionStatusView(transport: editor.transport)
                 JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis, cancel: { editor.cancelJobs() })
                 divider

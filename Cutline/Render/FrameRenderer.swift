@@ -9,6 +9,11 @@ struct RenderSnapshot {
     /// Images decoded once per snapshot, keyed by asset id.
     var images: [UUID: CIImage]
     var lyrics: LyricRenderer?
+    /// Preview only: keep composited frames in `FrameCache`. Export leaves this off, so it
+    /// always renders from the original media.
+    var cachesFrames = false
+    /// Preview from proxies: part of the frame key, so proxy frames never stand in for originals.
+    var usesProxies = false
 }
 
 enum FrameRenderer {

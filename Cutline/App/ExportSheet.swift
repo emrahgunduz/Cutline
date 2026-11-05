@@ -37,7 +37,8 @@ enum ExportSheet {
     }
 
     private static func run(editor: EditorModel, settings: ExportSettings, to url: URL, window: NSWindow) {
-        let exporter = Exporter()
+        guard let cacheDir = editor.segmentCacheURL else { return }
+        let exporter = SegmentExporter(cacheDir: cacheDir)
         let model = ExportProgressModel()
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
         let host = NSHostingController(rootView: ExportProgressView(model: model, fileName: url.lastPathComponent,
@@ -53,11 +54,13 @@ enum ExportSheet {
                 if settings.rateMode == .size, let mb = settings.sizeTargetMB {
                     sizeNote = try await exportToSize(project: project, settings: settings, targetMB: mb, to: url, exporter: exporter, model: model)
                 } else {
-                    try await exporter.export(project: project, settings: settings, to: url) { p in
+                    let stats = try await exporter.export(project: project, settings: settings, to: url) { p in
                         Task { @MainActor in model.progress = p }
                     }
+                    if stats.reused > 0 { sizeNote = "Reused \(stats.reused) of \(stats.reused + stats.encoded) unchanged segments from the cache." }
                 }
             } catch { failure = error }
+            editor.segmentCacheChanged()
             window.endSheet(sheet)
             if let failure {
                 if case ExportError.cancelled = failure { return }
@@ -83,7 +86,7 @@ extension ExportSheet {
     /// one is kept. Returns a note for the finish alert.
     @MainActor
     static func exportToSize(project: Project, settings: ExportSettings, targetMB: Double, to url: URL,
-                             exporter: Exporter, model: ExportProgressModel) async throws -> String {
+                             exporter: SegmentExporter, model: ExportProgressModel) async throws -> String {
         let target = targetMB * 1_000_000
         var made: [URL] = []
         defer { made.forEach { try? FileManager.default.removeItem(at: $0) } }
@@ -96,6 +99,7 @@ extension ExportSheet {
                 .appendingPathComponent(".\(url.deletingPathExtension().lastPathComponent)-pass\(pass + 1).\(url.pathExtension)")
             made.append(passURL)
             try await exporter.export(project: project, settings: s, to: passURL) { p in Task { @MainActor in model.progress = p } }
+
             let bytes = (try FileManager.default.attributesOfItem(atPath: passURL.path)[.size] as? NSNumber)?.int64Value ?? 0
             return SizeSolver.Attempt(bitrate: bitrate, bytes: bytes, url: passURL)
         }

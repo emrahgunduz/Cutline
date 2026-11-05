@@ -175,6 +175,20 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         projectDocument.editor.alignLyrics(window: window)
     }
 
+    /// Empty the render cache and say how much was freed (R42).
+    @objc func clearRenderCache(_ sender: Any?) {
+        let freed = projectDocument.editor.clearRenderCache()
+        let alert = NSAlert()
+        alert.messageText = "Render cache cleared"
+        alert.informativeText = "Freed \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)). Proxies, thumbnails, waveforms and music analysis were kept. The next export renders everything again."
+        if let window { alert.beginSheetModal(for: window) { _ in } } else { alert.runModal() }
+        toolbar?.refreshCacheSize()
+    }
+
+    @objc func resetMediaCaches(_ sender: Any?) {
+        ResetCachesSheet.present(editor: projectDocument.editor, window: window)
+    }
+
     @objc func nextUnsureWord(_ sender: Any?) { projectDocument.editor.jumpToUnsureWord(forward: true) }
     @objc func previousUnsureWord(_ sender: Any?) { projectDocument.editor.jumpToUnsureWord(forward: false) }
     @objc func confirmWord(_ sender: Any?) { projectDocument.editor.toggleConfirmSelectedWords() }

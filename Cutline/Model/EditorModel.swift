@@ -72,6 +72,10 @@ final class EditorModel: ObservableObject {
     /// Analyse the song automatically when it is added or replaced (off in unit tests).
     var autoAnalyze = !AppDelegate.isTestHost
     private var analysisWatch: AnyCancellable?
+    /// What Reset Media Caches is doing right now (nil when idle).
+    @Published var mediaResetMessage: String?
+    /// Export segment files in `cache/segments/` (see CacheStrip).
+    @Published var segmentFiles: Set<String> = []
     /// The running lyric alignment, if any (see LyricAlignment).
     var alignmentTask: Task<Void, Never>?
 
@@ -86,6 +90,7 @@ final class EditorModel: ObservableObject {
     @MainActor
     func warmCaches() {
         watchSong()
+        segmentCacheChanged()
         for a in project.assets {
             switch a.kind {
             case .video, .image: Task { await thumbnails.ensureThumbnail(for: a) }
