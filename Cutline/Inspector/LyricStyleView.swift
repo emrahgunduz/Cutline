@@ -16,14 +16,15 @@ struct LyricStyleView: View {
                         ForEach(fontChoices(current: style.fontName), id: \.self) { Text($0).tag($0) }
                     }
                     .controlSize(.small)
-                    row("Size", style.sizeFraction * 100, 2...20, format: "%.1f%%") { $0.sizeFraction = $1 / 100 }
+                    row("Size", style.sizeFraction * 100, 2...20, format: "%.1f%%", reset: LyricStyle().sizeFraction * 100) { $0.sizeFraction = $1 / 100 }
                     ColorPicker("Color", selection: color(\.color, "Lyric Color")).font(.system(size: 12))
-                    row("Position", style.verticalPosition * 100, 5...95, format: "%.0f%%") { $0.verticalPosition = $1 / 100 }
+                    row("Position", style.verticalPosition * 100, 5...95, format: "%.0f%%", reset: LyricStyle().verticalPosition * 100) { $0.verticalPosition = $1 / 100 }
                 }
                 InspectorSection(title: "Drop Shadow", icon: "shadow", isOn: binding(\.shadowEnabled, "Drop Shadow")) {
-                    row("Blur", style.shadowBlur, 0...40, format: "%.1f") { $0.shadowBlur = $1 }
-                    row("Distance X", style.shadowDX, -50...50, format: "%.0f") { $0.shadowDX = $1 }
-                    row("Distance Y", style.shadowDY, -50...50, format: "%.0f") { $0.shadowDY = $1 }
+                    row("Blur", style.shadowBlur, 0...40, format: "%.1f", reset: LyricStyle().shadowBlur) { $0.shadowBlur = $1 }
+                    row("Strength", style.shadowStrength * 100, 0...400, format: "%.0f%%", reset: 100) { $0.shadowStrength = $1 / 100 }
+                    row("Distance X", style.shadowDX, -50...50, format: "%.0f", reset: LyricStyle().shadowDX) { $0.shadowDX = $1 }
+                    row("Distance Y", style.shadowDY, -50...50, format: "%.0f", reset: LyricStyle().shadowDY) { $0.shadowDY = $1 }
                     ColorPicker("Color", selection: color(\.shadowColor, "Shadow Color")).font(.system(size: 12))
                 }
             }
@@ -66,9 +67,9 @@ struct LyricStyleView: View {
         })
     }
 
-    private func row(_ label: String, _ value: Double, _ range: ClosedRange<Double>, format: String,
+    private func row(_ label: String, _ value: Double, _ range: ClosedRange<Double>, format: String, reset: Double? = nil,
                      set: @escaping (inout LyricStyle, Double) -> Void) -> some View {
-        ValueRow(label: label, value: value, range: range, format: format,
+        ValueRow(label: label, value: value, range: range, format: format, defaultValue: reset,
                  onChange: { v in editor.liveEdit { set(&$0.lyricStyle, v) } },
                  onCommit: { editor.endLiveEdit(label) })
     }

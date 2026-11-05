@@ -47,10 +47,14 @@ final class LyricRenderer {
                 "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                 "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                 "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(sc.a)),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(sc.a * style.shadowStrength)),
                 "inputBiasVector": CIVector(x: CGFloat(sc.r), y: CGFloat(sc.g), z: CGFloat(sc.b), w: 0),
             ])
             .applyingGaussianBlur(sigma: max(0, style.shadowBlur))
+            // Strength above 1 also boosts the blurred falloff, so the shadow reads denser.
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(max(1, style.shadowStrength))),
+            ])
             .transformed(by: CGAffineTransform(translationX: style.shadowDX, y: -style.shadowDY))
         return text.composited(over: shadow)
     }
