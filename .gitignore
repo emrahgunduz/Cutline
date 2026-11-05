@@ -1,2 +1,6 @@
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
 .DS_Store
+DerivedData/
 Example_Music_Video/
+build/

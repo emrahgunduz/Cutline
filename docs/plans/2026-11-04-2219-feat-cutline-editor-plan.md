@@ -70,6 +70,7 @@ The user edits their own music videos and used After Effects for the sample proj
 - R13. One audio track holds the song, which can be dropped in, replaced or removed. It shows the waveform, beat and downbeat ticks, and loud/quiet regions.
 - R14. A section lane above the waveform shows detected song sections (for example verse and chorus), and the user can adjust section boundaries and individual downbeats.
 - R15. Clip edges, cuts, lyric lines and words, and the cinemascope markers snap to beats, downbeats and section edges. A modifier key disables snapping. Markers keep their musical position when the analysis is corrected.
+- R41. The timeline button bar has a master snapping toggle plus separate toggles for each snap-target group: beats, downbeats, sections, and edges & playhead. The toggles are saved per project, and ⌘ while dragging bypasses all of them.
 - R16. Video tracks can be added and removed. Each holds multiple clips (video or image) shown with thumbnails. Clips can be moved, trimmed at either end, split at the playhead and deleted.
 - R17. Lyric tracks can be added and removed. Each holds line items, and each line contains word items.
 - R18. Lyric lines can be moved between lyric tracks. Lines on different tracks that overlap in time are shown at the same time, stacked in the tracks' vertical order.
@@ -104,6 +105,8 @@ The user edits their own music videos and used After Effects for the sample proj
 - R32. Preview and export share one cache keying and invalidation scheme. Preview keeps rendered frames and export keeps encoded segments, and an edit invalidates only the time ranges whose output it changes.
 - R33. The timeline shows a cache strip marking valid, stale and uncached ranges.
 - R34. Re-exporting after a small edit re-renders only the changed ranges, and a cancelled export can resume.
+- R42. A **Clear Cache** button in the window toolbar (and a matching menu item) empties the render cache: preview frames in memory and the encoded export segments on disk. Proxies, thumbnails, waveforms and music analysis are kept. The button shows how much space is used and how much was freed.
+- R43. A separate **Reset Media Caches…** toolbar button (and menu item) rebuilds the slow caches. Its sheet lists each kind with its disk size and a checkbox: thumbnails and waveforms, music analysis, and proxies. Rebuilding runs in the background with progress. Proxies are recreated at their current sizes, never just deleted. It never touches the render cache, which Clear Cache handles.
 
 **Limits and export**
 
@@ -372,14 +375,16 @@ Waits on: PR 1 merged.
 ### U9. Snapping
 
 **Goal:** Snap edges, lines, words and markers to beats, downbeats and section edges, with a modifier to bypass.
-**Requirements:** R15
+**Requirements:** R15, R41
 **Dependencies:** U8
 **Files:** `Cutline/Timeline/Snapping.swift`, `CutlineTests/SnappingTests.swift`
-**Approach:** The snap radius is fixed in pixels, so it scales with zoom. Priority is section edge, then downbeat, then beat, then other clip edges. Markers store a beat index plus an offset (KTD6).
+**Approach:** The snap radius is fixed in pixels, so it scales with zoom. Priority is section edge, then downbeat, then beat, then other clip edges. Markers store a beat index plus an offset (KTD6). Each target group is filtered by its toggle (R41). The toggles sit next to the existing snapping button in `Cutline/Timeline/TimelineContainer.swift` and are stored in the project layout.
 **Test scenarios:**
 - A drag within the radius of a downbeat lands exactly on it.
 - With the modifier held, it lands on the raw position.
 - After a downbeat is corrected, a marker anchored to it moves with it.
+- With Beats off but Downbeats on, a drag near a plain beat doesn't snap, and a drag near a downbeat does.
+- With the master toggle off, nothing snaps whatever the group toggles say.
 **Verification:** Cuts on the sample land on beats without frame-level zoom.
 
 ### U10. Lyric generation and alignment
@@ -447,10 +452,10 @@ Waits on: PR 2 merged.
 ### U14. Render cache, stale strip and segment reuse
 
 **Goal:** Exact range-level caching shared by preview and export, a visible cache strip, and resumable segment export.
-**Requirements:** R32, R33, R34
+**Requirements:** R32, R33, R34, R42
 **Dependencies:** U6, U12
 **Files:** `Cutline/Render/RenderKey.swift`, `Cutline/Render/FrameCache.swift`, `Cutline/Export/SegmentExporter.swift`, `Cutline/Timeline/CacheStrip.swift`, `CutlineTests/RenderKeyTests.swift`, `CutlineTests/SegmentExporterTests.swift`
-**Approach:** KTD11. Start with a spike: encode two segments with identical settings, join them by passthrough, and check for a single format description and clean playback. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
+**Approach:** KTD11. The Clear Cache toolbar item (R42) lives in `Cutline/App/WindowToolbar.swift`, calls the cache's clear method, and the cache strip turns fully uncached afterwards. Start with a spike: encode two segments with identical settings, join them by passthrough, and check for a single format description and clean playback. Segments are 2 s and closed-GOP, with a keyframe at every boundary. A cancelled export keeps its finished segments for resume. The strip colours each range by whether its key is in the cache.
 **Test scenarios:**
 - Changing one clip's brightness changes keys only within that clip's range.
 - Moving a lyric word changes keys only where that word was or now is visible.
@@ -458,7 +463,22 @@ Waits on: PR 2 merged.
 - The concatenated output plays without glitches at segment joins.
 - Resume after cancel encodes only the missing segments.
 - Changing the export bitrate re-encodes every segment.
+- Clear Cache empties `cache/segments/` and the memory cache, leaves `proxies/`, `thumbnails/` and `analysis/` untouched, and the next export re-encodes everything.
 **Verification:** After a one-word fix, re-exporting the full sample song takes a small fraction of the first export.
+
+### U16. Reset media caches
+
+**Goal:** Let the user rebuild thumbnails, waveforms, music analysis and proxies from a toolbar button, separately from Clear Cache.
+**Requirements:** R43
+**Dependencies:** U2, U8, U14
+**Files:** `Cutline/App/WindowToolbar.swift`, `Cutline/App/ResetCachesSheet.swift`, `Cutline/Assets/MediaCacheReset.swift`, `CutlineTests/MediaCacheResetTests.swift`
+**Approach:** The sheet measures `thumbnails/`, `analysis/` and `proxies/` sizes, and the user ticks which to rebuild (all ticked by default). The chosen folders are deleted, then rebuilt through the existing builders: thumbnails, the waveform pyramid, the analysis job, and proxies at each asset's recorded scale. Progress shows in the status bar and the button is disabled while a rebuild runs. Lyric timing and other edits are untouched, because they live in `project.json`.
+**Test scenarios:**
+- Rebuilding thumbnails only leaves proxies and analysis files unchanged.
+- After rebuilding proxies, each proxied asset has a proxy at the same scale.
+- Lyric line and word times are identical before and after a full reset.
+- Clear Cache (R42) and Reset Media Caches never touch each other's folders.
+**Verification:** On the sample project, a full reset rebuilds everything and the project plays and exports as before.
 
 ### U15. Import from another project
 
