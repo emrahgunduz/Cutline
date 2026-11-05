@@ -216,11 +216,18 @@ final class PreviewCanvasView: NSView {
     override func otherMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
     override func otherMouseUp(with event: NSEvent) { drag = nil }
 
+    /// Mouse wheel zooms at the pointer. A trackpad's two-finger scroll pans (pinch zooms);
+    /// hold ⌥ on a trackpad to zoom with scrolling instead.
     override func scrollWheel(with event: NSEvent) {
-        if event.modifierFlags.contains(.option) || event.modifierFlags.contains(.command) {
-            zoom(by: 1 + event.scrollingDeltaY * 0.01, at: convert(event.locationInWindow, from: nil)); return
+        let p = convert(event.locationInWindow, from: nil)
+        let isTrackpad = event.hasPreciseScrollingDeltas
+        if !isTrackpad || event.modifierFlags.contains(.option) || event.modifierFlags.contains(.command) {
+            let dy = isTrackpad ? event.scrollingDeltaY * 0.01 : event.scrollingDeltaY * 0.08
+            guard dy != 0 else { return }
+            zoom(by: max(0.5, min(1.5, 1 + dy)), at: p)
+            return
         }
-        guard controller.zoom != nil else { return }
+        if controller.zoom == nil { controller.zoom = geometry.fitScale }
         controller.pan = CGPoint(x: controller.pan.x + event.scrollingDeltaX, y: controller.pan.y + event.scrollingDeltaY)
     }
 

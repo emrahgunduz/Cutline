@@ -23,6 +23,7 @@ final class PreviewController: ObservableObject {
     @Published var fitPercent = 100
 
     func resetView() { zoom = nil; pan = .zero }
+    func center() { pan = .zero }
     func setZoom(percent: Double) { zoom = CGFloat(percent / 100); pan = .zero }
     func stepZoom(_ factor: CGFloat) { zoom = min(max((zoom ?? CGFloat(fitPercent) / 100) * factor, 0.05), 8) }
 
