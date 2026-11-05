@@ -119,11 +119,12 @@ extension Project {
         write(AnchorStretch.stretch(before: prior, after: after, anchored: anchored, follows: follows, minLength: frameDuration), to: words, anchored: anchored)
     }
 
-    /// Trim unconfirmed words so no two words overlap in sung order (confirmed ones stay).
+    /// Trim aligned words so no two words overlap in sung order (confirmed and hand-edited ones stay).
     mutating func resolveLyricOverlaps() {
         let words = lyricOrder()
         let spans = words.map { AnchorStretch.Span(start: $0.value.start, end: $0.value.start + frameDuration) }
-        let anchored = words.map(\.value.confirmed)
+        // Your timing (confirmed or moved by hand) stays; aligned words make room around it.
+        let anchored = words.map(\.value.isUserTimed)
         write(AnchorStretch.resolveOverlaps(spans, anchored: anchored, minLength: frameDuration), to: words, anchored: anchored)
     }
 

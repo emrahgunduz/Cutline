@@ -213,7 +213,7 @@ final class LyricCorrectionTests: XCTestCase {
         let r = LyricAlignment.Result(lines: [0.0, 5, 10].map { t in
             [.init(text: "", start: 20 + t, end: 20.4 + t, confidence: 0.9, source: "mms"), .init(text: "", start: 21 + t, end: 21.4 + t, confidence: 0.9, source: "mms")]
         })
-        p.applyAlignment(r, lineIDs: ids, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(r, lineIDs: ids, audioStart: 0, keepEdits: false)
         XCTAssertEqual(p.lyricTracks[1].lines[0].words[0].start, 25)
         XCTAssertEqual(p.lyricTracks[0].lines.map(\.start), [20, 30])
     }
@@ -232,7 +232,7 @@ final class LyricCorrectionTests: XCTestCase {
     func testRetimeAllClearsConfirmation() {
         var p = editor(confirmed: [0]).project
         let r = LyricAlignment.Result(lines: [(0..<5).map { .init(text: "", start: 20 + Double($0), end: 20.5 + Double($0), confidence: 0.9, source: "mms") }])
-        p.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(r, track: 0, audioStart: 0, keepEdits: false)
         XCTAssertFalse(p.lyricTracks[0].lines[0].words[0].confirmed)
         XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 20)
     }
