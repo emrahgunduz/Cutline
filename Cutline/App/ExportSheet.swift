@@ -8,6 +8,8 @@ enum ExportSheet {
     static func present(editor: EditorModel, window: NSWindow?) {
         guard let window, window.attachedSheet == nil else { return }
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        // Swift owns it; AppKit releasing it on close as well crashes the app.
+        sheet.isReleasedWhenClosed = false
         let host = NSHostingController(rootView: ExportSettingsView(editor: editor, finish: { settings in
             window.endSheet(sheet)
             guard let settings else { return }
@@ -39,6 +41,8 @@ enum ExportSheet {
         let exporter = SegmentExporter(cacheDir: cacheDir)
         let model = ExportProgressModel()
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        // Swift owns it; AppKit releasing it on close as well crashes the app.
+        sheet.isReleasedWhenClosed = false
         let host = NSHostingController(rootView: ExportProgressView(model: model, fileName: url.lastPathComponent,
                                                                     cancel: { exporter.cancel() }))
         host.sizingOptions = [.preferredContentSize]

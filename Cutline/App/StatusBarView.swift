@@ -26,6 +26,8 @@ struct StatusBarView: View {
                 JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis, cancel: { editor.cancelJobs() })
                 divider
                 Label(saveText, systemImage: editor.document?.isDocumentEdited == true ? "pencil.circle" : "checkmark.circle")
+                divider
+                CacheStatusView(editor: editor)
             }
             .font(.system(size: 11).monospacedDigit())
             .foregroundStyle(.secondary)
@@ -88,6 +90,38 @@ struct StatusBarView: View {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
         return "Saved \(f.localizedString(for: date, relativeTo: Date()))"
+    }
+}
+
+/// Render cache size, with Clear Cache and Reset Media Caches buttons. The size is measured
+/// every few seconds (and after exports and clears), not on every redraw of the status bar.
+private struct CacheStatusView: View {
+    let editor: EditorModel
+    @State private var bytes: Int64 = 0
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file), systemImage: "internaldrive")
+                .help("Render cache: preview frames in memory and export segments in the project")
+            Button { send(#selector(MainWindowController.clearRenderCache(_:))) } label: { Image(systemName: "trash") }
+                .buttonStyle(.borderless).disabled(bytes == 0).accessibilityLabel("Clear Cache")
+                .help("Clear the render cache (proxies, thumbnails, waveforms and analysis are kept)")
+            Button { send(#selector(MainWindowController.resetMediaCaches(_:))) } label: { Image(systemName: "arrow.triangle.2.circlepath") }
+                .buttonStyle(.borderless).accessibilityLabel("Reset Media Caches")
+                .help("Reset Media Caches… (thumbnails, waveforms, analysis, proxies)")
+        }
+        .task {
+            while !Task.isCancelled {
+                bytes = editor.renderCacheBytes
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
+        .onReceive(editor.$segmentFiles) { _ in bytes = editor.renderCacheBytes }
+    }
+
+    private func send(_ action: Selector) {
+        NSApp.sendAction(action, to: editor.document?.windowControllers.first, from: nil)
+        bytes = editor.renderCacheBytes
     }
 }
 

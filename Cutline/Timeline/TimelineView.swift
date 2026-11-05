@@ -1115,16 +1115,34 @@ final class TimelineView: NSView {
 
     override func otherMouseUp(with event: NSEvent) { drag = nil; NSCursor.arrow.set() }
 
-    override func scrollWheel(with event: NSEvent) {
-        if event.modifierFlags.contains(.option) || event.modifierFlags.contains(.command) {
-            zoom(by: 1 + event.scrollingDeltaY * 0.01, around: convert(event.locationInWindow, from: nil).x)
-            return
+    /// What a scroll does. A mouse wheel zooms at the pointer (⇧ scrolls in time, and over
+    /// the track names it scrolls the tracks); trackpad scrolling pans; ⌥ or ⌘ always zooms.
+    enum WheelAction: Equatable { case zoom(CGFloat), pan(dx: CGFloat, dy: CGFloat) }
+
+    static func wheelAction(dx: CGFloat, dy: CGFloat, precise: Bool, flags: NSEvent.ModifierFlags, overHeader: Bool) -> WheelAction {
+        if flags.contains(.option) || flags.contains(.command) {
+            // A wheel notch is about 1; trackpad deltas are pixels.
+            return .zoom(precise ? 1 + dy * 0.01 : pow(1.15, max(-5, min(5, dy))))
         }
+        if precise { return .pan(dx: dx, dy: dy) }
+        if flags.contains(.shift) { return .pan(dx: (dx == 0 ? dy : dx) * 8, dy: 0) }
+        if overHeader { return .pan(dx: 0, dy: dy * 8) }
+        if dy == 0 { return .pan(dx: dx * 8, dy: 0) }      // a tilt wheel scrolls in time
+        return .zoom(pow(1.15, max(-5, min(5, dy))))
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
         var dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
-        if event.modifierFlags.contains(.shift) && dx == 0 { dx = dy; dy = 0 }
-        if !event.hasPreciseScrollingDeltas { dx *= 8; dy *= 8 }
-        scrollTime = min(max(0, scrollTime - Double(dx / pixelsPerSecond)), contentDuration)
-        scrollY = min(max(0, scrollY - dy), maxScrollY)
+        if event.hasPreciseScrollingDeltas, event.modifierFlags.contains(.shift), dx == 0 { dx = dy; dy = 0 }
+        switch Self.wheelAction(dx: dx, dy: dy, precise: event.hasPreciseScrollingDeltas, flags: event.modifierFlags,
+                                overHeader: p.x < TimelineLayout.headerWidth) {
+        case .zoom(let factor):
+            zoom(by: factor, around: max(p.x, TimelineLayout.headerWidth))
+        case .pan(let px, let py):
+            scrollTime = min(max(0, scrollTime - Double(px / pixelsPerSecond)), contentDuration)
+            scrollY = min(max(0, scrollY - py), maxScrollY)
+        }
     }
 
     override func magnify(with event: NSEvent) {
