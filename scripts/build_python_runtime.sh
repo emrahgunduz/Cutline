@@ -1,7 +1,8 @@
 #!/bin/zsh
-# Builds the helper's Python runtime and downloads every model into build/ml.
-# An Xcode build phase copies build/ml plus helper/cutline_helper into
-# Cutline.app/Contents/Resources/ml. Nothing is downloaded when the app runs.
+# Builds the helper's Python runtime into build/ml/python, and downloads the models into
+# build/ml/models for development and tests. An Xcode build phase copies the runtime and
+# helper/cutline_helper into Cutline.app/Contents/Resources/ml. The models are NOT bundled:
+# the app downloads them (New Project screen, Settings > Models) into a folder the user picks.
 #
 #   scripts/build_python_runtime.sh          build runtime + models (skips parts already done)
 #   scripts/build_python_runtime.sh --clean  start over
@@ -41,7 +42,7 @@ if [[ $(cat $ML/.packages 2>/dev/null) != $LOCK_HASH ]]; then
   echo $LOCK_HASH > $ML/.packages
 fi
 
-if [[ ! -f $ML/models/manifest.json ]]; then
+if [[ ! -f $ML/models/.complete ]]; then
   mkdir -p $ML/models
   $PY -s $ROOT/scripts/fetch_models.py $ML/models
 fi

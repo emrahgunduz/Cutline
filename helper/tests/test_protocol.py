@@ -1,6 +1,5 @@
 import json
 
-from cutline_helper.models import missing_files, write_manifest
 from cutline_helper.protocol import HelperError, parse_request
 
 import pytest
@@ -35,34 +34,23 @@ def test_network_is_blocked_and_noop_still_runs(run_helper):
 
 def test_missing_model_fails_fast_and_names_file(run_helper, models):
     (models / "weights.bin").unlink()
-    code, msgs, _ = run_helper({"command": "ping"})
+    code, msgs, _ = run_helper({"command": "align_lyrics", "args": {}})
     assert code == 2
     assert msgs[-1]["code"] == "model_missing"
     assert "weights.bin" in msgs[-1]["message"]
 
 
-def test_missing_manifest_is_reported(run_helper, tmp_path):
+def test_jobs_without_models_run_with_no_models_folder(run_helper, tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
-    _, msgs, _ = run_helper({"command": "ping"}, models_dir=empty)
-    assert msgs[-1]["code"] == "model_missing"
-    assert "manifest.json" in msgs[-1]["message"]
+    code, msgs, _ = run_helper({"command": "ping"}, models_dir=empty)
+    assert code == 0 and msgs[-1]["type"] == "result"
 
 
 def test_stray_prints_go_to_stderr(run_helper):
     # Library output must never reach the protocol stream: every stdout line is JSON.
     code, msgs, err = run_helper({"command": "ping", "args": {"steps": 1}})
     assert all(m["type"] in {"progress", "result"} for m in msgs)
-
-
-def test_manifest_round_trip(tmp_path):
-    (tmp_path / "a").mkdir()
-    (tmp_path / "a" / "w.pt").write_bytes(b"xx")
-    m = write_manifest(str(tmp_path))
-    assert m["files"] == [{"path": "a/w.pt", "size": 2}]
-    assert missing_files(str(tmp_path)) == []
-    (tmp_path / "a" / "w.pt").write_bytes(b"x")
-    assert missing_files(str(tmp_path)) == ["a/w.pt"]
 
 
 def test_parse_request_validates_fields():

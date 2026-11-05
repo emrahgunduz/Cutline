@@ -22,14 +22,17 @@ final class JobRunnerTests: XCTestCase {
         models = root.appendingPathComponent("models", isDirectory: true)
         try FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
         try Data("1234".utf8).write(to: models.appendingPathComponent("weights.bin"))
-        try Data(#"{"version":1,"files":[{"path":"weights.bin","size":4}]}"#.utf8).write(to: models.appendingPathComponent("manifest.json"))
+        try Data(#"{"version":1}"#.utf8).write(to: models.appendingPathComponent(".complete"))
+        try Data(#"{"version":1,"total_bytes":4,"items":[{"id":"w","label":"W","bytes":4,"files":[{"path":"weights.bin","url":"https://example.invalid/w","size":4,"sha256":"x"}]}]}"#.utf8)
+            .write(to: root.appendingPathComponent("models.json"))
     }
 
     override func tearDown() async throws { try? FileManager.default.removeItem(at: root) }
 
     private func runner() throws -> JobRunner {
         let py = try XCTUnwrap(Self.python, "no python3 found")
-        let config = HelperConfig(python: py, helperDir: Self.repo.appendingPathComponent("helper"), modelsDir: models)
+        let config = HelperConfig(python: py, helperDir: Self.repo.appendingPathComponent("helper"), modelsDir: models,
+                                  manifest: root.appendingPathComponent("models.json"))
         return JobRunner(config: config, scratchRoot: root.appendingPathComponent("jobs"))
     }
 
@@ -61,7 +64,7 @@ final class JobRunnerTests: XCTestCase {
     func testMissingModelFailsFastAndNamesFile() async throws {
         try FileManager.default.removeItem(at: models.appendingPathComponent("weights.bin"))
         do {
-            _ = try await runner().run("Ping", command: "ping") { _, _ in () }
+            _ = try await runner().run("Align", command: "align_lyrics") { _, _ in () }
             XCTFail("expected an error")
         } catch HelperError.failed(let code, let message) {
             XCTAssertEqual(code, "model_missing")
@@ -101,7 +104,7 @@ final class JobRunnerTests: XCTestCase {
         XCTAssertNil(HelperMessage.parse(Data("noise".utf8)))
     }
 
-    /// The real bundle: offline runtime, models present, torch importable.
+    /// The real bundle: offline runtime, torch importable (the models aren't bundled).
     func testBundledRuntimeRunsOffline() async throws {
         guard let config = HelperConfig.bundled else { throw XCTSkip("app built without build/ml") }
         let r = JobRunner(config: config, scratchRoot: root.appendingPathComponent("jobs"))
