@@ -42,6 +42,14 @@ enum MainMenu {
         editItem.submenu = edit
         main.addItem(editItem)
 
+        let lyricsItem = NSMenuItem()
+        let lyrics = NSMenu(title: "Lyrics")
+        let align = lyrics.addItem(withTitle: "Align Words to Song", action: #selector(MainWindowController.alignLyrics(_:)), keyEquivalent: "l")
+        align.keyEquivalentModifierMask = [.command, .option]
+        lyrics.addItem(withTitle: "Analyze Song Again", action: #selector(MainWindowController.analyzeSongAgain(_:)), keyEquivalent: "")
+        lyricsItem.submenu = lyrics
+        main.addItem(lyricsItem)
+
         let windowItem = NSMenuItem()
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

@@ -72,6 +72,8 @@ final class EditorModel: ObservableObject {
     /// Analyse the song automatically when it is added or replaced (off in unit tests).
     var autoAnalyze = !AppDelegate.isTestHost
     private var analysisWatch: AnyCancellable?
+    /// The running lyric alignment, if any (see LyricAlignment).
+    var alignmentTask: Task<Void, Never>?
 
     init(document: ProjectDocument?) {
         self.document = document

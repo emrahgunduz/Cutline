@@ -18,7 +18,7 @@ struct StatusBarView: View {
                     divider
                     Label("\(proxyCount) proxied", systemImage: "bolt.horizontal").help("Videos playing from preview proxies")
                 }
-                JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis)
+                JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis, cancel: { editor.cancelJobs() })
                 divider
                 Label(saveText, systemImage: editor.document?.isDocumentEdited == true ? "pencil.circle" : "checkmark.circle")
             }
@@ -100,6 +100,7 @@ struct StatusBarView: View {
 private struct JobStatusView: View {
     @ObservedObject var jobs: JobRunner
     @ObservedObject var analysis: AudioAnalysisStore
+    let cancel: () -> Void
 
     var body: some View {
         if let job = jobs.active.first {
@@ -107,8 +108,8 @@ private struct JobStatusView: View {
             HStack(spacing: 6) {
                 ProgressView(value: job.fraction).progressViewStyle(.linear).frame(width: 70).controlSize(.mini)
                 Text("\(job.message ?? job.title) \(Int((job.fraction * 100).rounded()))%").lineLimit(1)
-                Button { analysis.cancel() } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless).help("Cancel the analysis")
+                Button(action: cancel) { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless).help("Cancel")
             }
         } else if case .failed(let message) = analysis.state {
             Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)

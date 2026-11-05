@@ -73,7 +73,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Shadow strength** | How dense the lyric drop shadow is (100% = the color's own opacity). |
 | **Lyric style** | The one font, size, color, position and drop shadow used for all lyrics. |
 | **Proxy** | A smaller copy of a video used only for preview. Export always uses the original. |
-| **Alignment** | Matching each lyric word to when it's sung in the song (coming in PR 2). |
+| **Alignment** | Matching each lyric word to when it's sung, from the TXT and the vocal stem. Runs after you drop the TXT on a lyrics track (when the song is on the timeline), or from Lyrics > Align Words to Song (⌥⌘L). |
 | **Cinemascope / letterbox** | Animated black bars from 16:9 to 2.35:1, music videos only. Toggle in the timeline button bar. |
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
 | **Analysis helper** | The bundled, offline Python process (inside `Cutline.app/Contents/Resources/ml`) that runs the music and lyric models. Built by `scripts/build_python_runtime.sh`. |
@@ -85,3 +85,5 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Beat and section fixes** | Your corrections to downbeats and sections. Saved in the project, separate from the raw analysis; reset from the audio row's right-click menu. |
 | **Snap groups** | The four toggles next to the snapping button: Sections, Downbeats, Beats, and Edges & Playhead. When several targets are in reach, sections win, then downbeats, then beats, then edges. Saved per project. |
 | **Beat anchor** | Cinemascope markers placed on (or near) a beat remember it, so they move when that downbeat is corrected or the song is moved. |
+| **Unsure word** | A lyric word whose timing confidence is below 60% and that you haven't confirmed. Drawn with an orange outline and bar on the timeline. |
+| **Confirmed word** | A word you've checked; alignment asks whether to keep its time. |

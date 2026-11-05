@@ -74,6 +74,8 @@ extension EditorModel {
                 guard p.lyricTracks.indices.contains(track) else { return }
                 p.lyricTracks[track].lines = lines
             }
+            // With a song on the timeline, time the words to it right away (R21).
+            if project.audio != nil, audioAnalysis.state != .unavailable { alignLyrics(track: track, window: window) }
         }
         if project.lyricTracks.indices.contains(track), !project.lyricTracks[track].lines.isEmpty, let window {
             let alert = NSAlert()
