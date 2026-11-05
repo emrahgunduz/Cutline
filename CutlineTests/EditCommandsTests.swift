@@ -366,3 +366,27 @@ final class DefaultClipScaleTests: XCTestCase {
         XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 400, height: 900), kind: .image), 1)
     }
 }
+
+final class PreviewNudgeTests: XCTestCase {
+    func testShiftLocksADragToOneAxis() {
+        XCTAssertEqual(PreviewCanvasView.locked(30, 12, shift: true).0, 30)
+        XCTAssertEqual(PreviewCanvasView.locked(30, 12, shift: true).1, 0)
+        XCTAssertEqual(PreviewCanvasView.locked(-5, 40, shift: true).0, 0)
+        XCTAssertEqual(PreviewCanvasView.locked(-5, 40, shift: true).1, 40)
+        XCTAssertEqual(PreviewCanvasView.locked(30, 12, shift: false).1, 12, "free without ⇧")
+    }
+
+    func testArrowsNudgeOnePixelAndShiftUsesTheStep() {
+        let key = NudgeStep.key
+        let saved = UserDefaults.standard.object(forKey: key)
+        defer { UserDefaults.standard.set(saved, forKey: key) }
+        UserDefaults.standard.removeObject(forKey: key)
+        XCTAssertEqual(PreviewCanvasView.nudgeDelta(keyCode: 124, flags: [])?.0, 1)
+        XCTAssertEqual(PreviewCanvasView.nudgeDelta(keyCode: 126, flags: [])?.1, 1, "up is +y")
+        XCTAssertEqual(PreviewCanvasView.nudgeDelta(keyCode: 123, flags: [.shift])?.0, -10)
+        UserDefaults.standard.set(25.0, forKey: key)
+        XCTAssertEqual(PreviewCanvasView.nudgeDelta(keyCode: 125, flags: [.shift])?.1, -25)
+        XCTAssertNil(PreviewCanvasView.nudgeDelta(keyCode: 124, flags: [.option]))
+        XCTAssertNil(PreviewCanvasView.nudgeDelta(keyCode: 49, flags: []))
+    }
+}

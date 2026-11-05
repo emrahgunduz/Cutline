@@ -257,7 +257,7 @@ final class PreviewCanvasView: NSView {
         case .move:
             guard let clip = d.clip else { return }
             var next = d.original
-            let dx = Double((p.x - d.start.x) / g.scale), dy = Double(-(p.y - d.start.y) / g.scale)
+            let (dx, dy) = Self.locked(Double((p.x - d.start.x) / g.scale), Double(-(p.y - d.start.y) / g.scale), shift: event.modifierFlags.contains(.shift))
             var ox = clip.transform.offsetX + dx, oy = clip.transform.offsetY + dy
             // Snap back to center when close (6 view px).
             if abs(ox) * Double(g.scale) < 6 && !event.modifierFlags.contains(.command) { ox = 0 }
@@ -266,7 +266,7 @@ final class PreviewCanvasView: NSView {
             editor.replaceWithoutUndo(next)
         case .moveLines(let starts):
             var next = d.original
-            let dx = Double((p.x - d.start.x) / g.scale), dy = Double(-(p.y - d.start.y) / g.scale)
+            let (dx, dy) = Self.locked(Double((p.x - d.start.x) / g.scale), Double(-(p.y - d.start.y) / g.scale), shift: event.modifierFlags.contains(.shift))
             for (id, c) in starts {
                 guard let loc = next.lineLocation(id) else { continue }
                 next.lyricTracks[loc.track].lines[loc.index].centerX = (Double(c.x) + dx).rounded()
@@ -335,17 +335,66 @@ final class PreviewCanvasView: NSView {
         controller.pan = CGPoint(x: local.x - unpanned.x, y: local.y - unpanned.y)
     }
 
-    override func keyDown(with event: NSEvent) {
-        guard let clip = editor.selectedClip else { super.keyDown(with: event); return }
-        let step = event.modifierFlags.contains(.shift) ? 10.0 : 1.0
-        var dx = 0.0, dy = 0.0
-        switch event.keyCode {
-        case 123 where event.modifierFlags.contains(.option): dx = -step
-        case 124 where event.modifierFlags.contains(.option): dx = step
-        case 125 where event.modifierFlags.contains(.option): dy = -step
-        case 126 where event.modifierFlags.contains(.option): dy = step
-        default: super.keyDown(with: event); return
+    /// ⇧ while dragging: the move keeps to one axis, whichever the pointer has gone further along.
+    static func locked(_ dx: Double, _ dy: Double, shift: Bool) -> (Double, Double) {
+        guard shift else { return (dx, dy) }
+        return abs(dx) >= abs(dy) ? (dx, 0) : (0, dy)
+    }
+
+    /// Move the selection by canvas pixels (+y up): the selected lyric lines, else the
+    /// selected clip. Automatically placed lines get the position they are drawn at first.
+    /// Returns false when nothing in the preview is selected.
+    @discardableResult
+    func nudge(dx: Double, dy: Double) -> Bool {
+        let lines = editor.selectedLineIDs
+        if !lines.isEmpty, case .lyricLine = editor.selection {
+            let placed = lyricRenderer().placedLines(at: editor.playhead)
+            let drawn = Dictionary(placed.map { ($0.line.id, CGPoint(x: $0.rect.midX, y: $0.rect.midY)) }, uniquingKeysWith: { a, _ in a })
+            editor.edit(lines.count > 1 ? "Nudge Lyrics" : "Nudge Lyric Line") { p in
+                for id in lines {
+                    guard let loc = p.lineLocation(id) else { continue }
+                    let line = p.lyricTracks[loc.track].lines[loc.index]
+                    guard let x = line.centerX ?? drawn[id].map({ Double($0.x) }), let y = line.centerY ?? drawn[id].map({ Double($0.y) }) else { continue }
+                    p.lyricTracks[loc.track].lines[loc.index].centerX = (x + dx).rounded()
+                    p.lyricTracks[loc.track].lines[loc.index].centerY = (y + dy).rounded()
+                }
+            }
+            needsLayout = true
+            return true
         }
+        guard let clip = editor.selectedClip else { return false }
         editor.edit("Nudge Clip") { $0.updateClip(clip.id) { $0.transform.offsetX += dx; $0.transform.offsetY += dy } }
+        needsLayout = true
+        return true
+    }
+
+    /// Arrow keys nudge the selection 1 px; with ⇧ they move by the nudge step (inspector).
+    override func keyDown(with event: NSEvent) {
+        guard let (dx, dy) = Self.nudgeDelta(keyCode: event.keyCode, flags: event.modifierFlags), nudge(dx: dx, dy: dy) else {
+            super.keyDown(with: event); return
+        }
+    }
+
+    static func nudgeDelta(keyCode: UInt16, flags: NSEvent.ModifierFlags) -> (Double, Double)? {
+        let mods = flags.intersection([.command, .option, .control, .shift])
+        guard mods.isEmpty || mods == [.shift] else { return nil }
+        let step = mods == [.shift] ? NudgeStep.value : 1
+        switch keyCode {
+        case 123: return (-step, 0)
+        case 124: return (step, 0)
+        case 125: return (0, -step)
+        case 126: return (0, step)
+        default: return nil
+        }
+    }
+}
+
+/// How far ⇧-arrow moves the selection in the preview, in canvas pixels (app-wide setting).
+enum NudgeStep {
+    static let key = "previewNudgeStep"
+    static let defaultValue = 10.0
+    static var value: Double {
+        let v = UserDefaults.standard.double(forKey: key)
+        return v > 0 ? v : defaultValue
     }
 }
