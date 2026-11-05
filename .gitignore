@@ -4,3 +4,8 @@
 DerivedData/
 Example_Music_Video/
 build/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
