@@ -500,6 +500,7 @@
 			buildPhases = (
 				7D811C6E554D7ECC18C56C24 /* Sources */,
 				5414366B16DCDB70A7F916A2 /* Resources */,
+				2316C4F8A7EB5EF5CDFA9851 /* Stamp version */,
 				22DE2679904CFA970AE84AC9 /* Bundle analysis runtime */,
 			);
 			buildRules = (
@@ -583,6 +584,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# Copies the Python runtime, models (build/ml, made by scripts/build_python_runtime.sh)\n# and the helper source into Contents/Resources/ml.\nSRC=\"$SRCROOT/build/ml\"\nDST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml\"\nif [ ! -x \"$SRC/python/bin/python3\" ] || [ ! -f \"$SRC/models/manifest.json\" ]; then\n  echo \"warning: build/ml is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build.\"\n  rm -rf \"$DST\"\n  exit 0\nfi\nmkdir -p \"$DST/helper\"\nrsync -a --delete \"$SRC/python/\" \"$DST/python/\"\nrsync -a --delete \"$SRC/models/\" \"$DST/models/\"\nrsync -a --delete --exclude __pycache__ \"$SRCROOT/helper/cutline_helper/\" \"$DST/helper/cutline_helper/\"\n";
+		};
+		2316C4F8A7EB5EF5CDFA9851 /* Stamp version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp version";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/scripts/stamp_version.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -754,6 +774,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.emrahgunduz.cutline;
 				SDKROOT = macosx;
+				VERSION_BASE = 1.0;
 			};
 			name = Release;
 		};
@@ -856,6 +877,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.emrahgunduz.cutline;
 				SDKROOT = macosx;
+				VERSION_BASE = 1.0;
 			};
 			name = Debug;
 		};
