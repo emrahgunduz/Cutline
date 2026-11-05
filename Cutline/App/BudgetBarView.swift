@@ -30,7 +30,8 @@ struct BudgetBarView: View {
 
     /// Size against the saved target, or nil when there is no target.
     private var sizeBudget: AnyView? {
-        guard let s = p.exportSettings, let target = s.sizeTargetMB, p.duration > 0 else { return nil }
+        guard let s = p.exportSettings, p.duration > 0 else { return nil }
+        let target = s.sizeTarget
         switch s.rateMode {
         case .size:
             let mbps = s.sizeTargetBitrateMbps(duration: p.duration) ?? 0
@@ -41,6 +42,11 @@ struct BudgetBarView: View {
                 .help("Export size target and the video bitrate it leaves for this length"))
         case .bitrate:
             let mb = s.estimatedBytes(duration: p.duration) / 1_000_000
+            // Only types with a size limit (ads) measure the bitrate against a target.
+            guard Presets.preset(for: p.type).defaultSizeTargetMB != nil else {
+                return AnyView(Label(String(format: "≈ %.1f MB", mb), systemImage: "internaldrive").foregroundStyle(Color.secondary)
+                    .help("Estimated export size at the saved bitrate"))
+            }
             let over = mb > target
             return AnyView(HStack(spacing: 5) {
                 Image(systemName: "internaldrive")

@@ -52,12 +52,15 @@ enum SizeSolver {
     }
 
     /// Run passes until a file fits (`encode` writes one pass and reports its size).
-    static func run(targetBytes: Double, duration: Double, audioKbps: Double,
+    /// - Parameter start: a bitrate that met this same target before; starting there lets a
+    ///   re-export reuse the cached segments of that pass.
+    static func run(targetBytes: Double, duration: Double, audioKbps: Double, start: Double? = nil,
                     encode: (_ bitrate: Double, _ pass: Int) async throws -> Attempt) async throws -> Outcome {
-        var bitrate = videoBitrate(targetBytes: targetBytes, duration: duration, audioKbps: audioKbps)
-        guard bitrate >= minimumVideoBitrate else {
+        let computed = videoBitrate(targetBytes: targetBytes, duration: duration, audioKbps: audioKbps)
+        guard computed >= minimumVideoBitrate else {
             throw Failure.targetTooSmall(minimumMB: minimumTargetBytes(duration: duration, audioKbps: audioKbps) / 1_000_000)
         }
+        var bitrate = start.map { max(minimumVideoBitrate, $0) } ?? computed
         var attempts: [Attempt] = []
         for pass in 0...maxRetries {
             let a = try await encode(bitrate, pass)

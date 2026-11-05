@@ -157,13 +157,22 @@ final class SizeTargetedExportTests: XCTestCase {
         settings.sizeTargetMB = 3
         let out = TestMedia.tempURL("mp4")
         defer { try? FileManager.default.removeItem(at: out) }
+        let cache = FileManager.default.temporaryDirectory.appendingPathComponent("seg-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: cache) }
+        var solved: ExportSettings.SolvedSize?
         let note = try await ExportSheet.exportToSize(project: e.project, settings: settings, targetMB: 3, to: out,
-                                                      exporter: SegmentExporter(cacheDir: FileManager.default.temporaryDirectory.appendingPathComponent("seg-\(UUID())")),
-                                                      model: ExportProgressModel())
+                                                      exporter: SegmentExporter(cacheDir: cache), model: ExportProgressModel()) { solved = $0 }
         let bytes = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: out.path)[.size] as? NSNumber).doubleValue
         XCTAssertLessThanOrEqual(bytes, 3_000_000, note)
         XCTAssertGreaterThan(bytes, 3_000_000 * 0.6, "uses most of the budget: \(note)")
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: out.deletingLastPathComponent().path).filter { $0.contains("-pass") && $0.contains(out.deletingPathExtension().lastPathComponent) }
         XCTAssertEqual(leftovers, [], "pass files are cleaned up")
+
+        // The next export to the same target starts at the bitrate that met it, so every
+        // segment of that pass comes from the cache (even when it took a correction pass).
+        settings.solvedSize = try XCTUnwrap(solved)
+        let again = try await ExportSheet.exportToSize(project: e.project, settings: settings, targetMB: 3, to: out,
+                                                       exporter: SegmentExporter(cacheDir: cache), model: ExportProgressModel())
+        XCTAssertTrue(again.contains("Reused 4 of 4"), again)
     }
 }

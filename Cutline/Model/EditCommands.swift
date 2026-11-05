@@ -70,10 +70,19 @@ extension Project {
               videoTracks.indices.contains(track) else { return nil }
         lockFrameRate(from: asset)
         let duration = asset.kind == .video ? (asset.duration ?? Self.defaultImageDuration) : Self.defaultImageDuration
-        let clip = Clip(assetID: assetID, start: quantize(max(0, time)), duration: quantize(duration))
+        var clip = Clip(assetID: assetID, start: quantize(max(0, time)), duration: quantize(duration))
+        clip.transform.scale = defaultScale(for: asset)
         videoTracks[track].clips.append(clip)
         videoTracks[track].clips.sort { $0.start < $1.start }
         return clip.id
+    }
+
+    /// Video in a horizontal project fills the frame (no black bars; the overflow is cropped).
+    /// Images and portrait projects start fitted, since there the whole picture usually matters.
+    func defaultScale(for asset: Asset) -> Double {
+        guard !type.isPortrait, asset.kind == .video, let px = asset.pixelSize, px.width > 0, px.height > 0 else { return 1 }
+        let sx = Double(canvas.width) / Double(px.width), sy = Double(canvas.height) / Double(px.height)
+        return max(sx, sy) / min(sx, sy)
     }
 
     mutating func moveClip(_ id: UUID, toTrack track: Int, start: Double) {

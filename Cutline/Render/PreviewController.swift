@@ -9,6 +9,8 @@ final class PreviewController: ObservableObject {
     private let editor: EditorModel
     private var cancellables: Set<AnyCancellable> = []
     private var timeObserver: Any?
+    /// Where playback stops by itself: the project's length limit.
+    private var limitStop: Double?
     private var structureKey: Int?
     private var built: BuiltComposition?
     private var rebuildTask: Task<Void, Never>?
@@ -53,6 +55,14 @@ final class PreviewController: ObservableObject {
             guard let self, self.player.rate != 0, !self.loopJumping else { return }
             if let stop = self.editor.transport.stopAt, time.seconds >= stop {
                 self.editor.reachedStopPoint()
+                return
+            }
+            // Social and ad projects stop at their length limit (when playback started before it).
+            if let limit = self.limitStop, time.seconds >= limit {
+                self.limitStop = nil
+                self.editor.isPlaying = false
+                self.editor.setPlayhead(limit)
+                self.seek(to: limit)
                 return
             }
             if let loop = self.editor.transport.loop, time.seconds >= loop.upperBound {
@@ -165,6 +175,8 @@ final class PreviewController: ObservableObject {
             if editor.playhead >= editor.project.duration - editor.project.frameDuration { editor.playhead = 0; seek(to: 0) }
             if let loop = editor.transport.loop, !loop.contains(editor.playhead) { editor.playhead = loop.lowerBound; seek(to: loop.lowerBound) }
             player.defaultRate = editor.transport.rate
+            let limit = editor.project.lengthLimit
+            limitStop = limit.flatMap { editor.playhead < $0 - editor.project.frameDuration / 2 && editor.transport.loop == nil ? $0 : nil }
             player.play()
         } else {
             player.pause()
