@@ -372,7 +372,7 @@ final class TimelineView: NSView {
         let showAnalysis = r.height >= 40
         let wave = showAnalysis ? SectionLane.waveform(in: r) : r
         if showAnalysis {
-            SectionLane.drawLoudness(store.loudness, audioStart: audio.start, in: wave, x: l.x(for:))
+            SectionLane.drawLoudness(store.loudness, audioStart: audio.start, in: wave, visible: x0...x1, x: l.x(for:))
             if let beats = editor.resolvedBeats {
                 SectionLane.drawSections(beats.sections, audioStart: audio.start, duration: audio.duration, in: r, visible: x0...x1, x: l.x(for:))
                 SectionLane.drawTicks(beats: beats.beats, downbeats: beats.downbeats, audioStart: audio.start, in: r,
@@ -408,6 +408,9 @@ final class TimelineView: NSView {
         }
         NSColor.white.withAlphaComponent(0.40).setStroke(); peak.lineWidth = 1; peak.stroke()
         NSColor(calibratedRed: 0.55, green: 1, blue: 0.75, alpha: 0.9).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
+        if showAnalysis {
+            SectionLane.drawLoudnessCurve(store.loudnessEnvelope, audioStart: audio.start, in: wave, visible: x0...x1, time: l.time(for:))
+        }
     }
 
     /// Lyric row layout: the line's name bar on top, then one row per word (word 1 on the
