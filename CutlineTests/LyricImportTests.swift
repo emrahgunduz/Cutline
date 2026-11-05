@@ -49,7 +49,7 @@ final class LyricImportTests: XCTestCase {
     func testAlignmentTimesWordsFromTheAudioStartOnTheFrameGrid() {
         var p = placed()
         p.applyAlignment(result([[(18.88, 19.32, 0.74), (19.34, 20.91, 0.78)], [(23.54, 24.28, 0.2), (24.30, 26.47, 0.9)]]),
-                         track: 0, audioStart: 2, keepConfirmed: true)
+                         track: 0, audioStart: 2, keepEdits: true)
         let l = p.lyricTracks[0].lines
         XCTAssertEqual(l[0].words[0].start, p.quantize(20.88))
         XCTAssertEqual(l[0].start, l[0].words[0].start)
@@ -66,16 +66,16 @@ final class LyricImportTests: XCTestCase {
         let before = p.lyricTracks[0].lines[0].words[0]
         let r = result([[(5, 5.5, 0.9), (6, 7, 0.9)], [(8, 9, 0.9), (9, 10, 0.9)]])
         var keep = p
-        keep.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: true)
+        keep.applyAlignment(r, track: 0, audioStart: 0, keepEdits: true)
         XCTAssertEqual(keep.lyricTracks[0].lines[0].words[0].start, before.start)
         XCTAssertTrue(keep.lyricTracks[0].lines[0].words[0].confirmed)
-        p.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(r, track: 0, audioStart: 0, keepEdits: false)
         XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 5)
     }
 
     func testAlignedWordsNeverOverlapAfterQuantizing() {
         var p = placed()
-        p.applyAlignment(result([[(1.0, 1.03, 0.9), (1.01, 1.2, 0.9)], [(3, 3.01, 0.9), (3.01, 3.02, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(result([[(1.0, 1.03, 0.9), (1.01, 1.2, 0.9)], [(3, 3.01, 0.9), (3.01, 3.02, 0.9)]]), track: 0, audioStart: 0, keepEdits: false)
         for line in p.lyricTracks[0].lines {
             for (a, b) in zip(line.words, line.words.dropFirst()) { XCTAssertLessThan(a.start, b.start) }
             for w in line.words {
@@ -114,7 +114,7 @@ final class LyricImportTests: XCTestCase {
     func testLeadInShowsAlignedWordsEarlier() {
         var p = placed()
         p.lyricStyle.leadIn = 0.25
-        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepEdits: false)
         let w = p.lyricTracks[0].lines[0].words[0]
         XCTAssertEqual(w.start, p.quantize(9.75))
         XCTAssertEqual(w.end, p.lyricTracks[0].lines[0].end)
@@ -125,7 +125,7 @@ final class LyricImportTests: XCTestCase {
 
     func testChangingLeadInMovesOnlyAlignedUnconfirmedWords() {
         var p = placed()
-        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepEdits: false)
         p.lyricTracks[0].lines[1].words[0].confirmed = true
         let handPlaced = p.lyricTracks[0].lines[0].words[1].id
         p.retimeWord(handPlaced, start: 11.5, confirm: false)
@@ -144,7 +144,7 @@ final class LyricImportTests: XCTestCase {
 
     func testAlignedTimesFollowLineAndAudioMoves() {
         var p = placed()
-        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepConfirmed: false)
+        p.applyAlignment(result([[(10, 10.5, 0.9), (11, 12, 0.9)], [(20, 21, 0.9), (21, 22, 0.9)]]), track: 0, audioStart: 0, keepEdits: false)
         let line = p.lyricTracks[0].lines[0]
         p.moveLine(line.id, toTrack: 0, start: line.start + 1)
         XCTAssertEqual(p.lyricTracks[0].lines.first { $0.id == line.id }!.words[0].alignedStart, 11)

@@ -229,6 +229,12 @@ struct LyricWord: Codable, Equatable, Identifiable {
     /// edited by hand; then the lead-in no longer moves it.
     var alignedStart: Double?
     var alignedEnd: Double?
+    /// Set when you moved or re-timed the word on the timeline (a word, line or group drag).
+    /// Re-aligning asks before clearing it. nil = not edited.
+    var handEdited: Bool?
+    var isHandEdited: Bool { handEdited == true }
+    /// Confirmed or hand-edited: your timing, which re-aligning asks before replacing.
+    var isUserTimed: Bool { confirmed || isHandEdited }
 }
 
 struct RGBA: Codable, Equatable {

@@ -15,15 +15,16 @@ enum LyricAlignment {
 
 extension Project {
     /// Put aligned times (audio-file seconds) onto the lines of `track`, in time order.
-    mutating func applyAlignment(_ r: LyricAlignment.Result, track: Int, audioStart: Double, keepConfirmed: Bool) {
+    mutating func applyAlignment(_ r: LyricAlignment.Result, track: Int, audioStart: Double, keepEdits: Bool) {
         guard lyricTracks.indices.contains(track) else { return }
         let ids = lyricTracks[track].lines.sorted { $0.start < $1.start }.map(\.id)
-        applyAlignment(r, lineIDs: ids, audioStart: audioStart, keepConfirmed: keepConfirmed)
+        applyAlignment(r, lineIDs: ids, audioStart: audioStart, keepEdits: keepEdits)
     }
 
     /// Put aligned times onto the given lines (result line k goes to `lineIDs[k]`).
-    /// With `keepConfirmed`, words the user confirmed keep their times.
-    mutating func applyAlignment(_ r: LyricAlignment.Result, lineIDs: [UUID], audioStart: Double, keepConfirmed: Bool) {
+    /// With `keepEdits`, words you confirmed or moved by hand keep their times (and their flags);
+    /// every word alignment re-times loses both.
+    mutating func applyAlignment(_ r: LyricAlignment.Result, lineIDs: [UUID], audioStart: Double, keepEdits: Bool) {
         let f = frameDuration
         let lead = lyricStyle.leadIn
         for (li, aligned) in r.lines.enumerated() where lineIDs.indices.contains(li) {
@@ -31,12 +32,13 @@ extension Project {
             var line = lyricTracks[loc.track].lines[loc.index]
             guard line.words.count == aligned.count else { continue }
             for (wi, a) in aligned.enumerated() {
-                if keepConfirmed && line.words[wi].confirmed { continue }
+                if keepEdits && line.words[wi].isUserTimed { continue }
                 let s = quantize(max(0, audioStart + a.start - lead))
                 line.words[wi].start = s
                 line.words[wi].end = max(s + f, quantize(audioStart + a.end - lead))
                 line.words[wi].confidence = a.confidence
                 line.words[wi].confirmed = false   // re-timed by alignment, no longer the user's time
+                line.words[wi].handEdited = nil
                 line.words[wi].alignedStart = audioStart + a.start
                 line.words[wi].alignedEnd = audioStart + a.end
             }
@@ -49,7 +51,7 @@ extension Project {
             // can be changed afterwards.
             if let lineEnd = aligned.map(\.end).max() {
                 let e = max(quantize(audioStart + lineEnd - lead + lyricStyle.leadOut), (line.words.map(\.start).max() ?? 0) + f)
-                for wi in line.words.indices where !(keepConfirmed && line.words[wi].confirmed) {
+                for wi in line.words.indices where !(keepEdits && line.words[wi].isUserTimed) {
                     line.words[wi].end = max(e, line.words[wi].start + f)
                     line.words[wi].alignedEnd = audioStart + lineEnd
                 }
@@ -112,22 +114,36 @@ extension EditorModel {
     func alignLyrics(window: NSWindow?) {
         let words = project.lyricTracks.flatMap(\.lines).flatMap(\.words)
         guard !words.isEmpty else { return }
-        let confirmed = words.filter(\.confirmed).count
-        guard confirmed > 0, let window else { startAlignment(keepConfirmed: true, window: window); return }
+        let changes = Self.userTimingSummary(words)
+        guard let changes, let window else { startAlignment(keepEdits: true, window: window); return }
         let alert = NSAlert()
-        alert.messageText = "Keep the \(confirmed) confirmed word\(confirmed == 1 ? "" : "s")?"
-        alert.informativeText = "Alignment re-times every word. Confirmed words can keep the times you set; the words around them are fitted between them."
-        alert.addButton(withTitle: "Keep Confirmed")
+        alert.messageText = "Keep your lyric changes?"
+        alert.informativeText = changes + "\n\nKeep My Changes keeps those times and fits the other words between them. Re-time All clears them and times every word to the song again."
+        alert.addButton(withTitle: "Keep My Changes")
         alert.addButton(withTitle: "Re-time All")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { [weak self] r in
             guard r != .alertThirdButtonReturn else { return }
-            self?.startAlignment(keepConfirmed: r == .alertFirstButtonReturn, window: window)
+            self?.startAlignment(keepEdits: r == .alertFirstButtonReturn, window: window)
         }
     }
 
+    /// What re-aligning would replace, or nil when every word still has its aligned time:
+    /// words confirmed (next unsure word, tap mode, Return) and words moved or re-timed by hand
+    /// (word, line and group drags).
+    nonisolated static func userTimingSummary(_ words: [LyricWord]) -> String? {
+        let confirmed = words.filter(\.confirmed).count
+        let edited = words.filter { $0.isHandEdited && !$0.confirmed }.count
+        guard confirmed + edited > 0 else { return nil }
+        func n(_ k: Int) -> String { k == 1 ? "1 word" : "\(k) words" }
+        var parts: [String] = []
+        if confirmed > 0 { parts.append("\(n(confirmed)) confirmed (next unsure word, tap mode or a word drag)") }
+        if edited > 0 { parts.append("\(n(edited)) moved or re-timed by hand (line and group drags)") }
+        return "Re-aligning re-times every lyric word. You have " + parts.joined(separator: " and ") + "."
+    }
+
     @MainActor
-    private func startAlignment(keepConfirmed: Bool, window: NSWindow?) {
+    private func startAlignment(keepEdits: Bool, window: NSWindow?) {
         alignmentTask?.cancel()
         alignmentTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -154,9 +170,9 @@ extension EditorModel {
                 guard let audioNow = self.project.audio, audioNow.assetID == songAtStart.asset, audioNow.start == songAtStart.start,
                       self.audioAnalysis.analysis?.audioHash == songAtStart.hash else { throw AlignmentError.songChanged }
                 self.edit("Align Lyrics") { p in
-                    p.applyAlignment(result, lineIDs: ids, audioStart: audio.start, keepConfirmed: keepConfirmed)
+                    p.applyAlignment(result, lineIDs: ids, audioStart: audio.start, keepEdits: keepEdits)
                     // Newly aligned words never overlap the confirmed words that were kept.
-                    if keepConfirmed { p.resolveLyricOverlaps() }
+                    if keepEdits { p.resolveLyricOverlaps() }
                 }
             } catch is CancellationError {
             } catch {

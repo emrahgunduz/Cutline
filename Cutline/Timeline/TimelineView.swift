@@ -928,13 +928,19 @@ final class TimelineView: NSView {
             editor.replaceWithoutUndo(original)
             editor.edit(actionName(for: hit)) { $0 = final }
         case .group(let original, _, _) where d.didEdit:
-            let final = editor.project
+            var final = editor.project
+            final.markHandEditedWords(comparedTo: original)
             editor.replaceWithoutUndo(original)
             editor.edit("Move Items") { $0 = final }
         case .edit(let hit, let original) where d.didEdit:
             // Only the dragged item changes: an edited word is confirmed, but the words around
             // it keep their times (tap mode is what re-times the words between taps).
-            let final = editor.project
+            var final = editor.project
+            // Moved or re-timed lyrics are your timing now: re-aligning asks before replacing it.
+            switch hit {
+            case .line, .word: final.markHandEditedWords(comparedTo: original)
+            default: break
+            }
             editor.replaceWithoutUndo(original)
             editor.edit(actionName(for: hit)) { $0 = final }
         default: break

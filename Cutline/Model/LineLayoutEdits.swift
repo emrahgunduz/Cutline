@@ -89,3 +89,20 @@ extension EditorModel {
         }
     }
 }
+
+extension Project {
+    /// After a timeline drag: words whose start or end changed are marked hand-edited, so
+    /// re-aligning asks before replacing them.
+    mutating func markHandEditedWords(comparedTo before: Project) {
+        let old = Dictionary(before.lyricTracks.flatMap(\.lines).flatMap(\.words).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for t in lyricTracks.indices {
+            for l in lyricTracks[t].lines.indices {
+                for w in lyricTracks[t].lines[l].words.indices {
+                    let word = lyricTracks[t].lines[l].words[w]
+                    guard let o = old[word.id], o.start != word.start || o.end != word.end else { continue }
+                    lyricTracks[t].lines[l].words[w].handEdited = true
+                }
+            }
+        }
+    }
+}
