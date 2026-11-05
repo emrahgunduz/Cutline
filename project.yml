@@ -64,7 +64,15 @@ targets:
         ENABLE_APP_SANDBOX: NO
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+    dependencies:
+      - target: cutline-ctl
+        embed: false
     postBuildScripts:
+      - name: Bundle cutline-ctl
+        basedOnDependencyAnalysis: false
+        script: |
+          # The control channel's client, next to the app's executable (Contents/MacOS).
+          cp "$BUILT_PRODUCTS_DIR/cutline-ctl" "$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/cutline-ctl"
       - name: Stamp version
         basedOnDependencyAnalysis: false
         # Depends on the processed Info.plist, so it always runs after Xcode writes it
@@ -89,6 +97,17 @@ targets:
           rsync -a --delete "$SRC/python/" "$DST/python/"
           rsync -a --delete "$SRC/models/" "$DST/models/"
           rsync -a --delete --exclude __pycache__ "$SRCROOT/helper/cutline_helper/" "$DST/helper/cutline_helper/"
+  cutline-ctl:
+    # The control channel's command-line client (Claude runs it), shipped inside the app.
+    type: tool
+    platform: macOS
+    sources:
+      - Tools/cutline-ctl
+      - Cutline/Control/ControlProtocol.swift
+    settings:
+      base:
+        PRODUCT_NAME: cutline-ctl
+        SKIP_INSTALL: YES
   CutlineTests:
     type: bundle.unit-test
     platform: macOS

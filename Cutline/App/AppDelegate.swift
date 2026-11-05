@@ -25,7 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = MainMenu.build()
     }
 
+    private var controlServer: ControlServer?
+
     func applicationWillTerminate(_ notification: Notification) {
+        controlServer?.stop()
         HelperProcess.terminateAll()
     }
 
@@ -34,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Window restoration and Finder opens finish just after launch; only offer a new
         // project if nothing was opened by then.
         guard !Self.isTestHost else { return }
+        // The control channel (Claude and other local programs, with the user's approval).
+        let server = ControlServer { request in await ControlService.shared.handle(request) }
+        do { try server.start(); controlServer = server } catch { NSLog("Cutline control channel unavailable: \(error)") }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             if NSDocumentController.shared.documents.isEmpty { NSDocumentController.shared.newDocument(nil) }
         }

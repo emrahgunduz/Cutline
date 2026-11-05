@@ -29,6 +29,8 @@ final class ProjectDocument: NSDocument {
     static let cacheFolders = ["analysis", "thumbnails", "proxies", "cache"]
 
     private(set) lazy var editor = EditorModel(document: self)
+    /// How the control channel names this open project (stable while it is open).
+    let controlID = String(UUID().uuidString.prefix(8)).lowercased()
     var layout = LayoutState()
 
     /// Where cache folders live before the first save.

@@ -26,6 +26,7 @@ struct StatusBarView: View {
                 JobStatusView(jobs: editor.jobs, analysis: editor.audioAnalysis, cancel: { editor.cancelJobs() })
                 divider
                 Label(saveText, systemImage: editor.document?.isDocumentEdited == true ? "pencil.circle" : "checkmark.circle")
+                ControlStatusView(service: ControlService.shared)
                 divider
                 CacheStatusView(editor: editor)
             }
@@ -90,6 +91,26 @@ struct StatusBarView: View {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
         return "Saved \(f.localizedString(for: date, relativeTo: Date()))"
+    }
+}
+
+/// Programs connected through the control channel (Claude…), with a Disconnect button.
+private struct ControlStatusView: View {
+    @ObservedObject var service: ControlService
+
+    var body: some View {
+        let sessions = service.sessions.values.sorted { $0.lastUsed > $1.lastUsed }
+        if let first = sessions.first {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            HStack(spacing: 6) {
+                Image(systemName: "link.circle.fill").foregroundStyle(.green)
+                Text(sessions.count == 1 ? "\(first.client) connected" : "\(sessions.count) connected")
+                    .help(sessions.map { $0.client + ($0.purpose.isEmpty ? "" : ": " + $0.purpose) }.joined(separator: "\n"))
+                Button("Disconnect") { service.disconnectAll() }
+                    .buttonStyle(.borderless).foregroundStyle(.orange)
+                    .help("End the connection: it has to ask again")
+            }
+        }
     }
 }
 
