@@ -118,7 +118,7 @@ final class LyricRenderer {
     /// Lines on screen at t, in track order (track 1 first, drawn on top of the stack).
     func drawnLines(at t: Double) -> [LyricLine] {
         let a = animation
-        return project.lyricTracks.flatMap { track in
+        return project.lyricTracks.filter { !$0.isHidden }.flatMap { track in
             track.lines.filter { LyricLayout.isDrawn($0, at: t, animation: a) }
         }
     }

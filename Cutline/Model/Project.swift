@@ -118,12 +118,18 @@ struct AudioClip: Codable, Equatable {
     var assetID: UUID
     var start: Double = 0
     var duration: Double
+    /// Muted: the song is silent in the preview and the export (nil = audible).
+    var muted: Bool?
+    var isMuted: Bool { muted == true }
     var end: Double { start + duration }
 }
 
 struct VideoTrack: Codable, Equatable, Identifiable {
     var id = UUID()
     var clips: [Clip] = []
+    /// Hidden tracks aren't drawn in the preview or the export (nil = shown).
+    var hidden: Bool?
+    var isHidden: Bool { hidden == true }
 }
 
 struct Clip: Codable, Equatable, Identifiable {
@@ -172,6 +178,10 @@ struct FadeFilter: Codable, Equatable {
 struct LyricTrack: Codable, Equatable, Identifiable {
     var id = UUID()
     var lines: [LyricLine] = []
+    /// Hidden tracks aren't drawn in the preview or the export (nil = shown). Their lines are
+    /// still aligned with the others.
+    var hidden: Bool?
+    var isHidden: Bool { hidden == true }
 }
 
 struct LyricLine: Codable, Equatable, Identifiable {
