@@ -215,7 +215,7 @@ final class TimelineView: NSView {
 
     private func title(_ row: TimelineRow) -> String {
         switch row {
-        case .video(let t): "Video \(t + 1)"
+        case .video(let t): project.videoTracks.indices.contains(t) ? (project.videoTracks[t].name ?? "Video \(t + 1)") : "Video \(t + 1)"
         case .audio: "Audio"
         case .lyric(let t): "Lyrics \(t + 1)"
         case .ruler: ""

@@ -132,6 +132,8 @@ struct AudioClip: Codable, Equatable {
 struct VideoTrack: Codable, Equatable, Identifiable {
     var id = UUID()
     var clips: [Clip] = []
+    /// Shown in the track header instead of "Video n" (e.g. "Dummies").
+    var name: String?
     /// Hidden tracks aren't drawn in the preview or the export (nil = shown).
     var hidden: Bool?
     var isHidden: Bool { hidden == true }
