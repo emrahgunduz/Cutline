@@ -36,8 +36,9 @@ targets:
       properties:
         CFBundleName: Cutline
         CFBundleDisplayName: Cutline
-        CFBundleShortVersionString: "0.1"
-        CFBundleVersion: "1"
+        # The build stamps 1.0.<build number> into the built app (scripts/stamp_version.sh).
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "0"
         NSPrincipalClass: NSApplication
         LSMinimumSystemVersion: "15.0"
         CFBundleDocumentTypes:
@@ -58,11 +59,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.emrahgunduz.cutline
+        VERSION_BASE: "1.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: NO
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_USER_SCRIPT_SANDBOXING: NO
     postBuildScripts:
+      - name: Stamp version
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/scripts/stamp_version.sh"
       - name: Bundle analysis runtime
         basedOnDependencyAnalysis: false
         script: |
