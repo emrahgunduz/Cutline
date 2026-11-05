@@ -1,4 +1,5 @@
 import AVFoundation
+import VideoToolbox
 
 /// Export choices, saved with the project so the next export and the budget bar reuse them.
 struct ExportSettings: Equatable, Codable {
