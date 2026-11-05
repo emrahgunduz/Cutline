@@ -14,13 +14,15 @@ final class JobRunner: ObservableObject {
     }
 
     @Published private(set) var active: [Job] = []
-    let config: HelperConfig?
+    /// Read when each job starts, so it uses the models folder chosen at that moment.
+    private let configProvider: @Sendable () -> HelperConfig?
+    var config: HelperConfig? { configProvider() }
     /// Parent of the per-job scratch folders.
     let scratchRoot: URL
 
-    nonisolated init(config: HelperConfig? = .bundled,
+    nonisolated init(config: @autoclosure @escaping @Sendable () -> HelperConfig? = HelperConfig.bundled,
          scratchRoot: URL = FileManager.default.temporaryDirectory.appendingPathComponent("cutline-jobs", isDirectory: true)) {
-        self.config = config
+        configProvider = config
         self.scratchRoot = scratchRoot
     }
 

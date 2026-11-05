@@ -30,7 +30,11 @@ targets:
   Cutline:
     type: application
     platform: macOS
-    sources: [Cutline]
+    sources:
+      - Cutline
+      # The pinned model list, shared with the helper (one source of truth).
+      - path: helper/cutline_helper/models.json
+        buildPhase: resources
     info:
       path: Cutline/Info.plist
       properties:
@@ -84,18 +88,19 @@ targets:
       - name: Bundle analysis runtime
         basedOnDependencyAnalysis: false
         script: |
-          # Copies the Python runtime, models (build/ml, made by scripts/build_python_runtime.sh)
-          # and the helper source into Contents/Resources/ml.
+          # Copies the Python runtime (build/ml/python, made by scripts/build_python_runtime.sh)
+          # and the helper source into Contents/Resources/ml. The models are not bundled: the app
+          # downloads them into a folder the user picks (ModelStore).
           SRC="$SRCROOT/build/ml"
           DST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml"
-          if [ ! -x "$SRC/python/bin/python3" ] || [ ! -f "$SRC/models/manifest.json" ]; then
-            echo "warning: build/ml is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build."
+          rm -rf "$DST/models"
+          if [ ! -x "$SRC/python/bin/python3" ]; then
+            echo "warning: build/ml/python is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build."
             rm -rf "$DST"
             exit 0
           fi
           mkdir -p "$DST/helper"
           rsync -a --delete "$SRC/python/" "$DST/python/"
-          rsync -a --delete "$SRC/models/" "$DST/models/"
           rsync -a --delete --exclude __pycache__ "$SRCROOT/helper/cutline_helper/" "$DST/helper/cutline_helper/"
   cutline-ctl:
     # The control channel's command-line client (Claude runs it), shipped inside the app.

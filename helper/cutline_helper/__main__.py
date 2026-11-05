@@ -1,26 +1,47 @@
-"""Entry point: `python -m cutline_helper` reads one request and runs it."""
+"""Entry point.
+
+`python -m cutline_helper` reads one request and runs it.
+`python -m cutline_helper --check-models DIR` prints the models folder's status as one JSON line.
+"""
+import json
 import os
 import sys
 import tempfile
 import traceback
 
+# Jobs that load models; the others (ping, probes) run without them.
+NEEDS_MODELS = {"analyze_audio", "align_lyrics"}
+
+
+def check_models(models_dir: str) -> int:
+    from .models import status
+    print(json.dumps({"type": "models_status", **status(models_dir)}), flush=True)
+    return 0
+
 
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--check-models":
+        return check_models(sys.argv[2])
+
     from .protocol import Channel, HelperError, parse_request
     ch = Channel.take_stdout()
 
     from . import offline
     offline.block_network()
-    from .models import default_models_dir, missing_files
-    models_dir = os.environ.get("CUTLINE_MODELS") or default_models_dir()
-    offline.configure_environment(models_dir)
+    models_dir = os.environ.get("CUTLINE_MODELS", "")
+    if models_dir:
+        offline.configure_environment(models_dir)
 
     try:
         req = parse_request(sys.stdin.readline())
-        missing = missing_files(models_dir)
-        if missing:
-            shown = ", ".join(missing[:5]) + (f" and {len(missing) - 5} more" if len(missing) > 5 else "")
-            raise HelperError("model_missing", f"missing model files in {models_dir}: {shown}")
+        if req["command"] in NEEDS_MODELS:
+            from .models import missing_files
+            missing = missing_files(models_dir) if models_dir else ["(no models folder)"]
+            if missing:
+                shown = ", ".join(missing[:3]) + (f" and {len(missing) - 3} more" if len(missing) > 3 else "")
+                raise HelperError("model_missing",
+                                  f"The analysis models are missing or incomplete in {models_dir or 'no folder'} ({shown}). "
+                                  "Download them in Settings > Models or on the New Project screen.")
         output_dir = req["output_dir"] or tempfile.mkdtemp(prefix="cutline-job-")
         os.makedirs(output_dir, exist_ok=True)
         from .commands import run

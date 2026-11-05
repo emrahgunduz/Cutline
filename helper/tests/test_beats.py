@@ -3,7 +3,6 @@ import os
 import numpy as np
 import pytest
 
-from cutline_helper.models import default_models_dir
 
 MODELS = os.environ.get("CUTLINE_MODELS") or os.path.join(os.path.dirname(__file__), "..", "..", "build", "ml", "models")
 needs_models = pytest.mark.skipif(not os.path.exists(os.path.join(MODELS, "torch")), reason="models not built")

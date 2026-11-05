@@ -39,7 +39,8 @@ final class AlignmentJobTests: XCTestCase {
         e.audioAnalysis.adopt(AudioAnalysis(hash: "h", result: .init(duration: 60, tempo: 0, beats: [], downbeats: [], onsets: [], sections: [], vocals: "")))
         try Data("stem".utf8).write(to: XCTUnwrap(e.audioAnalysis.vocalsURL("h")))
         let python = try XCTUnwrap(JobRunnerTests.python)
-        e.jobs = JobRunner(config: HelperConfig(python: python, helperDir: dir.appendingPathComponent("helper"), modelsDir: dir),
+        let config = HelperConfig(python: python, helperDir: dir.appendingPathComponent("helper"), modelsDir: dir)
+        e.jobs = JobRunner(config: config,
                            scratchRoot: dir.appendingPathComponent("jobs"))
         return doc
     }
