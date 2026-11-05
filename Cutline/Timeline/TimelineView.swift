@@ -372,7 +372,6 @@ final class TimelineView: NSView {
         let showAnalysis = r.height >= 40
         let wave = showAnalysis ? SectionLane.waveform(in: r) : r
         if showAnalysis {
-            SectionLane.drawLoudness(store.loudness, audioStart: audio.start, in: wave, visible: x0...x1, x: l.x(for:))
             if let beats = editor.resolvedBeats {
                 SectionLane.drawSections(beats.sections, audioStart: audio.start, duration: audio.duration, in: r, visible: x0...x1, x: l.x(for:))
                 SectionLane.drawTicks(beats: beats.beats, downbeats: beats.downbeats, audioStart: audio.start, in: r,
@@ -393,9 +392,10 @@ final class TimelineView: NSView {
               let level = wf.level(secondsPerPixel: 1 / Double(l.pixelsPerSecond)) else { return }
         let secondsPerBucket = Double(level.samplesPerBucket) / wf.sampleRate
         let peak = NSBezierPath(), rmsPath = NSBezierPath()
-        // The loudness curve's loudest moment fills the row (small margin); the waveform and the
-        // levels use the same gain, so all of them line up.
-        let gain = store.loudnessEnvelope?.displayGain() ?? wf.displayGain
+        // The waveform is scaled so its highest peak just fits the row; the loudness curve and
+        // its levels have their own scale, so the curve's loudest moment fills the row.
+        let waveGain = wf.peakFitGain
+        let lineGain = store.loudnessEnvelope?.displayGain() ?? wf.displayGain
         var x = x0
         while x < x1 {
             let t0 = l.time(for: x) - audio.start, t1 = l.time(for: x + 1) - audio.start
@@ -404,9 +404,9 @@ final class TimelineView: NSView {
                 var mx: Float = 0, mn: Float = 0, rm: Float = 0
                 for b in b0..<b1 { mx = max(mx, level.maxs[b]); mn = min(mn, level.mins[b]); rm = max(rm, level.rms[b]) }
                 // Same scale as the loudness curve and its levels (SectionLane.amplitudeY).
-                let hiY = SectionLane.amplitudeY(mx, gain: gain, in: wave).top, loY = SectionLane.amplitudeY(-mn, gain: gain, in: wave).bottom
+                let hiY = SectionLane.amplitudeY(mx, gain: waveGain, in: wave).top, loY = SectionLane.amplitudeY(-mn, gain: waveGain, in: wave).bottom
                 peak.move(to: CGPoint(x: x, y: hiY)); peak.line(to: CGPoint(x: x, y: loY))
-                let r = SectionLane.amplitudeY(rm, gain: gain, in: wave)
+                let r = SectionLane.amplitudeY(rm, gain: waveGain, in: wave)
                 rmsPath.move(to: CGPoint(x: x, y: r.top)); rmsPath.line(to: CGPoint(x: x, y: r.bottom))
             }
             x += 1
@@ -414,7 +414,9 @@ final class TimelineView: NSView {
         NSColor.white.withAlphaComponent(0.40).setStroke(); peak.lineWidth = 1; peak.stroke()
         NSColor(calibratedRed: 0.55, green: 1, blue: 0.75, alpha: 0.9).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
         if showAnalysis {
-            SectionLane.drawLoudnessCurve(store.loudnessEnvelope, gain: gain, audioStart: audio.start, in: wave, visible: x0...x1, time: l.time(for:))
+            // Loud/quiet stretches over the waveform, then the curve and its levels on top.
+            SectionLane.drawLoudness(store.loudness, audioStart: audio.start, in: wave, visible: x0...x1, x: l.x(for:))
+            SectionLane.drawLoudnessCurve(store.loudnessEnvelope, gain: lineGain, audioStart: audio.start, in: wave, visible: x0...x1, time: l.time(for:))
         }
     }
 

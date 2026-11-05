@@ -30,6 +30,13 @@ struct Waveform: Codable, Equatable {
         return r > 0 ? min(0.9 / r, 20) : 1
     }
 
+    /// Display gain at which the song's highest peak just fits the row (nothing is drawn
+    /// outside it). Capped so near-silence isn't blown up into noise.
+    var peakFitGain: Float {
+        let p = peakAmplitude
+        return p > 0 ? min(1 / p, 20) : 1
+    }
+
     /// The coarsest level that still gives at least one bucket per `secondsPerPixel`.
     func level(secondsPerPixel: Double) -> WaveformLevel? {
         let samplesPerPixel = secondsPerPixel * sampleRate
