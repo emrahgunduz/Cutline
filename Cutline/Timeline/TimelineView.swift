@@ -23,7 +23,7 @@ final class TimelineView: NSView {
     private enum Edge { case left, right, body }
     private enum Hit {
         case clip(UUID, Edge), line(UUID, Edge), word(UUID, Edge), audio
-        case ruler, empty(TimelineRow)
+        case ruler, empty(TimelineRow), marker(isStart: Bool)
         case headerButton(TimelineRow, HeaderButton), headerResize(TimelineRow), headerBody(TimelineRow)
     }
     enum HeaderButton { case add, remove }
@@ -35,6 +35,7 @@ final class TimelineView: NSView {
         case resize(TimelineRow, startHeight: CGFloat)
         case reorder(TimelineRow)
         case marquee
+        case marker(isStart: Bool, original: Project)
         case group(original: Project, clips: [UUID], lines: [UUID])
     }
     private struct Drag { var kind: DragKind; var startPoint: CGPoint; var didEdit = false }
@@ -437,10 +438,36 @@ final class TimelineView: NSView {
             }
             t += step
         }
+        drawCinemascopeMarkers(l, ruler: r)
         NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
         CGRect(x: 0, y: 0, width: TimelineLayout.headerWidth, height: r.height - 1).fill()
         (Timecode.string(editor.playhead, fps: project.fps) as NSString).draw(at: CGPoint(x: 10, y: 6),
             withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.systemRed])
+    }
+
+    static let cinemaColor = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.22, alpha: 1)
+
+    /// Cinemascope transition: a band on the ruler between the markers, a solid strip after
+    /// the end marker (full 2.35:1), and a draggable flag on each marker.
+    private func drawCinemascopeMarkers(_ l: TimelineLayout, ruler r: CGRect) {
+        let c = project.cinemascope
+        guard project.type == .musicVideo, c.enabled else { return }
+        let xs = l.x(for: c.startMarker), xe = l.x(for: c.endMarker)
+        let band = CGRect(x: xs, y: r.maxY - 6, width: max(0, xe - xs), height: 5)
+        NSGradient(starting: Self.cinemaColor.withAlphaComponent(0.15), ending: Self.cinemaColor.withAlphaComponent(0.8))?.draw(in: band, angle: 0)
+        Self.cinemaColor.withAlphaComponent(0.8).setFill()
+        CGRect(x: xe, y: r.maxY - 6, width: max(0, bounds.width - xe), height: 5).fill()
+        for (x, label) in [(xs, "▸ 2.35"), (xe, "2.35 ◂")] {
+            Self.cinemaColor.setFill()
+            CGRect(x: x - 1, y: 0, width: 2, height: r.height).fill()
+            let flag = NSBezierPath()
+            flag.move(to: CGPoint(x: x - 6, y: 0)); flag.line(to: CGPoint(x: x + 6, y: 0)); flag.line(to: CGPoint(x: x, y: 8)); flag.close()
+            flag.fill()
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: Self.cinemaColor]
+            let str = label as NSString
+            let w = str.size(withAttributes: attrs).width
+            str.draw(at: CGPoint(x: x == xs ? x + 4 : x - w - 4, y: 12), withAttributes: attrs)
+        }
     }
 
     private func drawPlayhead(_ l: TimelineLayout) {
@@ -458,7 +485,14 @@ final class TimelineView: NSView {
     private func hit(at p: CGPoint) -> Hit {
         let l = layout
         guard let row = l.row(atY: p.y) else { return .empty(.ruler) }
-        if row == .ruler { return .ruler }
+        if row == .ruler {
+            let c = project.cinemascope
+            if project.type == .musicVideo && c.enabled {
+                if abs(l.x(for: c.startMarker) - p.x) <= 7 { return .marker(isStart: true) }
+                if abs(l.x(for: c.endMarker) - p.x) <= 7 { return .marker(isStart: false) }
+            }
+            return .ruler
+        }
         if p.x < TimelineLayout.headerWidth {
             guard let f = l.frame(of: row) else { return .headerBody(row) }
             let b = headerButtonRects(f)
@@ -524,6 +558,7 @@ final class TimelineView: NSView {
         case .clip(_, .body), .line(_, .body), .word(_, .body), .audio:
             NSCursor.openHand.set()
         case .headerResize: NSCursor.resizeUpDown.set()
+        case .marker: NSCursor.resizeLeftRight.set()
         case .headerButton: NSCursor.pointingHand.set()
         case .headerBody(let r) where r != .audio: NSCursor.openHand.set()
         default: NSCursor.arrow.set()
@@ -564,6 +599,8 @@ final class TimelineView: NSView {
         case .line(let id, _): editor.selection = .lyricLine(id)
         case .word(let id, _): editor.selection = .lyricWord(id)
         case .audio: editor.selection = .audio
+        case .marker(let isStart):
+            drag = Drag(kind: .marker(isStart: isStart, original: editor.project), startPoint: p); return
         case .ruler:
             editor.isPlaying = false
             editor.setPlayhead(layout.time(for: p.x))
@@ -612,6 +649,15 @@ final class TimelineView: NSView {
         case .reorder(let row):
             reorderTarget = reorderDestination(for: row, at: p.y)
             needsDisplay = true
+            return
+        case .marker(let isStart, let original):
+            var next = original
+            let t = max(0, snapped(l.time(for: p.x), excluding: [], event: event))
+            if isStart { next.cinemascope.startMarker = next.quantize(min(t, original.cinemascope.endMarker)) }
+            else { next.cinemascope.endMarker = next.quantize(max(t, original.cinemascope.startMarker)) }
+            editor.replaceWithoutUndo(next)
+            d.didEdit = true
+            drag = d
             return
         case .marquee:
             let r = CGRect(x: min(p.x, d.startPoint.x), y: min(p.y, d.startPoint.y), width: abs(p.x - d.startPoint.x), height: abs(p.y - d.startPoint.y))
@@ -694,6 +740,10 @@ final class TimelineView: NSView {
         case .resize: editor.document?.persistLayout()
         case .reorder(let row):
             if let target = reorderTarget { performReorder(row, to: target) }
+        case .marker(_, let original) where d.didEdit:
+            let final = editor.project
+            editor.replaceWithoutUndo(original)
+            editor.edit("Move Cinemascope Marker") { $0 = final }
         case .group(let original, _, _) where d.didEdit:
             let final = editor.project
             editor.replaceWithoutUndo(original)

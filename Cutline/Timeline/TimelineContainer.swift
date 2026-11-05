@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 /// Timeline with its button bar and scrollbars.
 final class TimelineContainer: NSView {
@@ -8,6 +9,8 @@ final class TimelineContainer: NSView {
     private let vScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 200))
     private let bar = NSStackView()
     private var snapButton: NSButton!
+    private var cinemaButton: NSButton!
+    private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
 
     static func make(editor: EditorModel) -> NSView { TimelineContainer(editor: editor) }
@@ -33,12 +36,29 @@ final class TimelineContainer: NSView {
             self?.timeline.snappingEnabled.toggle()
         }
         snapButton.setButtonType(.pushOnPushOff)
+        cinemaButton = button("rectangle.ratio.16.to.9", "Cinemascope bars (music videos): drag the orange markers on the ruler to set where the bars start and finish closing to 2.35:1") { [weak editor] in
+            guard let editor else { return }
+            editor.edit(editor.project.cinemascope.enabled ? "Cinemascope Off" : "Cinemascope On") { p in
+                p.cinemascope.enabled.toggle()
+                // First use: start at the playhead and close over four seconds.
+                if p.cinemascope.enabled && p.cinemascope.startMarker == 0 && p.cinemascope.endMarker == 5 {
+                    p.cinemascope.startMarker = p.quantize(editor.playhead)
+                    p.cinemascope.endMarker = p.quantize(editor.playhead + 4)
+                }
+            }
+        }
+        cinemaButton.setButtonType(.pushOnPushOff)
         let zoomOut = button("minus.magnifyingglass", "Zoom out (⌘−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
         let zoomIn = button("plus.magnifyingglass", "Zoom in (⌘=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        for v in [addVideo, addLyrics, separator(), split, delete, separator(), snapButton!, spacer, zoomOut, zoomIn, fit] { bar.addArrangedSubview(v) }
+        for v in [addVideo, addLyrics, separator(), split, delete, separator(), snapButton!, cinemaButton!, spacer, zoomOut, zoomIn, fit] { bar.addArrangedSubview(v) }
+        cinemaButton.isHidden = editor.project.type != .musicVideo
+        editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
+            guard let self, let editor else { return }
+            self.cinemaButton.state = editor.project.cinemascope.enabled ? .on : .off
+        }.store(in: &cancellables)
 
         for v in [bar, timeline, hScroller, vScroller] as [NSView] { addSubview(v) }
         hScroller.scrollerStyle = .legacy
