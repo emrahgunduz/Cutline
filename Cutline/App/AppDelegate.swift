@@ -20,6 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate()
+        // Window restoration and Finder opens finish just after launch; only offer a new
+        // project if nothing was opened by then.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            if NSDocumentController.shared.documents.isEmpty { NSDocumentController.shared.newDocument(nil) }
+        }
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
@@ -33,10 +38,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Asks for the project type and resolution before creating a new project.
 final class CutlineDocumentController: NSDocumentController {
     override func newDocument(_ sender: Any?) {
-        guard let project = NewProjectPrompt.run() else { return }
-        let doc = ProjectDocument(project: project)
-        addDocument(doc)
-        doc.makeWindowControllers()
-        doc.showWindows()
+        switch NewProjectPrompt.run() {
+        case .none: return
+        case .open: openDocument(nil)
+        case .create(let project):
+            let doc = ProjectDocument(project: project)
+            addDocument(doc)
+            doc.makeWindowControllers()
+            doc.showWindows()
+        }
     }
 }

@@ -2,15 +2,18 @@ import AppKit
 import SwiftUI
 
 /// The "New Project" window: pick what you're making as a card, then a resolution.
+enum NewProjectChoice { case create(Project), open }
+
 enum NewProjectPrompt {
-    static func run() -> Project? {
-        var result: Project?
+    /// nil when cancelled.
+    static func run() -> NewProjectChoice? {
+        var result: NewProjectChoice?
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
-        let host = NSHostingController(rootView: NewProjectView { project in
-            result = project
+        let host = NSHostingController(rootView: NewProjectView { choice in
+            result = choice
             NSApp.stopModal()
         })
         host.sizingOptions = [.preferredContentSize]
@@ -27,7 +30,7 @@ enum NewProjectPrompt {
 }
 
 struct NewProjectView: View {
-    let finish: (Project?) -> Void
+    let finish: (NewProjectChoice?) -> Void
     @State private var type: ProjectType = .musicVideo
     @State private var canvasIndex = 0
 
@@ -62,6 +65,7 @@ struct NewProjectView: View {
                 .fixedSize()
                 .disabled(preset.canvases.count < 2)
                 Spacer()
+                Button("Open…") { finish(.open) }.controlSize(.large).help("Open an existing project")
                 Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
                 Button("Create Project", action: create).keyboardShortcut(.defaultAction).controlSize(.large)
             }
@@ -72,7 +76,7 @@ struct NewProjectView: View {
 
     private func create() {
         let canvases = preset.canvases
-        finish(Project(type: type, canvas: canvases[min(canvasIndex, canvases.count - 1)]))
+        finish(.create(Project(type: type, canvas: canvases[min(canvasIndex, canvases.count - 1)])))
     }
 }
 
