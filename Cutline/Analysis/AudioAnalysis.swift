@@ -247,6 +247,9 @@ final class AudioAnalysisStore: ObservableObject {
 
     func cancel() { task?.cancel(); task = nil; if state == .running { state = .idle } }
 
+    /// Show an analysis directly (tests and previews; normal use goes through ensure).
+    func adopt(_ a: AudioAnalysis) { analysis = a; state = .idle }
+
     func updateLoudness(_ wf: Waveform?) { loudness = wf.map { Loudness.regions($0) } ?? [] }
 
     /// Wait for the current load or job (tests).

@@ -8,6 +8,8 @@ extension EditorModel {
     /// A tap snaps to a vocal onset this close.
     static let tapSnapWindow = 0.04
     static let tapRates: [Float] = [1, 0.75, 0.5]
+    /// Longest a word keeps when a late tap carries it past its old end.
+    static let tapCarryLength = 2.0
     /// Tap mode starts playing this long before the first word...
     static let tapLeadTime = 5.0
     /// ...and keeps playing this long after the last word is tapped.
@@ -126,8 +128,12 @@ extension EditorModel {
         let shown = max(0, t - project.lyricStyle.leadIn)
         let before = project
         edit("Tap Word") { p in
-            // Only the start is set: every word ends with its line.
-            p.retimeWord(id, start: p.quantize(shown))
+            guard let w = p.lyricTracks.flatMap(\.lines).flatMap(\.words).first(where: { $0.id == id }) else { return }
+            let s = p.quantize(shown)
+            // A tap past the word's end moves the whole word there, keeping its length
+            // (at most 2 s); otherwise only the start changes.
+            let end = s < w.end - p.frameDuration ? w.end : s + min(max(w.end - w.start, p.frameDuration), Self.tapCarryLength)
+            p.retimeWord(id, start: s, end: end)
             p.applyAnchorStretch(from: before)
         }
         // Next word in sung order, whichever track it is on.

@@ -135,6 +135,8 @@ extension Project {
             var word = lyricTracks[w.track].lines[w.line].words[w.word]
             let s = quantize(max(0, result[k].start))
             guard s != word.start else { continue }
+            // A word pushed past its own end moves whole, keeping its length.
+            if s > word.end - frameDuration { word.end = s + max(word.end - word.start, frameDuration) }
             word.start = s
             // Keep the lead-in from undoing the change later.
             if word.alignedStart != nil { word.alignedStart = s + lead }
