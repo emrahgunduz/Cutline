@@ -65,6 +65,13 @@ final class EditorModel: ObservableObject {
     weak var document: ProjectDocument?
     private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
+    /// Analysis jobs on the bundled helper (progress shown in the status bar).
+    private(set) lazy var jobs = JobRunner()
+    private(set) lazy var audioAnalysis = AudioAnalysisStore(folder: { [weak self] in self?.folder("analysis") },
+                                                            analyzer: AudioAnalysisStore.helperAnalyzer(jobs))
+    /// Analyse the song automatically when it is added or replaced (off in unit tests).
+    var autoAnalyze = !AppDelegate.isTestHost
+    private var analysisWatch: AnyCancellable?
 
     init(document: ProjectDocument?) {
         self.document = document
@@ -76,6 +83,7 @@ final class EditorModel: ObservableObject {
     /// Load cached thumbnails and waveforms (or build them) for every asset, e.g. after opening.
     @MainActor
     func warmCaches() {
+        watchSong()
         for a in project.assets {
             switch a.kind {
             case .video, .image: Task { await thumbnails.ensureThumbnail(for: a) }
@@ -83,6 +91,26 @@ final class EditorModel: ObservableObject {
             case .lyrics: break
             }
         }
+    }
+
+    /// Keep the song's analysis and loud/quiet regions in step with the audio row.
+    @MainActor
+    func watchSong() {
+        guard analysisWatch == nil else { return }
+        analysisWatch = $project.map { $0.audio?.assetID }.removeDuplicates()
+            .combineLatest(waveforms.$waveforms)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] id, wfs in
+                guard let self else { return }
+                let asset = id.flatMap { self.project.asset($0) }
+                if self.autoAnalyze { self.audioAnalysis.ensure(for: asset) }
+                self.audioAnalysis.updateLoudness(id.flatMap { wfs[$0] })
+            }
+    }
+
+    /// Analysis with the user's corrections, for drawing and snapping.
+    @MainActor var resolvedBeats: ResolvedBeats? {
+        audioAnalysis.analysis.map { ResolvedBeats($0, project.beatCorrections) }
     }
 
     func replaceWithoutUndo(_ p: Project) {

@@ -78,3 +78,8 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
 | **Analysis helper** | The bundled, offline Python process (inside `Cutline.app/Contents/Resources/ml`) that runs the music and lyric models. Built by `scripts/build_python_runtime.sh`. |
 | **Job** | One run of the analysis helper (for example separating the vocal stem). Shows progress, can be cancelled, and leaves nothing behind if it fails. |
+| **Section lane** | The colored strip along the top of the audio row: song sections (A, B, C…) found by analysis. Drag a white boundary to move it, double-click the lane to add one, right-click to remove one. |
+| **Beat ticks / downbeats** | Marks along the bottom of the audio row: short ticks for beats, tall ticks for downbeats (the first beat of each bar). Drag a downbeat to correct it. |
+| **Loud / quiet shading** | Orange tint over loud stretches of the song and dark tint over quiet ones. |
+| **Vocal stem** | The song's vocals on their own, separated once by analysis and kept in the project's `analysis/` folder. |
+| **Beat and section fixes** | Your corrections to downbeats and sections. Saved in the project, separate from the raw analysis; reset from the audio row's right-click menu. |
