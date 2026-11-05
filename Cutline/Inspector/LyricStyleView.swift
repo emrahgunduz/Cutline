@@ -6,6 +6,7 @@ struct LyricStyleView: View {
     @EnvironmentObject var editor: EditorModel
     @AppStorage("lyricAlignPadding") private var padding = 60.0
     @AppStorage("lyricLineGap") private var gap = 0.0
+    @AppStorage(NudgeStep.key) private var nudgeStep = NudgeStep.defaultValue
     private static let families = NSFontManager.shared.availableFontFamilies
 
     var body: some View {
@@ -73,6 +74,9 @@ struct LyricStyleView: View {
                 }
                 ValueRow(label: "Padding", value: padding, range: 0...400, step: 1, format: "%.0f px", defaultValue: 60,
                          onChange: { padding = $0 }, onCommit: {})
+                ValueRow(label: "⇧ Nudge", value: nudgeStep, range: 1...200, step: 1, format: "%.0f px", defaultValue: NudgeStep.defaultValue,
+                         onChange: { nudgeStep = $0.rounded() }, onCommit: {})
+                    .help("Arrow keys move the selected lines 1 px in the preview; with ⇧ they move this far.")
                 if ids.count > 1 {
                     ValueRow(label: "Line gap", value: gap, range: -20...200, step: 1, format: "%.0f px", defaultValue: 0,
                              onChange: { gap = $0 }, onCommit: {})
