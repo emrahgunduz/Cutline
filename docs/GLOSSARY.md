@@ -87,3 +87,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Beat anchor** | Cinemascope markers placed on (or near) a beat remember it, so they move when that downbeat is corrected or the song is moved. |
 | **Unsure word** | A lyric word whose timing confidence is below 60% and that you haven't confirmed. Drawn with an orange outline and bar on the timeline. |
 | **Confirmed word** | A word you've checked; alignment asks whether to keep its time. |
+| **Lead-in** | Lyric inspector > Animation: aligned words appear this much before they are sung (default 0.15 s). Changing it moves aligned words live; confirmed and hand-placed words stay put. |

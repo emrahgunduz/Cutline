@@ -35,6 +35,10 @@ struct LyricStyleView: View {
                     if style.letterByLetter {
                         row("Overlap", style.letterOverlap * 100, 0...100, format: "%.0f%%", reset: 50) { $0.letterOverlap = $1 / 100 }
                     }
+                    ValueRow(label: "Lead-in", value: style.leadIn, range: 0...0.5, step: 0.01, format: "%.2fs", defaultValue: 0.15,
+                             onChange: { v in editor.liveEdit { $0.lyricStyle.leadIn = v; $0.applyLeadIn() } },
+                             onCommit: { editor.endLiveEdit("Lyric Lead-in") })
+                        .help("Aligned words appear this much before they are sung. Confirmed and hand-placed words don't move.")
                     Text(style.letterByLetter ? "Letters fade one after another and the whole word still appears within the fade time. Overlap: how much each letter overlaps the next." : "The same fades apply to every word.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }

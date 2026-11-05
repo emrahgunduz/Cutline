@@ -186,6 +186,8 @@ extension Project {
                 for w in lyricTracks[t].lines[l].words.indices {
                     lyricTracks[t].lines[l].words[w].start += delta
                     lyricTracks[t].lines[l].words[w].end += delta
+                    lyricTracks[t].lines[l].words[w].alignedStart? += delta
+                    lyricTracks[t].lines[l].words[w].alignedEnd? += delta
                 }
             }
         }
@@ -231,7 +233,10 @@ extension Project {
         let delta = quantize(max(0, start)) - line.start
         line.start += delta
         line.end += delta
-        for i in line.words.indices { line.words[i].start += delta; line.words[i].end += delta }
+        for i in line.words.indices {
+            line.words[i].start += delta; line.words[i].end += delta
+            line.words[i].alignedStart? += delta; line.words[i].alignedEnd? += delta
+        }
         lyricTracks[track].lines.append(line)
         lyricTracks[track].lines.sort { $0.start < $1.start }
     }
@@ -258,6 +263,7 @@ extension Project {
             if end != nil && start == nil { w.end = w.start + frameDuration } else { w.start = w.end - frameDuration }
         }
         if confirm { w.confirmed = true }
+        w.alignedStart = nil; w.alignedEnd = nil   // set by hand now
         line.words[loc.word] = w
         line.start = min(line.start, w.start)
         line.end = max(line.end, w.end)
