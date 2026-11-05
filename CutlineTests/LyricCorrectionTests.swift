@@ -80,7 +80,7 @@ final class LyricCorrectionTests: XCTestCase {
         e.transport.currentTime = { 12 }; e.tap(snap: false)
         let ws = (0..<5).map { w(e, $0) }
         XCTAssertEqual(ws[0].start, 10); XCTAssertEqual(ws[4].start, 12)
-        XCTAssertTrue(ws[1...3].allSatisfy { $0.start > 10 && $0.end <= 12 })
+        XCTAssertTrue(ws[1...3].allSatisfy { $0.start > 10 && $0.start < 12 })
         XCTAssertNil(e.transport.tapWordID, "tap mode ends after the last word")
         XCTAssertEqual(e.transport.stopAt ?? 0, ws[4].end + EditorModel.tapTailTime, accuracy: 1e-9, "the song plays on 5 s, then pauses")
         XCTAssertTrue(e.isPlaying)
@@ -180,7 +180,7 @@ final class LyricCorrectionTests: XCTestCase {
         e.transport.currentTime = { 11.4 }   // 0.4 s late; the word lasts 0.5 s, w3 starts at 12
         e.tap(snap: false)
         XCTAssertEqual(w(e, 2).start, 12, "the next aligned word keeps its time")
-        XCTAssertLessThanOrEqual(w(e, 1).end, 12)
+        XCTAssertEqual(w(e, 1).end, e.project.lyricTracks[0].lines[0].end, "words end with their line")
     }
 
     func testRetimeAllClearsConfirmation() {

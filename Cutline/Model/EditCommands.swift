@@ -256,41 +256,40 @@ extension Project {
         lyricTracks[track].lines.sort { $0.start < $1.start }
     }
 
-    /// Change a line's edges. The line always contains its words, so edges stop at them.
+    /// Change a line's edges. The line always contains its words: the start stops at the first
+    /// word's start, the end at one frame after the last word's start (every word ends with the line).
     mutating func retimeLine(_ id: UUID, start: Double? = nil, end: Double? = nil) {
         guard let loc = lineLocation(id) else { return }
         var line = lyricTracks[loc.track].lines[loc.index]
         let firstWord = line.words.map(\.start).min() ?? line.end
-        let lastWord = line.words.map(\.end).max() ?? line.start
+        let lastStart = line.words.map(\.start).max() ?? line.start
         if let start { line.start = min(quantize(max(0, start)), firstWord, line.end - frameDuration) }
-        if let end { line.end = max(quantize(end), lastWord, line.start + frameDuration) }
+        if let end { line.end = max(quantize(end), lastStart + frameDuration, line.start + frameDuration) }
+        for i in line.words.indices { line.words[i].end = line.end }
         lyricTracks[loc.track].lines[loc.index] = line
     }
 
-    /// Change a word's start and/or end. A word moved past its line's edge extends the line.
+    /// Change a word's start and/or end. Words always end with their line, so a new end moves
+    /// the line's end (for every word in it); a start past the line's end extends the line.
     mutating func retimeWord(_ id: UUID, start: Double? = nil, end: Double? = nil, confirm: Bool = true) {
         guard let loc = wordLocation(id) else { return }
         var line = lyricTracks[loc.track].lines[loc.line]
         var w = line.words[loc.word]
         if let start { w.start = quantize(max(0, start)) }
-        if let end { w.end = quantize(end) }
-        if w.end - w.start < frameDuration {
-            if end != nil && start == nil { w.end = w.start + frameDuration } else { w.start = w.end - frameDuration }
-        }
         if confirm { w.confirmed = true }
         w.alignedStart = nil; w.alignedEnd = nil   // set by hand now
         line.words[loc.word] = w
+        let lastStart = line.words.map(\.start).max() ?? w.start
+        if let end { line.end = quantize(end) }
+        line.end = max(line.end, lastStart + frameDuration)
         line.start = min(line.start, w.start)
-        line.end = max(line.end, w.end)
+        for i in line.words.indices { line.words[i].end = line.end }
         lyricTracks[loc.track].lines[loc.line] = line
     }
 
-    /// Move a word without changing its length.
+    /// Move a word's start (it still ends with its line).
     mutating func moveWord(_ id: UUID, start: Double) {
-        guard let loc = wordLocation(id) else { return }
-        let w = lyricTracks[loc.track].lines[loc.line].words[loc.word]
-        let s = quantize(max(0, start))
-        retimeWord(id, start: s, end: s + (w.end - w.start))
+        retimeWord(id, start: quantize(max(0, start)))
     }
 
     /// Remove a word; a line left without words is removed too.

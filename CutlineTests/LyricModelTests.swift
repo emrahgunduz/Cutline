@@ -42,9 +42,11 @@ final class LyricModelTests: XCTestCase {
     func testLineEdgeCannotCutIntoWords() {
         var p = project()
         let id = p.lyricTracks[0].lines[0].id
-        p.retimeLine(id, start: 5.5, end: 8)
+        p.retimeLine(id, start: 5.5, end: 6)
         XCTAssertEqual(p.lyricTracks[0].lines[0].start, 5)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 8.8)
+        // The end stops one frame after the last word starts; every word ends with the line.
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 6.2 + p.frameDuration, accuracy: 1e-9)
+        XCTAssertTrue(p.lyricTracks[0].lines[0].words.allSatisfy { $0.end == p.lyricTracks[0].lines[0].end })
         p.retimeLine(id, start: 3)
         XCTAssertEqual(p.lyricTracks[0].lines[0].start, 3)
     }

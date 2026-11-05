@@ -117,7 +117,7 @@ extension EditorModel {
     /// and move on to the next word sung.
     @MainActor
     func tap(snap: Bool = true) {
-        guard let id = transport.tapWordID, let loc = project.wordLocation(id) else { endTapMode(); return }
+        guard let id = transport.tapWordID, project.wordLocation(id) != nil else { endTapMode(); return }
         var t = transport.currentTime()
         if snap, let onsets = resolvedBeats?.onsets, let audio = project.audio {
             let near = onsets.map { $0 + audio.start }.min { abs($0 - t) < abs($1 - t) }
@@ -126,31 +126,9 @@ extension EditorModel {
         let shown = max(0, t - project.lyricStyle.leadIn)
         let before = project
         edit("Tap Word") { p in
-            let w = p.lyricTracks[loc.track].lines[loc.line].words[loc.word]
-            let s = p.quantize(shown)
-            let len = w.end - w.start
-            var e = w.end
-            if e <= s + p.frameDuration { e = s + max(len, p.frameDuration) }
-            // Don't run into the next word sung: a late tap shouldn't push it along.
-            let sung = p.lyricOrder()
-            if let i = sung.firstIndex(where: { $0.value.id == id }), i + 1 < sung.count, sung[i + 1].value.start > s {
-                e = min(e, sung[i + 1].value.start)
-            }
-            e = max(e, s + p.frameDuration)
-            p.retimeWord(id, start: s, end: e)
-            // The word sung before ends where this one starts (taps go forward in time).
-            let order = p.lyricOrder()
-            if let i = order.firstIndex(where: { $0.value.id == id }), i > 0 {
-                let prev = order[i - 1]
-                var pw = p.lyricTracks[prev.track].lines[prev.line].words[prev.word]
-                if pw.end > s {
-                    pw.end = max(pw.start + p.frameDuration, s)
-                    p.lyricTracks[prev.track].lines[prev.line].words[prev.word] = pw
-                    p.lyricTracks[prev.track].lines[prev.line].fitToWords()
-                }
-            }
+            // Only the start is set: every word ends with its line.
+            p.retimeWord(id, start: p.quantize(shown))
             p.applyAnchorStretch(from: before)
-            if let l = p.wordLocation(id) { p.lyricTracks[l.track].lines[l.line].fitToWords() }
         }
         // Next word in sung order, whichever track it is on.
         let order = project.lyricOrder().map(\.value.id)
