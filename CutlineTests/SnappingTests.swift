@@ -20,6 +20,23 @@ final class SnappingTests: XCTestCase {
         return Snapping.snap(t, targets: targets, pixelsPerSecond: pps)?.time
     }
 
+    /// U9: with the master toggle off, or ⌘ held, nothing snaps whatever the groups say.
+    func testMasterToggleAndBypassStopAllSnapping() {
+        let (p, a) = song()
+        let targets = Snapping.targets(in: p, playhead: 100, excluding: [], beats: ResolvedBeats(a, nil), groups: Set(SnapGroup.allCases))
+        XCTAssertEqual(Snapping.resolve(4.05, enabled: true, bypass: false, targets: targets, pixelsPerSecond: 100).time, 4)
+        XCTAssertEqual(Snapping.resolve(4.05, enabled: false, bypass: false, targets: targets, pixelsPerSecond: 100).time, 4.05)
+        XCTAssertNil(Snapping.resolve(4.05, enabled: false, bypass: false, targets: targets, pixelsPerSecond: 100).target)
+        XCTAssertEqual(Snapping.resolve(4.05, enabled: true, bypass: true, targets: targets, pixelsPerSecond: 100).time, 4.05)
+    }
+
+    /// While the song itself is dragged, its own beats can't be targets.
+    func testDraggingTheSongLeavesOutItsBeats() {
+        let (p, a) = song()
+        let targets = Snapping.targets(in: p, playhead: 100, excluding: [], includeAudio: false, beats: ResolvedBeats(a, nil), groups: Set(SnapGroup.allCases))
+        XCTAssertTrue(targets.allSatisfy { $0.group == .edges })
+    }
+
     func testDragNearDownbeatLandsExactlyOnIt() {
         let (p, a) = song()
         XCTAssertEqual(snap(4.05, p, a), 4)
