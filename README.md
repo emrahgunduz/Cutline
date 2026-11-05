@@ -52,6 +52,38 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
 - Dummies: colored placeholder cards (title, scene description, length) for shots that don't exist yet.
 - A local control channel lets Claude place one dummy per scene of a production document, with your approval each time it connects. It can add tracks and dummies; it never deletes tracks or touches the song or lyrics.
 
+## Installing
+
+Download Cutline from the [latest release](https://github.com/emrahgunduz/Cutline/releases/latest). It needs a Mac with Apple Silicon and macOS 15 or later.
+
+Cutline is signed ad-hoc rather than with an Apple Developer ID, and Apple hasn't notarized it. So the first time you open it, macOS blocks it with a message that Apple couldn't verify it. That's expected for apps distributed this way. The checksum file lets you confirm you have exactly the file that was published here.
+
+1. From the release, download `Cutline-1.0.<n>.zip` and `Cutline-1.0.<n>.zip.sha256`.
+2. Optional: check the download. In Terminal, in the folder you downloaded to, run the line below (with your version number). It should print `OK`.
+
+   ```bash
+   shasum -a 256 -c Cutline-1.0.<n>.zip.sha256
+   ```
+
+3. Unzip it, and move `Cutline.app` to your Applications folder.
+4. Let macOS open it, in one of two ways:
+   - **In Terminal:** remove the quarantine mark that macOS put on the download, then open Cutline as usual.
+
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/Cutline.app
+     ```
+
+   - **In System Settings:**
+     1. Open Cutline. When macOS says it can't be opened, click **Done**.
+     2. Go to **System Settings → Privacy & Security** and scroll to **Security**.
+     3. Next to the line saying Cutline was blocked, click **Open Anyway**, then confirm with your password or Touch ID.
+     4. Click **Open** in the dialog that follows.
+
+     Since macOS 15, Control-clicking the app and choosing Open no longer gets past this.
+5. On first launch, Cutline offers to download its analysis models (below).
+
+Each new version you download needs step 4 again. Your projects, settings and models stay where they are.
+
 ## The analysis models
 
 Song analysis and lyric alignment use four models: HTDemucs (vocal separation), Beat This! (beats and downbeats), the MMS forced aligner and Whisper medium. They're about 3 GB and are not inside the app.

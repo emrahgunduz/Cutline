@@ -69,8 +69,9 @@ jobs:
           **Cutline ${TAG}** for Apple Silicon Macs (macOS 15 or later).
 
           1. Download \`${ZIP}\` and unzip it. To check it: \`shasum -a 256 -c ${ZIP}.sha256\`
-          2. The app isn't notarized, so macOS quarantines it. Run once:
+          2. The app isn't notarized, so macOS blocks it the first time. Run once:
              \`xattr -dr com.apple.quarantine Cutline.app\`
+             or allow it in System Settings: see [Installing](https://github.com/emrahgunduz/Cutline#installing) in the README.
           3. Open Cutline. The New Project window downloads the analysis models once (2.96 GB), into Library or a folder you choose.
 
           SHA-256: \`$(cut -d' ' -f1 "$ZIP.sha256")\`
