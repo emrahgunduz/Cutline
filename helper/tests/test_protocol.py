@@ -71,3 +71,18 @@ def test_parse_request_validates_fields():
         parse_request(json.dumps({"command": 3}))
     with pytest.raises(HelperError):
         parse_request(json.dumps({"command": "ping", "args": []}))
+
+
+def test_align_language_is_passed_through_or_left_to_whisper(monkeypatch, tmp_path):
+    from cutline_helper import align, commands
+    seen = []
+    monkeypatch.setattr(align, "align", lambda lines, vocals, language, models, progress: seen.append(language) or [])
+    vocals = tmp_path / "v.flac"
+    vocals.write_bytes(b"x")
+    class Ch:
+        def progress(self, *a): pass
+    commands.run("align_lyrics", {"vocals": str(vocals), "lines": [["a"]]}, str(tmp_path), Ch())
+    commands.run("align_lyrics", {"vocals": str(vocals), "lines": [["a"]], "language": "en"}, str(tmp_path), Ch())
+    assert seen == [None, "en"]
+    with pytest.raises(HelperError):
+        commands.run("align_lyrics", {"vocals": str(vocals), "lines": [["a"]], "language": 3}, str(tmp_path), Ch())

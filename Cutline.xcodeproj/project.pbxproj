@@ -53,6 +53,7 @@
 		7DDAD07CAE072A0F9F01D9E2 /* ExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858F6775E8B4AA655EC12500 /* ExportSettings.swift */; };
 		801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75B629399C7ACF1CFA72AEA /* LyricImport.swift */; };
 		81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */; };
+		84134D1EB89147ADEAA6E5F4 /* LyricsLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B22B3DC2BB9AF28995BE746 /* LyricsLanguage.swift */; };
 		844740FF67B0903A98F485A1 /* LyricPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726ADC25A13D2E39324D7F7B /* LyricPlacementTests.swift */; };
 		8B83F1E2D6B67088AC884AEA /* LetterboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B885123EFA34EFDA73BC3CCD /* LetterboxTests.swift */; };
 		8C619DAE436D023E36DC1B81 /* HelperProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B0D161436BA55D45A5EBE9 /* HelperProcess.swift */; };
@@ -116,6 +117,7 @@
 		25D2D132D911EE445BA2025B /* LyricLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricLayout.swift; sourceTree = "<group>"; };
 		263C40DE25F06B14F13BC4A6 /* ProxyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyManager.swift; sourceTree = "<group>"; };
 		29DA3D9EC68856266AA1D0C5 /* TimelineContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineContainer.swift; sourceTree = "<group>"; };
+		2B22B3DC2BB9AF28995BE746 /* LyricsLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsLanguage.swift; sourceTree = "<group>"; };
 		2E7898909EAD3252329FD738 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F17E5F28B1246F79C69B619 /* ShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsView.swift; sourceTree = "<group>"; };
 		2F29BB3D7693A806D2EFC85B /* ExportSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsTests.swift; sourceTree = "<group>"; };
@@ -354,6 +356,7 @@
 				97B0D161436BA55D45A5EBE9 /* HelperProcess.swift */,
 				DA0BC60B5EFC2D0CA9A6F2CD /* JobRunner.swift */,
 				DF06291CE396B80832230900 /* LyricAlignment.swift */,
+				2B22B3DC2BB9AF28995BE746 /* LyricsLanguage.swift */,
 			);
 			path = Analysis;
 			sourceTree = "<group>";
@@ -530,6 +533,7 @@
 				E15DE66864FDAFE27CA40E64 /* LyricPlacement.swift in Sources */,
 				81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */,
 				F723A3DF86EA6416D4968F51 /* LyricStyleView.swift in Sources */,
+				84134D1EB89147ADEAA6E5F4 /* LyricsLanguage.swift in Sources */,
 				E595C8588F4292E299228E7B /* MainMenu.swift in Sources */,
 				518C4503BF19A867E8E2CCCE /* MainWindowController.swift in Sources */,
 				C91C00726772D8A9548195F4 /* NewProjectView.swift in Sources */,

@@ -100,7 +100,8 @@ def analyze_audio(args: dict, output_dir: str, ch: Channel) -> dict:
 def align_lyrics(args: dict, output_dir: str, ch: Channel) -> dict:
     """Time known lyric words on the vocal stem.
 
-    args: vocals (path), lines ([[word, ...], ...]), language ("tr" default).
+    args: vocals (path), lines ([[word, ...], ...]), language (Whisper code such as "tr";
+    absent means Whisper detects the language from the audio).
     Returns lines of {text, start, end, confidence, source} in audio-file seconds.
     """
     from . import align
@@ -111,7 +112,10 @@ def align_lyrics(args: dict, output_dir: str, ch: Channel) -> dict:
     if not isinstance(lines, list) or not all(isinstance(l, list) for l in lines):
         raise HelperError("bad_request", "'lines' must be a list of word lists")
     models_dir = os.environ.get("CUTLINE_MODELS", "")
-    result = align.align(lines, vocals, args.get("language") or "tr", models_dir, ch.progress)
+    language = args.get("language")
+    if language is not None and not isinstance(language, str):
+        raise HelperError("bad_request", "'language' must be a string")
+    result = align.align(lines, vocals, language or None, models_dir, ch.progress)
     ch.progress(1.0, "Done")
     return {"lines": result}
 
