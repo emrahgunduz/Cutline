@@ -7,7 +7,7 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
     private let vertical = NSSplitView()
     private let horizontal = NSSplitView()
     private var restoring = true
-    private let projectDocument: ProjectDocument
+    let projectDocument: ProjectDocument
 
     init(document: ProjectDocument) {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1600, height: 1000),

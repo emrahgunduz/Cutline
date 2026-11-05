@@ -46,6 +46,11 @@ enum MainMenu {
         let lyrics = NSMenu(title: "Lyrics")
         let align = lyrics.addItem(withTitle: "Align Words to Song", action: #selector(MainWindowController.alignLyrics(_:)), keyEquivalent: "l")
         align.keyEquivalentModifierMask = [.command, .option]
+        let languageItem = NSMenuItem(title: "Lyrics Language", action: nil, keyEquivalent: "")
+        let languages = NSMenu(title: "Lyrics Language")
+        languages.delegate = LyricsLanguageMenuDelegate.shared
+        languageItem.submenu = languages
+        lyrics.addItem(languageItem)
         lyrics.addItem(withTitle: "Analyze Song Again", action: #selector(MainWindowController.analyzeSongAgain(_:)), keyEquivalent: "")
         lyrics.addItem(.separator())
         // Plain-key shortcuts (N, Return, T) are handled by the window, so they show in the titles.
@@ -74,5 +79,23 @@ enum MainMenu {
         main.addItem(windowItem)
         NSApp.windowsMenu = window
         return main
+    }
+}
+
+/// Fills the Lyrics > Lyrics Language submenu for the front project each time it opens.
+final class LyricsLanguageMenuDelegate: NSObject, NSMenuDelegate {
+    static let shared = LyricsLanguageMenuDelegate()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        guard let controller = NSApp.mainWindow?.windowController as? MainWindowController else {
+            menu.addItem(withTitle: "Open a project first", action: nil, keyEquivalent: "")
+            return
+        }
+        let editor = controller.projectDocument.editor
+        let built = LyricsLanguage.menu(selected: editor.project.lyricsLanguage) { [weak editor] code in
+            editor?.edit("Lyrics Language") { $0.lyricsLanguage = code }
+        }
+        for item in built.items { built.removeItem(item); menu.addItem(item) }
     }
 }

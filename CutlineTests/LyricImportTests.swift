@@ -85,9 +85,28 @@ final class LyricImportTests: XCTestCase {
         }
     }
 
-    func testLanguageHint() {
-        XCTAssertEqual(LyricAlignment.language(for: ["Kör", "aynalarda"]), "tr")
-        XCTAssertNil(LyricAlignment.language(for: ["hello", "world"]))
+    func testLanguageIsDetectedFromTheLyrics() {
+        XCTAssertEqual(LyricsLanguage.detect("Kör aynalarda yüzümü kaybedişim rastlantı değilmiş".split(separator: " ").map(String.init)), "tr")
+        XCTAssertEqual(LyricsLanguage.detect("I never thought that you would leave me standing in the rain tonight".split(separator: " ").map(String.init)), "en")
+        XCTAssertEqual(LyricsLanguage.detect("Я помню чудное мгновенье передо мной явилась ты".split(separator: " ").map(String.init)), "ru")
+        XCTAssertNil(LyricsLanguage.detect([]))
+    }
+
+    func testChosenLanguageWinsOverDetection() {
+        var p = placed()
+        XCTAssertEqual(LyricsLanguage.resolved(for: p), "tr")
+        p.lyricsLanguage = "en"
+        XCTAssertEqual(LyricsLanguage.resolved(for: p), "en")
+    }
+
+    func testLanguageListIsCompleteAndAlphabetical() {
+        let list = LyricsLanguage.sorted
+        XCTAssertEqual(list.count, 100)
+        XCTAssertEqual(Set(list.map(\.code)).count, 100)
+        XCTAssertTrue(zip(list, list.dropFirst()).allSatisfy { $0.name.localizedStandardCompare($1.name) != .orderedDescending })
+        let menu = LyricsLanguage.menu(selected: "tr") { _ in }
+        XCTAssertEqual(menu.items.first?.title, "Detect from Lyrics")
+        XCTAssertEqual(menu.items.filter { $0.state == .on }.map(\.title), [LyricsLanguage.name("tr")])
     }
 
     // MARK: Lead-in

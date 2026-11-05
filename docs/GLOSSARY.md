@@ -94,3 +94,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Sung order** | All lyric lines across tracks, by start time: alignment, tapping and anchor stretch treat them as one sequence. |
 | **Word timing** | New or aligned words start on their own time and end with their line; each word's end can then be changed on its own. Dragging a line's start moves every word's start with it (ends stay); dragging its end moves every word's end with it (starts stay). |
 | **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |
+| **Lyrics Language** | Lyrics > Lyrics Language, or the menu that opens from the Align Lyrics button: "Detect from Lyrics" (reads your TXT) or any of the 100 languages Whisper knows, saved per project. It only steers the double-check of unsure words. |

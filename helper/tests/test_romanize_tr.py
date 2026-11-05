@@ -15,3 +15,9 @@ def test_punctuation_and_apostrophes():
     assert romanize("Ali’nin") == "ali'nin"
     assert romanize("—") == ""
     assert romanize("café") == "cafe"
+
+
+def test_other_scripts_are_transliterated():
+    assert romanize("Привет") == "privet"
+    assert romanize("Γειά") == "geia"
+    assert romanize("Ünlü") == "unlu"

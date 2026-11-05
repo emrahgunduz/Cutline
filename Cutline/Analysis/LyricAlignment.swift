@@ -10,12 +10,6 @@ enum LyricAlignment {
     struct Word: Decodable, Equatable { var text: String; var start: Double; var end: Double; var confidence: Double; var source: String }
     struct Result: Decodable, Equatable { var lines: [[Word]] }
 
-    /// Whisper's language hint: Turkish letters mean Turkish; otherwise let it detect.
-    static func language(for words: [String]) -> String? {
-        let tr = Set("çğıöşüÇĞİÖŞÜ")
-        return words.contains { $0.contains(where: tr.contains) } ? "tr" : nil
-    }
-
     static func isLow(_ w: LyricWord) -> Bool { !w.confirmed && w.confidence < lowConfidence }
 }
 
@@ -127,7 +121,7 @@ extension EditorModel {
                 let ids = order.map(\.id)
                 let lines = order.map { $0.words.map(\.text) }
                 var args: [String: Any] = ["vocals": vocals.path, "lines": lines]
-                if let lang = LyricAlignment.language(for: lines.flatMap { $0 }) { args["language"] = lang }
+                if let lang = LyricsLanguage.resolved(for: self.project) { args["language"] = lang }
                 let result = try await self.jobs.run("Aligning lyrics", command: "align_lyrics", args: args) { data, _ in
                     try JSONDecoder().decode(LyricAlignment.Result.self, from: data)
                 }

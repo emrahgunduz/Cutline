@@ -21,6 +21,9 @@ struct Project: Codable, Equatable {
     var cinemascope = Cinemascope()
     /// User fixes to the song's beats and sections (see AudioAnalysis).
     var beatCorrections: BeatCorrections?
+    /// Language Whisper uses to double-check aligned lyrics (a Whisper code such as "tr");
+    /// nil detects it from the lyric text.
+    var lyricsLanguage: String?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type

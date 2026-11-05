@@ -155,8 +155,9 @@ def match_words(known: list[str], heard: list[str], min_sim: float = 0.5) -> lis
     return pairs[::-1]
 
 
-def whisper_words(wave16k: np.ndarray, windows: list[tuple[float, float]], language: str, models_dir: str):
-    """[(key, start, end)] heard by faster-whisper inside the given windows."""
+def whisper_words(wave16k: np.ndarray, windows: list[tuple[float, float]], language: str | None, models_dir: str):
+    """[(key, start, end)] heard by faster-whisper inside the given windows.
+    With no language, Whisper detects it from the audio."""
     from faster_whisper import WhisperModel
     model = WhisperModel(os.path.join(models_dir, "whisper-medium"), device="cpu", compute_type="int8")
     clips = [t for w in windows for t in w]
@@ -237,7 +238,7 @@ def finalize(words: list[Word], min_len: float = 0.06, hold: float = 0.25) -> No
         w.end = min(max(w.end, min(w.end + hold, nxt - 0.02)), max(nxt - 0.01, w.start + 0.01))
 
 
-def align(lines: list[list[str]], vocals_path: str, language: str, models_dir: str, progress) -> list[list[dict]]:
+def align(lines: list[list[str]], vocals_path: str, language: str | None, models_dir: str, progress) -> list[list[dict]]:
     stem, sr = audio.load(vocals_path)
     wave = audio.resample(audio.mono(stem), sr, 16000)
     words = [Word(text=t, key=romanize(t), line=li) for li, line in enumerate(lines) for t in line]

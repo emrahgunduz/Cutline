@@ -76,8 +76,15 @@ final class TimelineContainer: NSView {
         }
         analyzeButton.title = "Analyze Song"
         analyzeButton.imagePosition = .imageLeading
-        alignButton = button("text.word.spacing", "Time every lyric word to the song (⌥⌘L)") { [weak self, weak editor] in
-            editor?.alignLyrics(window: self?.window)
+        alignButton = button("text.word.spacing", "Time every lyric word to the song: pick the lyrics language (or detect it), then align") { [weak self, weak editor] in
+            guard let self, let editor else { return }
+            // Pick the language first; choosing one saves it with the project and aligns.
+            let menu = LyricsLanguage.menu(selected: editor.project.lyricsLanguage) { [weak self, weak editor] code in
+                guard let editor else { return }
+                editor.edit("Lyrics Language") { $0.lyricsLanguage = code }
+                editor.alignLyrics(window: self?.window)
+            }
+            menu.popUp(positioning: menu.items.first { $0.state == .on }, at: NSPoint(x: 0, y: self.alignButton.bounds.height + 4), in: self.alignButton)
         }
         alignButton.title = "Align Lyrics"
         alignButton.imagePosition = .imageLeading
