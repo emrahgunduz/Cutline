@@ -12,7 +12,7 @@ enum NewDummySheet {
         sheet.isReleasedWhenClosed = false
         let host = NSHostingController(rootView: NewDummyView(editor: editor) { add in
             window.endSheet(sheet)
-            if let add { MainActor.assumeIsolated { _ = editor.createDummy(add) } }
+            if let add { MainActor.assumeIsolated { _ = editor.createDummy(add.defaults, description: add.description) } }
         })
         host.sizingOptions = [.preferredContentSize]
         sheet.contentViewController = host
@@ -22,8 +22,10 @@ enum NewDummySheet {
 
 struct NewDummyView: View {
     let editor: EditorModel
-    let finish: (DummyDefaults?) -> Void
+    let finish: ((defaults: DummyDefaults, description: String)?) -> Void
     @State private var d: DummyDefaults
+    /// What the scene is: for this dummy only (not remembered).
+    @State private var sceneDescription = ""
     private let autoName: String
     private static let families = NSFontManager.shared.availableFontFamilies
     private static let swatches: [RGBA] = [
@@ -32,7 +34,7 @@ struct NewDummyView: View {
         RGBA(r: 0.25, g: 0.55, b: 0.90, a: 1), RGBA(r: 0.55, g: 0.40, b: 0.85, a: 1), RGBA(r: 0.92, g: 0.92, b: 0.93, a: 1),
     ]
 
-    init(editor: EditorModel, finish: @escaping (DummyDefaults?) -> Void) {
+    init(editor: EditorModel, finish: @escaping ((defaults: DummyDefaults, description: String)?) -> Void) {
         self.editor = editor
         self.finish = finish
         _d = State(initialValue: editor.project.dummyDefaults ?? DummyDefaults())
@@ -41,7 +43,8 @@ struct NewDummyView: View {
 
     private var card: DummyCard {
         let t = d.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return DummyCard(title: t.isEmpty ? autoName : t, fontName: d.fontName, length: max(0.1, d.length), color: d.color)
+        return DummyCard(title: t.isEmpty ? autoName : t, sceneDescription: sceneDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+                         fontName: d.fontName, length: max(0.1, d.length), color: d.color)
     }
 
     private var canvas: CGSize { editor.project.canvas.cgSize }
@@ -54,7 +57,7 @@ struct NewDummyView: View {
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.15)))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("New Dummy").font(.title2.bold())
-                    Text("A placeholder card for a shot you haven't made yet. It goes to the assets.")
+                    Text("A placeholder card for a shot you haven't made yet: title, what happens in it, and how long it lasts. It goes to the assets.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -67,6 +70,20 @@ struct NewDummyView: View {
                         TextField(autoName, text: $d.title).textFieldStyle(.roundedBorder)
                         Text("If left empty, it will be named \(autoName).").font(.caption).foregroundStyle(.secondary)
                     }
+                }
+                field("Scene") {
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $sceneDescription)
+                            .font(.body).scrollContentBackground(.hidden)
+                            .padding(.horizontal, 2).padding(.vertical, 4)
+                            .frame(height: 68)
+                        if sceneDescription.isEmpty {
+                            Text("What happens in this shot (optional)").foregroundStyle(.tertiary)
+                                .padding(.horizontal, 7).padding(.vertical, 5).allowsHitTesting(false)
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.15)))
                 }
                 field("Font") {
                     Picker("", selection: $d.fontName) {
@@ -106,7 +123,10 @@ struct NewDummyView: View {
                 Text(verbatim: "\(editor.project.canvas.width)×\(editor.project.canvas.height), the project's size").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
-                Button("Add to Assets") { finish(normalized) }.keyboardShortcut(.defaultAction).controlSize(.large)
+                // ⌘↩ adds: plain Return makes new lines in the scene description.
+                Button("Add to Assets") { finish((normalized, sceneDescription)) }
+                    .keyboardShortcut(.return, modifiers: .command).buttonStyle(.borderedProminent).controlSize(.large)
+                    .help("Add to Assets (⌘↩)")
             }
         }
         .padding(24)

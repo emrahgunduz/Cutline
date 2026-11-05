@@ -1,4 +1,5 @@
 import CoreImage
+import CoreText
 import XCTest
 @testable import Cutline
 
@@ -86,6 +87,14 @@ final class DummyModelTests: XCTestCase {
 
 @MainActor
 final class DummyEditorTests: XCTestCase {
+    func testTheDescriptionGoesOnTheCardButIsNotRemembered() {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        let e = doc.editor
+        let a = e.createDummy(DummyDefaults(), description: "  Close-up on the hands.\n")
+        XCTAssertEqual(a?.dummy?.sceneDescription, "Close-up on the hands.", "trimmed")
+        XCTAssertEqual(e.project.dummyDefaults, DummyDefaults(), "each scene has its own description")
+    }
+
     func testCreatingADummyRemembersTheChoicesAndSelectsIt() {
         let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
         let e = doc.editor
@@ -133,32 +142,74 @@ final class DummyRendererTests: XCTestCase {
         XCTAssertEqual(c.0, 0.2, accuracy: 0.02); XCTAssertEqual(c.1, 0.4, accuracy: 0.02); XCTAssertEqual(c.2, 0.8, accuracy: 0.02)
     }
 
-    func testTheTitleIsCentredAndTheLengthHangsUnderItsLeftEdge() {
+    private var described: DummyCard {
+        var c = card
+        c.sceneDescription = "Wide shot of the empty street at dawn. The singer walks in from the left, stops under the lamp and looks up."
+        return c
+    }
+
+    func testTheTitleSitsTopLeftInsideThePadding() {
         let size = CGSize(width: 1920, height: 1080)
         let l = DummyRenderer.layout(card, size: size)
-        XCTAssertEqual(l.titleOrigin.x + l.titleWidth / 2, size.width / 2, accuracy: 0.5, "centred across")
-        XCTAssertEqual(l.titleOrigin.y, size.height / 2, accuracy: l.titleSize * 0.5, "around the middle")
-        XCTAssertEqual(l.subtitleOrigin.x, l.titleOrigin.x, "the length line starts where the title starts")
-        XCTAssertLessThan(l.subtitleOrigin.y, l.titleOrigin.y, "and sits under it")
-        XCTAssertLessThan(l.subtitleSize, l.titleSize)
+        XCTAssertEqual(l.padding, 100)
+        XCTAssertEqual(l.titleOrigin.x, 100, "left aligned at the left padding")
+        let titleTop = l.titleOrigin.y + CTFontGetAscent(DummyRenderer.font(card.fontName, size: l.titleSize, bold: true))
+        XCTAssertEqual(titleTop, 1080 - 100, accuracy: 0.5, "its top on the top padding")
     }
 
-    func testTheTitleIsNeitherTooBigNorTooSmall() {
-        let l = DummyRenderer.layout(card, size: CGSize(width: 1920, height: 1080))
-        XCTAssertEqual(l.titleSize, 1080 * DummyRenderer.titleFraction, accuracy: 0.5)
-        XCTAssertGreaterThan(l.titleSize, 60); XCTAssertLessThan(l.titleSize, 140)
-        // The same card at 4K is laid out the same, twice as large.
-        let big = DummyRenderer.layout(card, size: CGSize(width: 3840, height: 2160))
-        XCTAssertEqual(big.titleSize / l.titleSize, 2, accuracy: 0.01)
+    func testTheTimeSitsBottomRightInsideThePadding() {
+        let size = CGSize(width: 1920, height: 1080)
+        let l = DummyRenderer.layout(card, size: size)
+        XCTAssertEqual(l.timeOrigin.x + l.timeWidth, 1920 - 100, accuracy: 0.5, "right aligned at the right padding")
+        let bottom = l.timeOrigin.y - CTFontGetDescent(DummyRenderer.font(card.fontName, size: l.timeSize, bold: true))
+        XCTAssertEqual(bottom, 100, accuracy: 0.5, "its bottom on the bottom padding")
     }
 
-    func testALongTitleShrinksToFitTheFrame() {
+    func testTheDescriptionFillsTheWidthUnderTheTitle() {
+        let size = CGSize(width: 1920, height: 1080)
+        let l = DummyRenderer.layout(described, size: size)
+        XCTAssertEqual(l.descriptionRect.minX, 100)
+        XCTAssertEqual(l.descriptionRect.width, 1920 - 200, "the frame's width minus both paddings")
+        XCTAssertLessThan(l.descriptionRect.maxY, l.titleOrigin.y, "under the title")
+        XCTAssertGreaterThan(l.descriptionRect.minY, l.timeOrigin.y, "above the time")
+        XCTAssertGreaterThanOrEqual(DummyRenderer.descriptionLineCount(described, size: size), 2, "long text wraps onto more lines")
+        XCTAssertEqual(DummyRenderer.layout(card, size: size).descriptionRect, .zero, "no description, no box")
+    }
+
+    func testTheDescriptionKeepsItsOwnLineBreaks() {
+        var c = card
+        c.sceneDescription = "One\nTwo\nThree"
+        XCTAssertEqual(DummyRenderer.descriptionLineCount(c, size: CGSize(width: 1920, height: 1080)), 3)
+    }
+
+    func testSizesAreBigAndReadableInHD() {
+        let l = DummyRenderer.layout(described, size: CGSize(width: 1920, height: 1080))
+        XCTAssertEqual(l.titleSize, 110, "bigger than before (92)")
+        XCTAssertEqual(l.descriptionSize, 44, "readable in HD")
+        XCTAssertEqual(l.timeSize, 56, "bigger than before (39)")
+        XCTAssertGreaterThan(l.titleSize, l.timeSize)
+        XCTAssertGreaterThan(l.timeSize, l.descriptionSize)
+    }
+
+    func testEverythingScalesWithTheFrame() {
+        let hd = DummyRenderer.layout(described, size: CGSize(width: 1920, height: 1080))
+        let uhd = DummyRenderer.layout(described, size: CGSize(width: 3840, height: 2160))
+        XCTAssertEqual(uhd.padding, 200)
+        XCTAssertEqual(uhd.titleSize / hd.titleSize, 2, accuracy: 0.01)
+        XCTAssertEqual(uhd.descriptionSize, 88)
+        // Portrait 1080×1920: the short side is 1080, so the HD sizes and paddings apply.
+        let portrait = DummyRenderer.layout(described, size: CGSize(width: 1080, height: 1920))
+        XCTAssertEqual(portrait.padding, 100)
+        XCTAssertEqual(portrait.descriptionRect.width, 880)
+    }
+
+    func testALongTitleShrinksToFitBetweenThePaddings() {
         var long = card
         long.title = String(repeating: "Çok uzun bir başlık ", count: 4)
         let size = CGSize(width: 1080, height: 1920)
         let l = DummyRenderer.layout(long, size: size)
-        XCTAssertLessThanOrEqual(l.titleWidth, size.width * DummyRenderer.maxWidth + 1)
-        XCTAssertGreaterThanOrEqual(l.titleOrigin.x, size.width * (1 - DummyRenderer.maxWidth) / 2 - 1)
+        XCTAssertLessThanOrEqual(l.titleOrigin.x + l.titleWidth, size.width - l.padding + 1)
+        XCTAssertLessThan(l.titleSize, 110)
     }
 
     func testTextIsReadableOnAnyColor() {
@@ -172,12 +223,22 @@ final class DummyRendererTests: XCTestCase {
         XCTAssertNotNil(DummyRenderer.image(c, size: CGSize(width: 640, height: 360)))
     }
 
-    func testTheTitleIsActuallyDrawnInTheMiddle() throws {
-        let img = try XCTUnwrap(DummyRenderer.image(card, size: CGSize(width: 1920, height: 1080)))
+    func testTheTextIsActuallyDrawnWhereTheLayoutSays() throws {
+        let img = try XCTUnwrap(DummyRenderer.image(described, size: CGSize(width: 1920, height: 1080)))
         let ci = CIImage(cgImage: img)
-        let middle = FilterChainTests.meanLuma(ci, CGRect(x: 760, y: 520, width: 400, height: 60))
-        let corner = FilterChainTests.meanLuma(ci, CGRect(x: 0, y: 0, width: 200, height: 100))
-        XCTAssertGreaterThan(middle, corner + 0.05, "white letters in the middle, plain color in the corner")
+        func luma(_ r: CGRect) -> Double { FilterChainTests.meanLuma(ci, r) }
+        let empty = luma(CGRect(x: 1700, y: 900, width: 150, height: 80))           // top right: nothing there
+        XCTAssertGreaterThan(luma(CGRect(x: 100, y: 870, width: 500, height: 100)), empty + 0.05, "title at the top left")
+        XCTAssertGreaterThan(luma(CGRect(x: 100, y: 650, width: 1700, height: 120)), empty + 0.03, "description under it")
+        XCTAssertGreaterThan(luma(CGRect(x: 1560, y: 100, width: 260, height: 60)), empty + 0.05, "time at the bottom right")
+    }
+
+    func testOlderDummiesLoadWithoutADescription() throws {
+        let json = #"{"title":"Dummy 0001","fontName":"Futura","length":5,"color":{"r":0,"g":0,"b":0,"a":1}}"#
+        let c = try JSONDecoder().decode(DummyCard.self, from: Data(json.utf8))
+        XCTAssertEqual(c.sceneDescription, "")
+        let back = try JSONDecoder().decode(DummyCard.self, from: JSONEncoder().encode(described))
+        XCTAssertEqual(back, described)
     }
 
     // MARK: In the project
