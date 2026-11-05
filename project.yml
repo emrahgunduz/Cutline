@@ -67,6 +67,10 @@ targets:
     postBuildScripts:
       - name: Stamp version
         basedOnDependencyAnalysis: false
+        # Depends on the processed Info.plist, so it always runs after Xcode writes it
+        # (otherwise the two can race and the stamp is overwritten).
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         script: |
           "$SRCROOT/scripts/stamp_version.sh"
       - name: Bundle analysis runtime
