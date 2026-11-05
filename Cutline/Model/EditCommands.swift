@@ -256,17 +256,41 @@ extension Project {
         lyricTracks[track].lines.sort { $0.start < $1.start }
     }
 
-    /// Change a line's edges. The line always contains its words: the start stops at the first
-    /// word's start, the end at one frame after the last word's start (every word ends with the line).
+    /// Change a line's edges. The words travel with the edge being dragged: moving the start
+    /// keeps every word's distance from the start (the end stays), moving the end keeps every
+    /// word's distance from the end (the start stays). Words always end with the line. The
+    /// words never cross the fixed edge.
     mutating func retimeLine(_ id: UUID, start: Double? = nil, end: Double? = nil) {
         guard let loc = lineLocation(id) else { return }
         var line = lyricTracks[loc.track].lines[loc.index]
-        let firstWord = line.words.map(\.start).min() ?? line.end
+        let f = frameDuration
+        let firstStart = line.words.map(\.start).min() ?? line.start
         let lastStart = line.words.map(\.start).max() ?? line.start
-        if let start { line.start = min(quantize(max(0, start)), firstWord, line.end - frameDuration) }
-        if let end { line.end = max(quantize(end), lastStart + frameDuration, line.start + frameDuration) }
+        if let start {
+            // The last word must still start a frame before the (fixed) end.
+            let s = min(quantize(max(0, start)), line.start + (line.end - f - lastStart))
+            shiftWords(&line, by: s - line.start)
+            line.start = s
+        }
+        if let end {
+            let firstNow = line.words.map(\.start).min() ?? firstStart
+            // The first word can't move before the (fixed) start.
+            let e = max(quantize(end), line.end + (line.start - firstNow), line.start + f)
+            shiftWords(&line, by: e - line.end)
+            line.end = e
+        }
         for i in line.words.indices { line.words[i].end = line.end }
         lyricTracks[loc.track].lines[loc.index] = line
+    }
+
+    /// Move every word start (and its aligned time, so the lead-in stays right) by `delta`.
+    private func shiftWords(_ line: inout LyricLine, by delta: Double) {
+        guard delta != 0 else { return }
+        for i in line.words.indices {
+            line.words[i].start = quantize(line.words[i].start + delta)
+            line.words[i].alignedStart? += delta
+            line.words[i].alignedEnd? += delta
+        }
     }
 
     /// Change a word's start and/or end. Words always end with their line, so a new end moves
