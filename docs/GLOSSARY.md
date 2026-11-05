@@ -6,13 +6,16 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 
 | Term | What it is |
 |---|---|
-| **Toolbar** | Strip at the very top: Import, Undo/Redo, Split, Delete, Video Track, Lyrics Track, project format, Export. |
+| **Toolbar** | Strip at the very top: Import, Undo, Redo, Split, Delete, Video Track, Lyrics Track, Clear Cache, Reset Caches, Export. |
 | **Assets panel** | Left column with your imported files. |
 | **Preview** | Middle area: the video canvas plus the transport bar below it. |
 | **Inspector** | Right column. Shows the selected item's settings, or the shortcuts list when nothing is selected. |
 | **Timeline** | Bottom area with the tracks. |
 | **Divider** | Draggable line between two panels. Panel sizes are saved per project. |
-| **Status bar** | Bottom strip of the window: selection details, project length vs. limit, format, proxies in use, save state. |
+| **Status bar** | Bottom strip of the window: selection details, project length vs. limit, estimated size, format, save state, render cache size, and Disconnect while a program uses the control channel. |
+| **New Project window** | Shown at launch and by File > New Project… (⌘N): pick the project type and resolution, then Create Project, Open…, Import from Project… or a recent project. While the analysis models are missing it shows the **models card** at the top and none of these work. |
+| **Models card** | The top of the New Project window until the models are ready: Download (to Library) or Choose Folder…, live progress with speed and time left, Cancel to pause, Resume Download, and "Models folder not found" when a chosen disk isn't connected. |
+| **Settings** | Cutline > Settings… (⌘,), with two tabs: **Presets** (format presets) and **Models** (see **Settings > Models**). |
 
 ## Assets panel
 
@@ -20,7 +23,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 |---|---|
 | **Asset** | One imported file (video, image, audio or lyrics TXT). |
 | **Tile** | One asset's thumbnail card. |
-| **Group / section** | Videos, Images, Audio and Lyrics, each collapsible. |
+| **Group / section** | Videos, Images, Dummies, Audio and Lyrics, each collapsible. |
 | **Used mark** | Green check on an asset that is on the timeline. |
 | **Proxy badge** | Orange "PROXY 1/4" label. |
 | **Footer** | The "3 of 9 selected" line at the bottom. |
@@ -40,7 +43,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 
 | Term | What it is |
 |---|---|
-| **Button bar** | Small icon row at the top of the timeline (add tracks, split, delete, snapping, zoom). |
+| **Button bar** | Icon row at the top of the timeline: Dummy, add tracks, split, delete, snapping and snap groups, cinemascope, Analyze Song, Align Lyrics, zoom. |
 | **Ruler** | Time scale under the button bar. Click or drag it to move the playhead. |
 | **Playhead** | Red vertical line marking the current time. |
 | **Track / row** | One horizontal lane: **Audio**, **Lyrics 1…n**, **Video 1…n**. Video n is drawn on top of lower video tracks. |
@@ -52,7 +55,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Waveform** | The audio drawing on the Audio track. |
 | **Line** | One lyric line, the darker purple box. |
 | **Word** | One word inside a line, the light purple box on the word rows. |
-| **Snapping / snap guide** | Edges pulling toward nearby edges or the playhead, shown with a yellow line. Toggle with N; hold ⌘ to bypass. |
+| **Snapping / snap guide** | Edges pulling toward nearby edges or the playhead, shown with a yellow line. Toggle with S; hold ⌘ to bypass. |
 | **Project end** | Darker area after the last clip or audio. |
 | **Scroller** | The horizontal scrollbar just under the button bar (vertical one on the right). |
 | **Word rows** | The rows under a lyric line, one per word (word 1 on row 1, …). |
@@ -98,18 +101,18 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Anchor stretch** | Tap mode: confirmed words are anchors, and unconfirmed words between two anchors are re-timed in proportion to fit between them. Dragging a word on the timeline changes only that word. |
 | **Sung order** | The order of the lyrics file: each line remembers its place in the TXT it came from, so alignment, tapping, next unsure word and anchor stretch sing the lines in that order wherever you move them (any track, any time). Lines from different files interleave by time; lines from no file go by time. Older projects recover the order by matching lines to the TXT. |
 | **Word timing** | New or aligned words start on their own time and end with their line; each word's end can then be changed on its own. Dragging a line's start moves every word's start with it (ends stay); dragging its end moves every word's end with it (starts stay). |
-| **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |
+| **Recent Projects** | The last 10 projects you opened or saved, listed in the New Project window. Click one to open it; Clear forgets the list (the projects stay). A project opened while the models are missing is added here, to open once they're downloaded. |
 | **Lyrics Language** | Lyrics > Lyrics Language, or the menu that opens from the Align Lyrics button: "Detect from Lyrics" (reads your TXT) or any of the 100 languages Whisper knows, saved per project. It only steers the double-check of unsure words. |
 | **Platform UI zones** | Portrait projects: the Platform UI menu in the preview bar shows where TikTok, Reels and Shorts draw their buttons and captions (preview only, never exported). Automatically placed lyrics always stay clear of every platform's zones, so showing or hiding them moves nothing; zones live in platform_overlays.json. |
 | **Hard-out line** | Social and ad projects: the red LIMIT line on the timeline at the type's maximum length; anything past it is hatched red as over. **Trim to Limit** (timeline bar, shown when over) ends the project on the last downbeat or lyric-line end before the limit. |
 | **Target size** | Export rate mode for social and ads: give a maximum size in MB; Cutline picks the bitrate, checks the finished file and re-encodes automatically (up to twice) if it came out too big. |
 | **Budget bar** | Status bar: project length against the limit, and the size target (or the estimated size at the saved bitrate) against it. |
-| **Format presets** | Cutline > Settings… (⌘,): each project type's length limit, codec, default bitrate and default size target. |
+| **Format presets** | Settings > Presets: each project type's length limit, codec, default bitrate and default size target. |
 | **Render cache** | Preview frames (in memory) and export segments (2 s pieces in the project's `cache/segments/`), keyed by everything that changes their pixels. A re-export encodes only the segments an edit changed; a cancelled export keeps the finished ones. |
 | **Cache strip** | The thin line along the bottom of the ruler: green where the export segment is cached, orange where an edit or setting change made it stale. |
 | **Clear Cache** | Toolbar (shows the size), the status bar (size, trash button) or File > Clear Render Cache: empties the render cache. Proxies, thumbnails, waveforms and analysis are kept. |
 | **Reset Media Caches** | Toolbar Reset Caches, the status bar (circular-arrows button) or File > Reset Media Caches…: pick thumbnails & waveforms, music analysis and/or proxies to delete and rebuild (proxies: rebuild at their current scale, or remove them). Proxy tiles show a spinner while they rebuild; opening it again while it runs offers to stop. |
-| **Import from Project** | New Project page: pick the type and resolution, then a project to copy from. The song, lyric timing, clips and track layout come over once (with the analysis, thumbnails, waveforms and proxies, so nothing re-runs); clips are centred on the new canvas at the same scale, lyric lines go back to automatic placement, and cinemascope is kept only for music videos. Nothing stays linked. |
+| **Import from Project** | New Project window: pick the type and resolution, then a project to copy from. The song, lyric timing, clips and track layout come over once (with the analysis, thumbnails, waveforms and proxies, so nothing re-runs); clips are centred on the new canvas at the same scale, lyric lines go back to automatic placement, and cinemascope is kept only for music videos. Nothing stays linked. |
 | **Line spacing** | Lines on one lyric track never overlap (put lines meant to be on screen together on different tracks). A dragged line stops against its neighbour and jumps past it once the pointer is closer to the other side; edges and words stop at the neighbours. |
 | **Group drag** | Dragging several selected items: the earliest one snaps, the rest keep their distance from it. |
 | **Fill / Fit** | Clip inspector > Size & Position: Fill scales the clip to cover the whole frame (centred, overflow cropped); Fit shows the whole picture. New video clips start filled in every project type; images start fitted. |
