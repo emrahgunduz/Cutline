@@ -1,0 +1,73 @@
+# Builds Cutline.app (without models), runs the offline smoke test, and publishes a GitHub
+# Release with the zipped app, its SHA-256 and the dSYM.
+#
+# Version: 1.0.<run number>, where the run number counts this workflow's runs. The release and
+# its tag (v1.0.<n>) are created on the chosen branch's commit.
+# Start it by hand: Actions -> Release -> Run workflow.
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      VERSION: 1.0.${{ github.run_number }}
+      TAG: v1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: astral-sh/setup-uv@v6
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: build/uv-cache
+          key: uv-${{ runner.os }}-${{ hashFiles('helper/requirements.lock', 'scripts/build_python_runtime.sh') }}
+      # The pinned models (3 GB) are only for the smoke test; cache them per model list.
+      - name: Cache the models
+        uses: actions/cache@v4
+        with:
+          path: build/ml/models
+          key: models-${{ hashFiles('helper/cutline_helper/models.json') }}
+
+      - name: Build, zip and check the app
+        run: APP_VERSION="$VERSION" APP_BUILD="${{ github.run_number }}" scripts/build_release.sh --clean
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/Release
+          # Versioned asset names without spaces; the checksum file names the zip exactly as
+          # published, so `shasum -a 256 -c` works after downloading.
+          ZIP="Cutline-${VERSION}.zip"
+          DSYM="Cutline-${VERSION}.dSYM.zip"
+          mv Cutline.zip "$ZIP"
+          shasum -a 256 "$ZIP" > "$ZIP.sha256"
+          ditto -c -k --keepParent Cutline.app.dSYM "$DSYM"
+          cat > notes.md <<NOTES
+          **Cutline ${TAG}** for Apple Silicon Macs (macOS 15 or later).
+
+          1. Download \`${ZIP}\` and unzip it. To check it: \`shasum -a 256 -c ${ZIP}.sha256\`
+          2. The app isn't notarized, so macOS quarantines it. Run once:
+             \`xattr -dr com.apple.quarantine Cutline.app\`
+          3. Open Cutline. The New Project window downloads the analysis models once (2.96 GB), into Library or a folder you choose.
+
+          SHA-256: \`$(cut -d' ' -f1 "$ZIP.sha256")\`
+          NOTES
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Cutline ${TAG}" --notes-file notes.md \
+            "$ZIP" "$ZIP.sha256" "$DSYM"

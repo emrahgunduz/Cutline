@@ -1,0 +1,53 @@
+# Tests for the Python helper and the app on an Apple Silicon runner.
+# Runs only when started by hand: Actions -> CI -> Run workflow (pick the branch).
+# To run it on every pull request, add `pull_request:` under `on:`.
+name: CI
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helper:
+    name: Helper tests
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # The runtime script keeps uv's downloads in build/ (Python and the locked packages).
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/uv-cache
+            build/uv-python
+          key: uv-${{ runner.os }}-${{ hashFiles('helper/requirements.lock', 'scripts/build_python_runtime.sh') }}
+      - name: Build the helper's Python runtime (no models)
+        run: scripts/build_python_runtime.sh --no-models
+      - name: pytest
+        run: PYTHONPATH=build/ml-dev build/ml/python/bin/python3 -B -m pytest -q -c helper/pytest.ini --rootdir helper helper/tests
+
+  app:
+    name: App tests
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        run: xcodegen generate
+      # Without build/ml the app has no bundled runtime: tests that need it skip; the
+      # helper's protocol tests use the runner's python3.
+      - name: xcodebuild test
+        run: |
+          xcodebuild test -project Cutline.xcodeproj -scheme Cutline \
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY=- | tail -40  # GitHub's bash runs with pipefail: a failure still fails the step
