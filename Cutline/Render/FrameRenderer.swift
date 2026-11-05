@@ -25,7 +25,7 @@ enum FrameRenderer {
         let p = snap.project
         let frame = p.frameIndex(time)
         let t = Double(frame) / p.fps
-        for track in snap.project.videoTracks {
+        for track in snap.project.videoTracks where !track.isHidden {
             for clip in track.clips where frame >= p.frameIndex(clip.start) && frame < p.frameIndex(clip.end) {
                 guard let asset = snap.project.asset(clip.assetID) else { continue }
                 let source: CIImage? = asset.kind == .image ? snap.images[asset.id] : sourceFrame(clip)

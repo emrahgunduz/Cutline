@@ -266,6 +266,10 @@ struct ExportSettingsView: View {
                 }
             }
 
+            if !editor.project.exportOmissions.isEmpty {
+                Label("Not in the export: " + editor.project.exportOmissions.joined(separator: "; ") + ".", systemImage: "eye.slash")
+                    .font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
             Label {
                 Text(settings.rateMode == .quality
                      ? "Constant quality keeps the picture at the chosen quality, so busy scenes use more data. The size is measured by test-encoding the busiest parts of your timeline."
