@@ -58,10 +58,15 @@ final class CutlineDocumentController: NSDocumentController {
                 if let error { NSAlert(error: error).runModal() }
             }
         case .create(let project):
-            let doc = ProjectDocument(project: project)
-            addDocument(doc)
-            doc.makeWindowControllers()
-            doc.showWindows()
+            show(ProjectDocument(project: project))
+        case .importFrom(let url, let type, let canvas):
+            do { show(try ProjectImport.document(importing: url, type: type, canvas: canvas)) } catch { NSAlert(error: error).runModal() }
         }
+    }
+
+    private func show(_ doc: ProjectDocument) {
+        addDocument(doc)
+        doc.makeWindowControllers()
+        doc.showWindows()
     }
 }

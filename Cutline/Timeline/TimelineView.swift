@@ -59,6 +59,8 @@ final class TimelineView: NSView {
     private var marqueeRect: CGRect?
     /// The red playhead line and flag, a layer so moving it repaints nothing underneath.
     private let playheadLayer = CAShapeLayer()
+    /// Cache strip states, recomputed only when the project or the segment files change.
+    private var stripMemo: (revision: Int, files: Set<String>, states: [(segment: SegmentExporter.Segment, state: CacheStrip.State)])?
 
     init(editor: EditorModel) {
         self.editor = editor
@@ -72,6 +74,7 @@ final class TimelineView: NSView {
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.audioAnalysis.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
+        editor.$segmentFiles.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.transport.$loop.removeDuplicates().receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.transport.$tapWordID.removeDuplicates().receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.transport.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
@@ -172,6 +175,9 @@ final class TimelineView: NSView {
         }
         NSGraphicsContext.restoreGraphicsState()
         drawRuler(l)
+        if let limit = project.lengthLimit {
+            HardOutLine.draw(limit: limit, duration: project.duration, layout: l, bounds: bounds, rulerHeight: TimelineLayout.rulerHeight)
+        }
         if let m = marqueeRect {
             NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
             m.fill()
@@ -522,10 +528,19 @@ final class TimelineView: NSView {
             }
         }
         drawCinemascopeMarkers(l, ruler: r)
+        drawCacheStrip(l, ruler: r)
         NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
         CGRect(x: 0, y: 0, width: TimelineLayout.headerWidth, height: r.height - 1).fill()
         (Timecode.string(editor.playhead, fps: project.fps) as NSString).draw(at: CGPoint(x: 10, y: 6),
             withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.systemRed])
+    }
+
+    private func drawCacheStrip(_ l: TimelineLayout, ruler r: CGRect) {
+        if stripMemo?.revision != editor.revision || stripMemo?.files != editor.segmentFiles {
+            let states = CacheStrip.states(project: project, settings: .defaults(for: project), files: editor.segmentFiles)
+            stripMemo = (editor.revision, editor.segmentFiles, states)
+        }
+        CacheStrip.draw(stripMemo?.states ?? [], layout: l, width: bounds.width, y: r.maxY - CacheStrip.height - 1)
     }
 
     static let cinemaColor = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.22, alpha: 1)

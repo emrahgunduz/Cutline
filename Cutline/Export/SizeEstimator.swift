@@ -40,7 +40,7 @@ enum SizeEstimator {
     }
 
     static func estimateBytes(project: Project, settings: ExportSettings) async throws -> Double {
-        if settings.rateMode == .bitrate { return settings.estimatedBytes(duration: project.duration) }
+        if settings.rateMode != .quality { return settings.estimatedBytes(duration: project.duration) }
         return try await withThrowingTaskGroup(of: Double.self) { group in
             group.addTask { try await probe(project: project, settings: settings) }
             group.addTask {

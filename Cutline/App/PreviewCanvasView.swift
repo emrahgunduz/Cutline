@@ -50,6 +50,8 @@ final class PreviewCanvasView: NSView {
     private let playerLayer: AVPlayerLayer
     private let overlay = CAShapeLayer()
     private let handlesLayer = CAShapeLayer()
+    /// Platform UI zones (portrait projects, preview only): tinted rectangles with labels.
+    private let platformLayer = CALayer()
     private let editor: EditorModel
     private let controller: PreviewController
     private var cancellables: Set<AnyCancellable> = []
@@ -74,6 +76,7 @@ final class PreviewCanvasView: NSView {
         handlesLayer.fillColor = NSColor.white.cgColor
         handlesLayer.strokeColor = NSColor.controlAccentColor.cgColor
         handlesLayer.lineWidth = 1.5
+        layer?.addSublayer(platformLayer)
         layer?.addSublayer(overlay)
         layer?.addSublayer(handlesLayer)
         let relayout: () -> Void = { [weak self] in self?.needsLayout = true }
@@ -106,6 +109,7 @@ final class PreviewCanvasView: NSView {
         CATransaction.setDisableActions(true)
         let g = geometry
         playerLayer.frame = viewRect(g)
+        layoutPlatformZones(g)
         let fit = Int((g.fitScale * 100).rounded())
         if controller.fitPercent != fit { DispatchQueue.main.async { self.controller.fitPercent = fit } }
         let lineRects = selectedLineViewRects(g)
@@ -124,6 +128,36 @@ final class PreviewCanvasView: NSView {
             handlesLayer.path = nil
         }
         CATransaction.commit()
+    }
+
+    /// Draws the zones of the platform overlays switched on, so lyrics and titles can be kept
+    /// clear of the app's buttons and captions. Never part of the render or export.
+    private func layoutPlatformZones(_ g: PreviewGeometry) {
+        platformLayer.sublayers = nil
+        let p = editor.project
+        guard p.type.isPortrait, let ids = p.platformOverlays, !ids.isEmpty else { return }
+        let colors: [NSColor] = [.systemPink, .systemTeal, .systemOrange]
+        for (i, overlay) in PlatformOverlay.all.enumerated() where ids.contains(overlay.id) {
+            let color = colors[i % colors.count]
+            for (zone, rect) in zip(overlay.zones, overlay.rects(on: p.canvas)) {
+                let r = g.viewRect(ofCanvasRect: rect).offsetBy(dx: 12, dy: 12)
+                let box = CALayer()
+                box.frame = r
+                box.backgroundColor = color.withAlphaComponent(0.18).cgColor
+                box.borderColor = color.withAlphaComponent(0.8).cgColor
+                box.borderWidth = 1
+                let label = CATextLayer()
+                label.string = "\(overlay.name): \(zone.name)"
+                label.fontSize = 10
+                label.foregroundColor = NSColor.white.cgColor
+                label.contentsScale = window?.backingScaleFactor ?? 2
+                label.isWrapped = true
+                label.frame = r.insetBy(dx: 4, dy: 3)
+                box.addSublayer(label)
+                label.frame = CGRect(x: 4, y: 3, width: max(0, r.width - 8), height: max(0, r.height - 6))
+                platformLayer.addSublayer(box)
+            }
+        }
     }
 
     private func corners(_ r: CGRect) -> [CGPoint] {

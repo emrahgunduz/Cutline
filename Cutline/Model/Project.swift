@@ -24,14 +24,23 @@ struct Project: Codable, Equatable {
     /// Language Whisper uses to double-check aligned lyrics (a Whisper code such as "tr");
     /// nil detects it from the lyric text.
     var lyricsLanguage: String?
+    /// Portrait only: platform UI overlays shown in the preview (ids from platform_overlays.json);
+    /// automatically placed lyrics stay clear of them.
+    var platformOverlays: [String]?
+    /// The last export choices (rate mode, bitrate, size target...), reused by the next export.
+    var exportSettings: ExportSettings?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type
         self.canvas = canvas
     }
 
+    /// Set only on render excerpts (one export segment, a size probe): their exact length.
+    var renderLength: Double?
+
     /// Project length: whichever ends later, the audio or the last video clip.
     var duration: Double {
+        if let renderLength { return renderLength }
         let audioEnd = audio?.end ?? 0
         let videoEnd = videoTracks.flatMap(\.clips).map(\.end).max() ?? 0
         return max(audioEnd, videoEnd)

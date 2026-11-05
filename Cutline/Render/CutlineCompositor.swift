@@ -53,6 +53,18 @@ final class CutlineCompositor: NSObject, AVVideoCompositing {
                 return
             }
             let t = request.compositionTime.seconds
+            let snap = instruction.snapshot
+            var key: String?
+            if snap.cachesFrames {
+                let p = snap.project
+                let f = Double(p.frameIndex(t)) / p.fps
+                let k = RenderKey.key(project: p, start: f, end: f + p.frameDuration, proxies: snap.usesProxies)
+                if let cached = FrameCache.shared.frame(k) {
+                    request.finish(withComposedVideoFrame: cached)
+                    return
+                }
+                key = k
+            }
             let image = FrameRenderer.render(instruction.snapshot, at: t) { clip in
                 guard let info = instruction.clipTracks[clip.id],
                       let pb = request.sourceFrame(byTrackID: info.trackID) else { return nil }
@@ -60,6 +72,7 @@ final class CutlineCompositor: NSObject, AVVideoCompositing {
             }
             Self.context.render(image, to: out, bounds: CGRect(origin: .zero, size: instruction.snapshot.project.canvas.cgSize),
                                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+            if let key { FrameCache.shared.store(out, for: key) }
             request.finish(withComposedVideoFrame: out)
         }
     }
