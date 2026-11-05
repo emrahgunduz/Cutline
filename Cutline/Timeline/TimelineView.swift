@@ -361,19 +361,29 @@ final class TimelineView: NSView {
         NSColor(calibratedRed: 0.55, green: 1, blue: 0.75, alpha: 0.9).setStroke(); rmsPath.lineWidth = 1; rmsPath.stroke()
     }
 
-    /// Lyric row layout: a line bar on top, then two word rows that words alternate between,
-    /// so neighbouring words never touch and each word's edges are easy to grab.
+    /// Lyric row layout: the line's name bar on top, then one row per word (word 1 on the
+    /// first row, word 2 on the second, …), each row capped in height so lines with few and
+    /// many words look alike. Words never touch, so each word's edges are easy to grab.
     struct LyricRowParts { var line: CGRect; var words: [CGRect] }
 
-    static func lyricParts(_ rect: CGRect) -> LyricRowParts {
+    static let maxWordRowHeight: CGFloat = 18
+    static let minWordRowHeight: CGFloat = 5
+
+    static func lyricParts(_ rect: CGRect, wordCount: Int) -> LyricRowParts {
         let lineH: CGFloat = min(Self.titleBarHeight, max(12, rect.height - 4))
         let line = CGRect(x: rect.minX, y: rect.minY + 2, width: rect.width, height: lineH)
-        let remaining = rect.maxY - 3 - line.maxY - 2
-        guard remaining >= 16 else { return LyricRowParts(line: line, words: []) }
-        let rowH = (remaining - 2) / 2
-        let w0 = CGRect(x: rect.minX, y: line.maxY + 2, width: rect.width, height: rowH)
-        let w1 = CGRect(x: rect.minX, y: w0.maxY + 2, width: rect.width, height: rowH)
-        return LyricRowParts(line: line, words: [w0, w1])
+        let n = max(1, wordCount)
+        let gap: CGFloat = 2
+        let remaining = rect.maxY - 3 - line.maxY - gap
+        let rowH = min(maxWordRowHeight, (remaining - gap * CGFloat(n - 1)) / CGFloat(n))
+        guard rowH >= minWordRowHeight else { return LyricRowParts(line: line, words: []) }
+        var rows: [CGRect] = []
+        var y = line.maxY + gap
+        for _ in 0..<n {
+            rows.append(CGRect(x: rect.minX, y: y, width: rect.width, height: rowH))
+            y += rowH + gap
+        }
+        return LyricRowParts(line: line, words: rows)
     }
 
     /// Height of the name bar on top of clips and lyric lines (easy to grab).
@@ -384,8 +394,8 @@ final class TimelineView: NSView {
 
     private func drawLyricTrack(_ t: Int, _ rect: CGRect, _ l: TimelineLayout) {
         let visible = l.visibleTimeRange
-        let parts = Self.lyricParts(rect)
         for line in project.lyricTracks[t].lines where line.end >= visible.lowerBound && line.start <= visible.upperBound {
+            let parts = Self.lyricParts(rect, wordCount: line.words.count)
             let x0 = l.x(for: line.start), w = CGFloat(line.end - line.start) * l.pixelsPerSecond
             let lineSelected = editor.isSelected(.lyricLine(line.id))
             // The line spans its whole box (bar plus word rows) so its extent stays readable.
@@ -406,14 +416,14 @@ final class TimelineView: NSView {
                 (line.text as NSString).draw(in: CGRect(x: bar.minX + 5, y: bar.minY + 3, width: bar.width - 10, height: 15),
                                              withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.9)])
             }
-            guard parts.words.count == 2 else { continue }
+            guard parts.words.count == line.words.count else { continue }
             for (i, wd) in line.words.enumerated() {
-                let row = parts.words[i % 2]
+                let row = parts.words[i]
                 let wr = CGRect(x: l.x(for: wd.start), y: row.minY, width: max(2, CGFloat(wd.end - wd.start) * l.pixelsPerSecond), height: row.height)
                 let selected = editor.isSelected(.lyricWord(wd.id))
                 (selected ? NSColor.controlAccentColor : Self.wordColor).setFill()
                 NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
-                if wr.width > 14 {
+                if wr.width > 14 && wr.height >= 10 {
                     (wd.text as NSString).draw(in: wr.insetBy(dx: 3, dy: 0),
                                                withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.black.withAlphaComponent(0.8)])
                 }
@@ -526,10 +536,10 @@ final class TimelineView: NSView {
             if let a = project.audio, t >= a.start, t <= a.end { return .audio }
         case .lyric(let ti):
             guard let frame = l.frame(of: row) else { break }
-            let parts = Self.lyricParts(frame)
             for line in project.lyricTracks[ti].lines where t >= line.start - grab && t <= line.end + grab {
-                for (i, w) in line.words.enumerated() where parts.words.count == 2 {
-                    let r = parts.words[i % 2]
+                let parts = Self.lyricParts(frame, wordCount: line.words.count)
+                for (i, w) in line.words.enumerated() where parts.words.count == line.words.count {
+                    let r = parts.words[i]
                     if p.y >= r.minY && p.y <= r.maxY && t >= w.start - grab && t <= w.end + grab {
                         return .word(w.id, edge(w.start, w.end))
                     }
