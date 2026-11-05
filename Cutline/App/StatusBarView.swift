@@ -128,6 +128,9 @@ private struct CorrectionStatusView: View {
             Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
             Label("Tap mode · \(Int((transport.rate * 100).rounded()))% · Space taps · 1/2/3 speed · Esc ends", systemImage: "hand.tap")
                 .foregroundStyle(.green)
+        } else if transport.stopAt != nil {
+            Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
+            Label("Last word tapped · playing 5 s more", systemImage: "hand.tap").foregroundStyle(.green)
         } else if transport.loop != nil {
             Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1, height: 12)
             Label("Looping · Return confirms · N next · Esc stops", systemImage: "repeat").foregroundStyle(.yellow)

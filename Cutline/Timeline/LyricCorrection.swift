@@ -8,6 +8,10 @@ extension EditorModel {
     /// A tap snaps to a vocal onset this close.
     static let tapSnapWindow = 0.04
     static let tapRates: [Float] = [1, 0.75, 0.5]
+    /// Tap mode starts playing this long before the first word...
+    static let tapLeadTime = 5.0
+    /// ...and keeps playing this long after the last word is tapped.
+    static let tapTailTime = 5.0
 
     /// All lyric words in time order with their track.
     private var allWords: [(track: Int, word: LyricWord)] {
@@ -74,16 +78,33 @@ extension EditorModel {
         }()
         guard let first = start else { return }
         clearLoop()
+        transport.stopAt = nil
         transport.tapWordID = first.id
         selection = .lyricWord(first.id)
-        // Start a little before the word so the first tap can land on time.
-        setPlayhead(max(0, min(playhead, first.start - 2)))
+        // Start well before the word so you hear the run-up and the first tap lands on time.
+        setPlayhead(max(0, first.start - Self.tapLeadTime))
         isPlaying = true
     }
 
     @MainActor
     func endTapMode() {
         transport.tapWordID = nil
+        transport.stopAt = nil
+        transport.rate = 1
+        isPlaying = false
+    }
+
+    /// After the last word: leave tap mode but let the song play on for the tail, then pause.
+    @MainActor
+    private func finishTapMode(after lastEnd: Double) {
+        transport.tapWordID = nil
+        transport.stopAt = lastEnd + Self.tapTailTime
+    }
+
+    /// Called by playback when it reaches `stopAt`.
+    @MainActor
+    func reachedStopPoint() {
+        transport.stopAt = nil
         transport.rate = 1
         isPlaying = false
     }
@@ -137,7 +158,7 @@ extension EditorModel {
             transport.tapWordID = order[i + 1]
             selection = .lyricWord(order[i + 1])
         } else {
-            endTapMode()
+            finishTapMode(after: word(id)?.end ?? t)
         }
     }
 }

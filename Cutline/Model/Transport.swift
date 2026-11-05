@@ -35,7 +35,7 @@ extension EditorModel {
         setPlayhead(playhead + seconds)
     }
     func goToEnd() { isPlaying = false; setPlayhead(project.duration) }
-    func togglePlay() { isPlaying.toggle() }
+    func togglePlay() { transport.stopAt = nil; isPlaying.toggle() }
 
     /// Split the selected clip at the playhead, or every clip under it when none is selected.
     func splitAtPlayhead() {
