@@ -9,6 +9,7 @@ final class TimelineContainer: NSView {
     private let vScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 200))
     private let bar = NSStackView()
     private var snapButton: NSButton!
+    private var groupButtons: [SnapGroup: NSButton] = [:]
     private var cinemaButton: NSButton!
     private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
@@ -32,10 +33,28 @@ final class TimelineContainer: NSView {
         }
         let split = button("scissors", "Cut at playhead (C)") { [weak editor] in editor?.splitAtPlayhead() }
         let delete = button("trash", "Delete selection (⌫)") { [weak editor] in editor?.deleteSelection() }
-        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (S): edges, playhead and lyrics attract while dragging. Hold ⌘ to bypass.") { [weak self] in
+        snapButton = button("dot.arrowtriangles.up.right.down.left.circle", "Snapping (S): the groups to the right attract while dragging. Hold ⌘ to bypass.") { [weak self] in
             self?.timeline.snappingEnabled.toggle()
         }
         snapButton.setButtonType(.pushOnPushOff)
+        let groupSymbols: [SnapGroup: (String, String)] = [
+            .sections: ("square.split.2x1", "Snap to section edges (strongest)"),
+            .downbeats: ("metronome.fill", "Snap to downbeats (first beat of each bar)"),
+            .beats: ("metronome", "Snap to beats"),
+            .edges: ("arrow.left.and.right.righttriangle.left.righttriangle.right", "Snap to clip, lyric and audio edges and the playhead"),
+        ]
+        for g in SnapGroup.allCases {
+            let (symbol, tip) = groupSymbols[g]!
+            let b = button(symbol, tip) { [weak self] in
+                guard let self else { return }
+                var groups = self.timeline.snapGroups
+                if groups.contains(g) { groups.remove(g) } else { groups.insert(g) }
+                self.timeline.snapGroups = groups
+            }
+            b.setButtonType(.pushOnPushOff)
+            b.controlSize = .small
+            groupButtons[g] = b
+        }
         cinemaButton = button("rectangle.ratio.16.to.9", "Cinemascope bars (music videos): drag the orange markers on the ruler to set where the bars start and finish closing to 2.35:1") { [weak editor] in
             guard let editor else { return }
             editor.edit(editor.project.cinemascope.enabled ? "Cinemascope Off" : "Cinemascope On") { p in
@@ -44,6 +63,7 @@ final class TimelineContainer: NSView {
                 if p.cinemascope.enabled && p.cinemascope.startMarker == 0 && p.cinemascope.endMarker == 5 {
                     p.cinemascope.startMarker = p.quantize(editor.playhead)
                     p.cinemascope.endMarker = p.quantize(editor.playhead + 4)
+                    p.anchorMarkers(editor.resolvedBeats, hash: editor.audioAnalysis.analysis?.audioHash)
                 }
             }
         }
@@ -53,7 +73,10 @@ final class TimelineContainer: NSView {
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        for v in [addVideo, addLyrics, separator(), split, delete, separator(), snapButton!, cinemaButton!, spacer, zoomOut, zoomIn, fit] { bar.addArrangedSubview(v) }
+        let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
+        let items: [NSView] = [addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
+            + [separator(), cinemaButton, spacer, zoomOut, zoomIn, fit]
+        for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo
         editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
@@ -67,14 +90,22 @@ final class TimelineContainer: NSView {
         vScroller.target = self; vScroller.action = #selector(vScrolled)
         hScroller.isEnabled = true; vScroller.isEnabled = true
         timeline.onScroll = { [weak self] in self?.syncScrollers() }
-        timeline.onSnappingChange = { [weak self] on in self?.snapButton.state = on ? .on : .off }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.snapButton.state = self.timeline.snappingEnabled ? .on : .off
-        }
+        timeline.onSnappingChange = { [weak self] _ in self?.syncSnapButtons() }
+        timeline.onSnapGroupsChange = { [weak self] _ in self?.syncSnapButtons() }
+        DispatchQueue.main.async { [weak self] in self?.syncSnapButtons() }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Group toggles keep their own state but grey out while snapping is off.
+    private func syncSnapButtons() {
+        let on = timeline.snappingEnabled, groups = timeline.snapGroups
+        snapButton.state = on ? .on : .off
+        for (g, b) in groupButtons {
+            b.state = groups.contains(g) ? .on : .off
+            b.isEnabled = on
+        }
+    }
 
     private func separator() -> NSView {
         let b = NSBox(); b.boxType = .separator

@@ -8,6 +8,8 @@ struct LayoutState: Codable, Equatable {
     /// Timeline row heights keyed by track id ("audio" for the audio row).
     var trackHeights: [String: Double]?
     var snapping: Bool?
+    /// Snap-target groups that are on (nil = all).
+    var snapGroups: [SnapGroup]?
 }
 
 enum ProjectFileError: LocalizedError {

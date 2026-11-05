@@ -14,6 +14,17 @@ final class TimelineView: NSView {
     /// Called whenever zoom or scroll changes, so scrollers can follow.
     var onScroll: (() -> Void)?
     var onSnappingChange: ((Bool) -> Void)?
+    var onSnapGroupsChange: ((Set<SnapGroup>) -> Void)?
+
+    /// Snap-target groups that are on (R41), saved per project.
+    var snapGroups: Set<SnapGroup> {
+        get { editor.document?.layout.snapGroups.map(Set.init) ?? Set(SnapGroup.allCases) }
+        set {
+            editor.document?.layout.snapGroups = SnapGroup.allCases.filter(newValue.contains)
+            editor.document?.persistLayout()
+            onSnapGroupsChange?(newValue)
+        }
+    }
 
     var snappingEnabled: Bool {
         get { editor.document?.layout.snapping ?? true }
@@ -717,8 +728,9 @@ final class TimelineView: NSView {
     private func snapped(_ time: Double, excluding ids: Set<UUID>, event: NSEvent?) -> Double {
         guard snappingEnabled, !(event?.modifierFlags.contains(.command) ?? false) else { snapGuide = nil; return time }
         let targets = Snapping.targets(in: drag.map { if case .edit(_, let o) = $0.kind { return o } else { return project } } ?? project,
-                                       playhead: editor.playhead, excluding: ids, includeAudio: !draggingAudio)
-        if let s = Snapping.snap(time, targets: targets, pixelsPerSecond: Double(pixelsPerSecond)) { snapGuide = s; return s }
+                                       playhead: editor.playhead, excluding: ids, includeAudio: !draggingAudio,
+                                       beats: editor.resolvedBeats, groups: snapGroups)
+        if let s = Snapping.snap(time, targets: targets, pixelsPerSecond: Double(pixelsPerSecond)) { snapGuide = s.time; return s.time }
         snapGuide = nil
         return time
     }
@@ -840,7 +852,8 @@ final class TimelineView: NSView {
         case .reorder(let row):
             if let target = reorderTarget { performReorder(row, to: target) }
         case .marker(_, let original) where d.didEdit:
-            let final = editor.project
+            var final = editor.project
+            final.anchorMarkers(editor.resolvedBeats, hash: editor.audioAnalysis.analysis?.audioHash)
             editor.replaceWithoutUndo(original)
             editor.edit("Move Cinemascope Marker") { $0 = final }
         case .beat(let hit, let original, _) where d.didEdit:
