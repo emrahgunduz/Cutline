@@ -100,7 +100,9 @@ struct AssetsPanelView: View {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(items) { asset in tile(asset, items) }
                 }
-                .padding(.horizontal, 8)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Self.groupColor(kind).opacity(0.25)))
+                .padding(.horizontal, 6)
             }
         }
     }
@@ -120,8 +122,18 @@ struct AssetsPanelView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 10).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.06)))
+            .background(RoundedRectangle(cornerRadius: 6).fill(Self.groupColor(kind)))
             .padding(.horizontal, 6)
+    }
+
+    /// Group colors match the timeline: video blue, image teal, audio green, lyrics purple.
+    static func groupColor(_ kind: AssetKind) -> Color {
+        switch kind {
+        case .video: Color(red: 0.16, green: 0.24, blue: 0.40)
+        case .image: Color(red: 0.12, green: 0.30, blue: 0.32)
+        case .audio: Color(red: 0.12, green: 0.30, blue: 0.20)
+        case .lyrics: Color(red: 0.28, green: 0.19, blue: 0.38)
+        }
     }
 
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
