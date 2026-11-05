@@ -1,38 +1,7 @@
-import AppKit
 import SwiftUI
 
-/// Settings window: the editable format presets (R39, KTD13). Changes apply to projects
+/// Settings > Presets: the editable format presets (R39, KTD13). Changes apply to projects
 /// opened afterwards and to the length limit and export defaults of open ones.
-final class PresetsSettingsWindow: NSObject {
-    static let shared = PresetsSettingsWindow()
-    private var window: NSWindow?
-
-    @objc func show(_ sender: Any?) {
-        if window == nil {
-            let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Cutline Settings"
-            w.isReleasedWhenClosed = false
-            let host = NSHostingController(rootView: SettingsView())
-            host.sizingOptions = [.preferredContentSize]
-            w.contentViewController = host
-            w.center()
-            window = w
-        }
-        window?.makeKeyAndOrderFront(nil)
-    }
-}
-
-/// The settings, one tab per section.
-struct SettingsView: View {
-    var body: some View {
-        TabView {
-            PresetsSettingsView().tabItem { Label("Presets", systemImage: "slider.horizontal.3") }
-            ModelsSettingsView(store: .shared).padding(.vertical, 8).tabItem { Label("Models", systemImage: "square.stack.3d.down.right") }
-        }
-        .padding(.top, 8)
-    }
-}
-
 struct PresetsSettingsView: View {
     @State private var presets = Presets.all()
     @State private var saved = Presets.all()

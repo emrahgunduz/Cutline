@@ -8,8 +8,8 @@ enum MainMenu {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About Cutline", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        let settings = appMenu.addItem(withTitle: "Settings…", action: #selector(PresetsSettingsWindow.show(_:)), keyEquivalent: ",")
-        settings.target = PresetsSettingsWindow.shared
+        let settings = appMenu.addItem(withTitle: "Settings…", action: #selector(SettingsWindow.show(_:)), keyEquivalent: ",")
+        settings.target = SettingsWindow.shared
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide Cutline", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
