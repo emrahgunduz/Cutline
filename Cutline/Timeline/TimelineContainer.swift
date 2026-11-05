@@ -28,6 +28,12 @@ final class TimelineContainer: NSView {
         bar.orientation = .horizontal
         bar.spacing = 4
         bar.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+        let dummy = button("rectangle.dashed", "New Dummy: a placeholder card (title, length, color) added to the assets") { [weak self, weak editor] in
+            guard let editor else { return }
+            NewDummySheet.present(editor: editor, window: self?.window)
+        }
+        dummy.title = "Dummy"
+        dummy.imagePosition = .imageLeading
         let addVideo = button("rectangle.stack.badge.plus", "Add video track") { [weak editor] in
             editor?.edit("Add Video Track") { $0.addVideoTrack() }
         }
@@ -102,7 +108,7 @@ final class TimelineContainer: NSView {
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
-        let items: [NSView] = [addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
+        let items: [NSView] = [dummy, separator(), addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
             + [separator(), cinemaButton, separator(), analyzeButton, alignButton, trimButton, spacer, zoomOut, zoomIn, fit]
         for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo

@@ -34,6 +34,11 @@ final class ThumbnailGenerator: ObservableObject {
             let t = CMTime(seconds: min(1, (asset.duration ?? 0) / 2), preferredTimescale: 600)
             return try await gen.image(at: t).image
         case .image:
+            if let card = asset.dummy {
+                let px = asset.pixelSize.map { CGSize(width: $0.width, height: $0.height) } ?? CGSize(width: 1920, height: 1080)
+                let scale = min(1, maxSize.width / max(px.width, px.height))
+                return DummyRenderer.image(card, size: CGSize(width: px.width * scale, height: px.height * scale))
+            }
             guard let src = CGImageSourceCreateWithURL(asset.url as CFURL, nil) else { return nil }
             let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                          kCGImageSourceThumbnailMaxPixelSize: Int(maxSize.width),

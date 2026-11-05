@@ -69,7 +69,8 @@ extension Project {
         guard let asset = asset(assetID), asset.kind == .video || asset.kind == .image,
               videoTracks.indices.contains(track) else { return nil }
         lockFrameRate(from: asset)
-        let duration = asset.kind == .video ? (asset.duration ?? Self.defaultImageDuration) : Self.defaultImageDuration
+        // Video uses its source length, a dummy its own length, other images a default.
+        let duration = asset.kind == .video ? (asset.duration ?? Self.defaultImageDuration) : (asset.dummy?.length ?? Self.defaultImageDuration)
         var clip = Clip(assetID: assetID, start: quantize(max(0, time)), duration: quantize(duration))
         clip.transform.scale = defaultScale(for: asset)
         videoTracks[track].clips.append(clip)
