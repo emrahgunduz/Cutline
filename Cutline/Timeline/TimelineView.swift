@@ -392,7 +392,6 @@ final class TimelineView: NSView {
         guard wave.height > 16, let wf = editor.waveforms.waveforms[audio.assetID],
               let level = wf.level(secondsPerPixel: 1 / Double(l.pixelsPerSecond)) else { return }
         let secondsPerBucket = Double(level.samplesPerBucket) / wf.sampleRate
-        let mid = wave.midY, half = wave.height / 2 - 2
         let peak = NSBezierPath(), rmsPath = NSBezierPath()
         var x = x0
         while x < x1 {
@@ -401,8 +400,11 @@ final class TimelineView: NSView {
             if b0 < level.maxs.count {
                 var mx: Float = 0, mn: Float = 0, rm: Float = 0
                 for b in b0..<b1 { mx = max(mx, level.maxs[b]); mn = min(mn, level.mins[b]); rm = max(rm, level.rms[b]) }
-                peak.move(to: CGPoint(x: x, y: mid - CGFloat(mx) * half)); peak.line(to: CGPoint(x: x, y: mid - CGFloat(mn) * half))
-                rmsPath.move(to: CGPoint(x: x, y: mid - CGFloat(rm) * half)); rmsPath.line(to: CGPoint(x: x, y: mid + CGFloat(rm) * half))
+                // Same scale as the loudness curve and its levels (SectionLane.amplitudeY).
+                let hiY = SectionLane.amplitudeY(mx, in: wave).top, loY = SectionLane.amplitudeY(-mn, in: wave).bottom
+                peak.move(to: CGPoint(x: x, y: hiY)); peak.line(to: CGPoint(x: x, y: loY))
+                let r = SectionLane.amplitudeY(rm, in: wave)
+                rmsPath.move(to: CGPoint(x: x, y: r.top)); rmsPath.line(to: CGPoint(x: x, y: r.bottom))
             }
             x += 1
         }

@@ -125,9 +125,22 @@ final class AudioAnalysisTests: XCTestCase {
         XCTAssertEqual(e.height(e.peak), 1)
         XCTAssertEqual(e.height(0), 0)
         XCTAssertEqual(e.height(e.peak * 2), 1, "clamped")
-        let lane = CGRect(x: 0, y: 0, width: 100, height: 52)
-        XCTAssertEqual(SectionLane.curveHeight(e, e.peak, lane), 50 * 0.85, accuracy: 1e-6, "the loudest moment stays inside the lane")
-        XCTAssertLessThan(SectionLane.curveHeight(e, e.quietLevel, lane), SectionLane.curveHeight(e, e.loudLevel, lane))
+    }
+
+    func testTheCurveAndLevelsUseTheWaveformsScale() throws {
+        let e = try XCTUnwrap(Loudness.envelope(steppedWaveform()))
+        let wave = CGRect(x: 0, y: 20, width: 100, height: 64)      // centre 52, half 30
+        let loud = SectionLane.amplitudeY(e.loudLevel, in: wave), quiet = SectionLane.amplitudeY(e.quietLevel, in: wave)
+        // An amplitude sits where the waveform draws it: centre ± value × half.
+        XCTAssertEqual(loud.top, 52 - CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
+        XCTAssertEqual(loud.bottom, 52 + CGFloat(e.loudLevel) * 30, accuracy: 1e-6)
+        XCTAssertEqual((loud.top + loud.bottom) / 2, wave.midY, accuracy: 1e-6, "mirrored around the waveform's centre")
+        XCTAssertEqual((quiet.top + quiet.bottom) / 2, wave.midY, accuracy: 1e-6)
+        XCTAssertLessThan(loud.top, quiet.top, "the loud level is further from the centre")
+        // The curve at a moment is exactly the RMS the waveform draws there (smoothing aside).
+        let rms: Float = 0.5
+        XCTAssertEqual(SectionLane.amplitudeY(e.value(at: 25), in: wave).top, SectionLane.amplitudeY(rms, in: wave).top, accuracy: 1e-3)
+        XCTAssertEqual(SectionLane.amplitudeY(2, in: wave).top, wave.midY - 30, "clamped to the lane")
     }
 
     func testSilenceHasNoEnvelope() {

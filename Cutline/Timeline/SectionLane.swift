@@ -51,40 +51,44 @@ enum SectionLane {
         }
     }
 
-    /// The loudness curve and the loud and quiet levels (dashed), drawn over the waveform.
+    /// Where the waveform draws an amplitude `v` (0...1) in `wave`: above and below its centre
+    /// line. The waveform, the loudness curve and the loud/quiet levels all use this, so they
+    /// share one scale.
+    static func amplitudeY(_ v: Float, in wave: CGRect) -> (top: CGFloat, bottom: CGFloat) {
+        let half = max(0, wave.height / 2 - 2)
+        let a = CGFloat(min(1, max(0, v))) * half
+        return (wave.midY - a, wave.midY + a)
+    }
+
+    /// The loudness curve (smoothed RMS, mirrored like the waveform's RMS layer) and the loud
+    /// and quiet levels (dashed, mirrored), drawn over the waveform on its own scale.
     static func drawLoudnessCurve(_ envelope: Loudness.Envelope?, audioStart: Double, in wave: CGRect,
                                   visible: ClosedRange<CGFloat>, time: (CGFloat) -> Double) {
         guard let e = envelope, e.peak > 0, wave.height > 12 else { return }
         let lo = max(visible.lowerBound, wave.minX), hi = min(visible.upperBound, wave.maxX)
         guard hi > lo else { return }
-        // y for a loudness value (the view is flipped: silent at the bottom).
-        func y(_ v: Float) -> CGFloat { wave.maxY - 1 - curveHeight(e, v, wave) }
         for (level, color) in [(e.loudLevel, loudColor), (e.quietLevel, quietColor)] {
+            let y = amplitudeY(level, in: wave)
             let line = NSBezierPath()
-            line.move(to: CGPoint(x: lo, y: y(level))); line.line(to: CGPoint(x: hi, y: y(level)))
+            for edge in [y.top, y.bottom] {
+                line.move(to: CGPoint(x: lo, y: edge)); line.line(to: CGPoint(x: hi, y: edge))
+            }
             line.setLineDash([4, 3], count: 2, phase: 0)
             line.lineWidth = 1
-            color.withAlphaComponent(0.7).setStroke()
+            color.withAlphaComponent(0.8).setStroke()
             line.stroke()
         }
-        let curve = NSBezierPath()
+        let upper = NSBezierPath(), lower = NSBezierPath()
         var px = lo
         var first = true
         while px <= hi {
-            let t = time(px) - audioStart
-            let p = CGPoint(x: px, y: y(e.value(at: t)))
-            if first { curve.move(to: p); first = false } else { curve.line(to: p) }
+            let y = amplitudeY(e.value(at: time(px) - audioStart), in: wave)
+            if first { upper.move(to: CGPoint(x: px, y: y.top)); lower.move(to: CGPoint(x: px, y: y.bottom)); first = false }
+            else { upper.line(to: CGPoint(x: px, y: y.top)); lower.line(to: CGPoint(x: px, y: y.bottom)) }
             px += 2
         }
-        curve.lineWidth = 1.5
-        curve.lineJoinStyle = .round
         NSColor.systemYellow.withAlphaComponent(0.9).setStroke()
-        curve.stroke()
-    }
-
-    /// Height above the lane's bottom for a loudness value (the loudest moment reaches 85%).
-    static func curveHeight(_ e: Loudness.Envelope, _ v: Float, _ wave: CGRect) -> CGFloat {
-        e.height(v) * (wave.height - 2) * 0.85
+        for c in [upper, lower] { c.lineWidth = 1.5; c.lineJoinStyle = .round; c.stroke() }
     }
 
     static func drawSections(_ sections: [SongSection], audioStart: Double, duration: Double, in clip: CGRect,
