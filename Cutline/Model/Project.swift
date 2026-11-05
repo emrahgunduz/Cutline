@@ -189,11 +189,20 @@ struct LyricLine: Codable, Equatable, Identifiable {
     var centerY: Double?
     /// Single line or wrapped at a width, and the text alignment. nil = the defaults.
     var layoutValue: LineLayout?
+    /// Where the line is in its lyrics file. Alignment sings the lines in this order wherever
+    /// they were moved on the timeline (any track, any time). nil = not from a file.
+    var textOrder: TextOrder?
     var hasPosition: Bool { centerX != nil && centerY != nil }
     var text: String { words.map(\.text).joined(separator: " ") }
     var layout: LineLayout { get { layoutValue ?? LineLayout() } set { layoutValue = newValue == LineLayout() ? nil : newValue } }
 
-    enum CodingKeys: String, CodingKey { case id, start, end, words, stanza, centerX, centerY, layoutValue = "layout" }
+    enum CodingKeys: String, CodingKey { case id, start, end, words, stanza, centerX, centerY, layoutValue = "layout", textOrder }
+}
+
+/// A line's place in the lyrics file it came from: the file (one import) and its index there.
+struct TextOrder: Codable, Equatable, Hashable {
+    var group: UUID
+    var index: Int
 }
 
 /// How one lyric line is laid out (per line).
