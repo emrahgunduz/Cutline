@@ -26,7 +26,7 @@ A simple native macOS (Apple Silicon) editor for music videos, portrait social v
 | `scripts` | Build scripts (runtime, Release, version stamp, icons, model fetch) |
 | `docs` | Glossary, the plan, and the Claude skill |
 
-`build/` and `Example_Music_Video/` aren't tracked. `build/ml` holds the Python runtime (copied into the app) and a development copy of the models. `build/Release/Cutline.app` is the Release app.
+`build/` isn't tracked. `build/ml` holds the Python runtime (copied into the app) and a development copy of the models. `build/Release/Cutline.app` is the Release app.
 
 ## Building
 
