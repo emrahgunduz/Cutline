@@ -28,7 +28,7 @@ enum LyricImport {
 
     /// Rough timing until audio alignment runs: lines fill `start..<end` in proportion to their
     /// length, with a pause between stanzas. Every word is marked unaligned (confidence 0).
-    static func roughlyTimed(_ parsed: [ParsedLine], start: Double, end: Double, fps: Double) -> [LyricLine] {
+    static func roughlyTimed(_ parsed: [ParsedLine], start: Double, end: Double, fps: Double, group: UUID = UUID()) -> [LyricLine] {
         guard !parsed.isEmpty, end > start else { return [] }
         func weight(_ w: String) -> Double { 1 + Double(w.count) / 6 }
         let stanzaGap = 2.0, lineGap = 0.6
@@ -51,6 +51,7 @@ enum LyricImport {
                 t += d
             }
             var line = LyricLine(start: words.first!.start, end: words.last!.end, words: words, stanza: l.stanza)
+            line.textOrder = TextOrder(group: group, index: i)   // its place in the file, kept forever
             line.endWordsAtLineEnd()   // new words end with their line by default
             lines.append(line)
         }
