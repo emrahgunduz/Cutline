@@ -7,9 +7,13 @@ description: Place one Cutline dummy card per scene of a music video production 
 
 Cutline (the user's music video editor) has a control channel. Talk to it only with `cutline-ctl`; never edit project files on disk. It never changes audio or lyrics; neither do you.
 
-`cutline-ctl` ships inside the app. Use the first that exists:
-- `/Volumes/PRO-G40/Code/Cutline/build/Release/Cutline.app/Contents/MacOS/cutline-ctl` (the app the user runs)
-- `/Volumes/PRO-G40/Code/Cutline/build/DerivedData/Build/Products/Debug/Cutline.app/Contents/MacOS/cutline-ctl`
+`cutline-ctl` ships inside the app. Whenever Cutline opens, it links its own copy to one fixed place, wherever the app is installed:
+
+```bash
+"$HOME/Library/Application Support/Cutline/cutline-ctl" apps
+```
+
+Below, `cutline-ctl` means that path. Always quote it (it has a space). If it isn't there, Cutline hasn't been opened yet (or is too old to make the link): ask the user to open Cutline, then try again. Never look for the app in the user's folders.
 
 Every command prints JSON. Exit 0 = ok, 1 = refused or error (read `message`), 2 = Cutline not running, or several running.
 
