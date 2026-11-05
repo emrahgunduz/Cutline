@@ -96,3 +96,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Recent Projects** | The last 10 projects you opened or saved, listed on the New Project page. Click one to open it; Clear forgets the list (the projects stay). |
 | **Lyrics Language** | Lyrics > Lyrics Language, or the menu that opens from the Align Lyrics button: "Detect from Lyrics" (reads your TXT) or any of the 100 languages Whisper knows, saved per project. It only steers the double-check of unsure words. |
 | **Platform UI zones** | Portrait projects: the Platform UI menu in the preview bar shows where TikTok, Reels and Shorts draw their buttons and captions (preview only, never exported). Automatically placed lyrics stay clear of the zones you switch on; zones live in platform_overlays.json. |
+| **Hard-out line** | Social and ad projects: the red LIMIT line on the timeline at the type's maximum length; anything past it is hatched red as over. **Trim to Limit** (timeline bar, shown when over) ends the project on the last downbeat or lyric-line end before the limit. |
+| **Target size** | Export rate mode for social and ads: give a maximum size in MB; Cutline picks the bitrate, checks the finished file and re-encodes automatically (up to twice) if it came out too big. |
+| **Budget bar** | Status bar: project length against the limit, and the size target (or the estimated size at the saved bitrate) against it. |
+| **Format presets** | Cutline > Settings… (⌘,): each project type's length limit, codec, default bitrate and default size target. |

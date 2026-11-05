@@ -27,6 +27,8 @@ struct Project: Codable, Equatable {
     /// Portrait only: platform UI overlays shown in the preview (ids from platform_overlays.json);
     /// automatically placed lyrics stay clear of them.
     var platformOverlays: [String]?
+    /// The last export choices (rate mode, bitrate, size target...), reused by the next export.
+    var exportSettings: ExportSettings?
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type

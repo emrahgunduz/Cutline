@@ -32,6 +32,19 @@ enum Presets {
         cached = presets
     }
 
+    /// Drop the user's edits and go back to the bundled table.
+    static func restoreDefaults() {
+        try? FileManager.default.removeItem(at: editableURL)
+        cached = nil
+    }
+
+    /// The bundled values, for comparison in Settings.
+    static var bundled: [FormatPreset] {
+        guard let url = bundledURL, let data = try? Data(contentsOf: url),
+              let p = try? JSONDecoder().decode([FormatPreset].self, from: data) else { return fallback }
+        return p
+    }
+
     private static func load() -> [FormatPreset] {
         let fm = FileManager.default
         if !fm.fileExists(atPath: editableURL.path), let bundledURL {

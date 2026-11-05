@@ -172,6 +172,9 @@ final class TimelineView: NSView {
         }
         NSGraphicsContext.restoreGraphicsState()
         drawRuler(l)
+        if let limit = project.lengthLimit {
+            HardOutLine.draw(limit: limit, duration: project.duration, layout: l, bounds: bounds, rulerHeight: TimelineLayout.rulerHeight)
+        }
         if let m = marqueeRect {
             NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
             m.fill()

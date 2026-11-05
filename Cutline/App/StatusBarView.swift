@@ -11,7 +11,7 @@ struct StatusBarView: View {
             HStack(spacing: 14) {
                 Label { Text(selectionText).lineLimit(1).truncationMode(.middle) } icon: { Image(systemName: selectionIcon) }
                 Spacer(minLength: 12)
-                lengthView
+                BudgetBarView()
                 divider
                 Text(verbatim: "\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Int(editor.project.fps.rounded())) fps")
                 if proxyCount > 0 {
@@ -41,16 +41,6 @@ struct StatusBarView: View {
         return p.assets.filter { used.contains($0.id) && $0.proxy != nil }.count
     }
 
-    @ViewBuilder private var lengthView: some View {
-        let limit = Presets.preset(for: p.type).maxDuration
-        let over = limit.map { p.duration > $0 } ?? false
-        HStack(spacing: 4) {
-            Image(systemName: "timer")
-            Text(tc(p.duration) + (limit.map { " / max \(tc($0))" } ?? ""))
-        }
-        .foregroundStyle(over ? Color.red : Color.secondary)
-        .help(over ? "Longer than this project type allows" : "Project length")
-    }
 
     private var selectionIcon: String {
         if editor.selectedItems.count > 1 { return "square.on.square" }
