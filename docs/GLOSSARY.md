@@ -76,3 +76,5 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Alignment** | Matching each lyric word to when it's sung in the song (coming in PR 2). |
 | **Cinemascope / letterbox** | Animated black bars from 16:9 to 2.35:1, music videos only. Toggle in the timeline button bar. |
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
+| **Analysis helper** | The bundled, offline Python process (inside `Cutline.app/Contents/Resources/ml`) that runs the music and lyric models. Built by `scripts/build_python_runtime.sh`. |
+| **Job** | One run of the analysis helper (for example separating the vocal stem). Shows progress, can be cancelled, and leaves nothing behind if it fails. |

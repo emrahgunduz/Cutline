@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = MainMenu.build()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        HelperProcess.terminateAll()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate()
         // Window restoration and Finder opens finish just after launch; only offer a new

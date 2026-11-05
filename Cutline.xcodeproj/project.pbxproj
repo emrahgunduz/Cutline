@@ -25,9 +25,11 @@
 		392F596D7B0F84402A9D850D /* AssetLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B9F6AE38DC41DC924985AC /* AssetLibrary.swift */; };
 		3A111F1D9BE53268BAA2D296 /* Timecode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86364879801D464F4CA7B592 /* Timecode.swift */; };
 		41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */; };
+		449F3E84A392E466628CC00C /* JobRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0BC60B5EFC2D0CA9A6F2CD /* JobRunner.swift */; };
 		46328A8BDE1E662B50DF4721 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A15C4D7584ACEF73D94EDA7 /* StatusBarView.swift */; };
 		4767FD52352B89696CD5E022 /* Presets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F8AA3C08E957501BF0222F /* Presets.swift */; };
 		48A0FF5396C6741300FBFCC2 /* WindowToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BF6447E10E82DFF132DB56 /* WindowToolbar.swift */; };
+		49C28E9C73CB6AE1364DCB3B /* JobRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D0ACB939B25A4B6DEA9C41 /* JobRunnerTests.swift */; };
 		4CBCAB9E4A7E9532D3BED6BB /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23FD7544E013663B4C9C951 /* TimelineView.swift */; };
 		4D1575E75E19A0AC441575D3 /* ExporterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */; };
 		51257BCDE123E8EC042AF5F0 /* EditCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57241241CDE82184DC86E55 /* EditCommands.swift */; };
@@ -48,6 +50,7 @@
 		81C7343BD7695078BE6DBBA6 /* LyricRasterizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABA2172552A305ED3A580F5 /* LyricRasterizer.swift */; };
 		844740FF67B0903A98F485A1 /* LyricPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726ADC25A13D2E39324D7F7B /* LyricPlacementTests.swift */; };
 		8B83F1E2D6B67088AC884AEA /* LetterboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B885123EFA34EFDA73BC3CCD /* LetterboxTests.swift */; };
+		8C619DAE436D023E36DC1B81 /* HelperProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B0D161436BA55D45A5EBE9 /* HelperProcess.swift */; };
 		8C93807386D4A76192988DB3 /* FilterChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469DB9DE42E9D04C0AB92D16 /* FilterChain.swift */; };
 		8F12F68EF5BE700BD8B53D81 /* Filmstrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF90EE62F3B92ADD7ED730F /* Filmstrip.swift */; };
 		8FD8835304008E56911C478D /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4572ED9F4E345B083FB20AF9 /* ProjectDocument.swift */; };
@@ -131,6 +134,7 @@
 		910CE9F27A8B6B8232C5BE7A /* TimelineLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineLayoutTests.swift; sourceTree = "<group>"; };
 		9274C7F6E607FAA343E05201 /* MainWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowTests.swift; sourceTree = "<group>"; };
 		9447FEEBB1D4C8993B540C82 /* CompositionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionBuilder.swift; sourceTree = "<group>"; };
+		97B0D161436BA55D45A5EBE9 /* HelperProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProcess.swift; sourceTree = "<group>"; };
 		97D242012F97B2217D19F98C /* PreviewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewController.swift; sourceTree = "<group>"; };
 		9E1CD2C7867C9E87D828B4A0 /* AssetUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetUsageTests.swift; sourceTree = "<group>"; };
 		9EB71F1E5EFB9D8BC6E0A8F9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -151,6 +155,7 @@
 		D2455FB297BE1835A69D9942 /* Cutline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cutline.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D308F2CA6627635889BC272A /* FrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRenderer.swift; sourceTree = "<group>"; };
 		D41363E6F47DBE1A2B1227C3 /* AssetImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetImporter.swift; sourceTree = "<group>"; };
+		DA0BC60B5EFC2D0CA9A6F2CD /* JobRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobRunner.swift; sourceTree = "<group>"; };
 		DBD4F9CF22E3B5CDFAD2CFED /* PreviewGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewGeometryTests.swift; sourceTree = "<group>"; };
 		DE9552D1BBCE487AFBEAD510 /* AssetUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetUsage.swift; sourceTree = "<group>"; };
 		E0C6DD7080EBE3BFA0B8888B /* ProjectCodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCodingTests.swift; sourceTree = "<group>"; };
@@ -160,6 +165,7 @@
 		E97E38B962C1BCFAC09AAE54 /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
 		EEAF106698E854825259E481 /* FilterChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChainTests.swift; sourceTree = "<group>"; };
 		EF04F275CDF8BD5066DB2E5A /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
+		F0D0ACB939B25A4B6DEA9C41 /* JobRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobRunnerTests.swift; sourceTree = "<group>"; };
 		F1D8E193DCC13514C90ADD93 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		F23FD7544E013663B4C9C951 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExporterIntegrationTests.swift; sourceTree = "<group>"; };
@@ -206,6 +212,7 @@
 				F4A46F48D78A7C6001032FAA /* ExporterIntegrationTests.swift */,
 				2F29BB3D7693A806D2EFC85B /* ExportSettingsTests.swift */,
 				EEAF106698E854825259E481 /* FilterChainTests.swift */,
+				F0D0ACB939B25A4B6DEA9C41 /* JobRunnerTests.swift */,
 				B885123EFA34EFDA73BC3CCD /* LetterboxTests.swift */,
 				E17399ADDF2FEBEF71635D01 /* LyricImportTests.swift */,
 				1DF1B2317E7E8F990845BB73 /* LyricLayoutTests.swift */,
@@ -300,6 +307,7 @@
 			children = (
 				2E7898909EAD3252329FD738 /* Assets.xcassets */,
 				5325553413F834E7931554AE /* Info.plist */,
+				C8FC322C02D761D4D0324A58 /* Analysis */,
 				88E8D54E3A3E8055356F5E59 /* App */,
 				161CEF3B62E5C73AC9B49419 /* Assets */,
 				448D55C287E076114315896C /* Export */,
@@ -310,6 +318,15 @@
 				AC8DCF15A923A7248FB80F30 /* Timeline */,
 			);
 			path = Cutline;
+			sourceTree = "<group>";
+		};
+		C8FC322C02D761D4D0324A58 /* Analysis */ = {
+			isa = PBXGroup;
+			children = (
+				97B0D161436BA55D45A5EBE9 /* HelperProcess.swift */,
+				DA0BC60B5EFC2D0CA9A6F2CD /* JobRunner.swift */,
+			);
+			path = Analysis;
 			sourceTree = "<group>";
 		};
 		CC3A4EFF98B7414012927CB4 /* Model */ = {
@@ -363,6 +380,7 @@
 			buildPhases = (
 				7D811C6E554D7ECC18C56C24 /* Sources */,
 				5414366B16DCDB70A7F916A2 /* Resources */,
+				22DE2679904CFA970AE84AC9 /* Bundle analysis runtime */,
 			);
 			buildRules = (
 			);
@@ -425,6 +443,28 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		22DE2679904CFA970AE84AC9 /* Bundle analysis runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle analysis runtime";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Copies the Python runtime, models (build/ml, made by scripts/build_python_runtime.sh)\n# and the helper source into Contents/Resources/ml.\nSRC=\"$SRCROOT/build/ml\"\nDST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ml\"\nif [ ! -x \"$SRC/python/bin/python3\" ] || [ ! -f \"$SRC/models/manifest.json\" ]; then\n  echo \"warning: build/ml is missing. Run scripts/build_python_runtime.sh; analysis is unavailable in this build.\"\n  rm -rf \"$DST\"\n  exit 0\nfi\nmkdir -p \"$DST/helper\"\nrsync -a --delete \"$SRC/python/\" \"$DST/python/\"\nrsync -a --delete \"$SRC/models/\" \"$DST/models/\"\nrsync -a --delete --exclude __pycache__ \"$SRCROOT/helper/cutline_helper/\" \"$DST/helper/cutline_helper/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		7D811C6E554D7ECC18C56C24 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -446,8 +486,10 @@
 				8F12F68EF5BE700BD8B53D81 /* Filmstrip.swift in Sources */,
 				8C93807386D4A76192988DB3 /* FilterChain.swift in Sources */,
 				33A3E32D65EB1DE91425AB42 /* FrameRenderer.swift in Sources */,
+				8C619DAE436D023E36DC1B81 /* HelperProcess.swift in Sources */,
 				59E945037F65708954BBD5CE /* InspectorControls.swift in Sources */,
 				35DD116F2970C41E9FFD9D9D /* InspectorView.swift in Sources */,
+				449F3E84A392E466628CC00C /* JobRunner.swift in Sources */,
 				9017E4B0F513329EA2116B0E /* Letterbox.swift in Sources */,
 				801EE6B0D3191271C3C9A4CD /* LyricImport.swift in Sources */,
 				AB5C2AE9691112978278C917 /* LyricLayout.swift in Sources */,
@@ -490,6 +532,7 @@
 				AE11F51F480A446F082371AB /* ExportSettingsTests.swift in Sources */,
 				4D1575E75E19A0AC441575D3 /* ExporterIntegrationTests.swift in Sources */,
 				A7A803232A98903E35FEF5E1 /* FilterChainTests.swift in Sources */,
+				49C28E9C73CB6AE1364DCB3B /* JobRunnerTests.swift in Sources */,
 				8B83F1E2D6B67088AC884AEA /* LetterboxTests.swift in Sources */,
 				70ADDC3D30D50E669727BC66 /* LyricImportTests.swift in Sources */,
 				41AA3E797540FC6A025A0B5B /* LyricLayoutTests.swift in Sources */,
@@ -542,6 +585,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Cutline/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -643,6 +687,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Cutline/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

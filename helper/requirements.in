@@ -1,0 +1,10 @@
+# Runtime packages for the bundled helper. Compile with scripts/build_python_runtime.sh --lock.
+torch==2.8.0
+torchaudio==2.8.0
+numpy<2.3
+scipy
+soundfile
+soxr
+demucs==4.0.1
+beat_this @ git+https://github.com/CPJKU/beat_this@b95c8ab0c58c2d9fcfd40508ae8dffbc05ac4f5c
+faster-whisper
