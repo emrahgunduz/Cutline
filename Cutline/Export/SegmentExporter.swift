@@ -126,7 +126,7 @@ final class SegmentExporter {
     // MARK: Audio (encoded once for the whole length, so there are no gaps at joins)
 
     private func audioFile(project p: Project, settings: ExportSettings) async throws -> URL? {
-        guard let audio = p.audio, let asset = p.asset(audio.assetID) else { return nil }
+        guard let audio = p.audio, !audio.isMuted, let asset = p.asset(audio.assetID) else { return nil }
         let stamp = "\(asset.path)|\(audio.start)|\(audio.duration)|\(p.duration)|\(settings.audioBitrateKbps)"
         let name = "audio-" + SHA256.hash(data: Data(stamp.utf8)).prefix(10).map { String(format: "%02x", $0) }.joined() + ".m4a"
         let url = cacheDir.appendingPathComponent(name)

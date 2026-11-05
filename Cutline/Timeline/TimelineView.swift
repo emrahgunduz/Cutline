@@ -38,7 +38,7 @@ final class TimelineView: NSView {
         case ruler, empty(TimelineRow), marker(isStart: Bool)
         case headerButton(TimelineRow, HeaderButton), headerResize(TimelineRow), headerBody(TimelineRow)
     }
-    enum HeaderButton { case add, remove }
+    enum HeaderButton { case add, remove, visibility }
 
     private enum DragKind {
         case edit(Hit, original: Project)
@@ -165,6 +165,11 @@ final class TimelineView: NSView {
             case .lyric(let t): drawLyricTrack(t, rect, l)
             case .ruler: break
             }
+            // A muted song or hidden track is dimmed, so it's clear it won't be seen or heard.
+            if visibilityState(row)?.off == true {
+                NSColor.black.withAlphaComponent(0.5).setFill()
+                rect.fill(using: .sourceOver)
+            }
             NSGraphicsContext.restoreGraphicsState()
             drawHeader(row, rect)
         }
@@ -217,11 +222,29 @@ final class TimelineView: NSView {
         }
     }
 
-    private func headerButtonRects(_ rect: CGRect) -> (add: CGRect, remove: CGRect) {
+    private func headerButtonRects(_ rect: CGRect) -> (add: CGRect, remove: CGRect, visibility: CGRect) {
         let y = rect.minY + 3
         let remove = CGRect(x: TimelineLayout.headerWidth - 22, y: y, width: 16, height: 16)
         let add = CGRect(x: TimelineLayout.headerWidth - 42, y: y, width: 16, height: 16)
-        return (add, remove)
+        let visibility = CGRect(x: TimelineLayout.headerWidth - 62, y: y, width: 16, height: 16)
+        return (add, remove, visibility)
+    }
+
+    /// Mute (audio) or show/hide (video and lyric tracks): the button's symbol and whether the
+    /// row is switched off. nil when the row has no such button.
+    private func visibilityState(_ row: TimelineRow) -> (symbol: String, off: Bool)? {
+        switch row {
+        case .audio:
+            guard let a = project.audio else { return nil }
+            return (a.isMuted ? "speaker.slash.fill" : "speaker.wave.2", a.isMuted)
+        case .video(let t):
+            guard project.videoTracks.indices.contains(t) else { return nil }
+            return (project.videoTracks[t].isHidden ? "eye.slash.fill" : "eye", project.videoTracks[t].isHidden)
+        case .lyric(let t):
+            guard project.lyricTracks.indices.contains(t) else { return nil }
+            return (project.lyricTracks[t].isHidden ? "eye.slash.fill" : "eye", project.lyricTracks[t].isHidden)
+        case .ruler: return nil
+        }
     }
 
     private func canRemove(_ row: TimelineRow) -> Bool {
@@ -252,6 +275,7 @@ final class TimelineView: NSView {
         let b = headerButtonRects(rect)
         if row != .audio { symbol("plus.circle", at: b.add, tint: .secondaryLabelColor) }
         if canRemove(row) { symbol("minus.circle", at: b.remove, tint: .secondaryLabelColor) }
+        if let v = visibilityState(row) { symbol(v.symbol, at: b.visibility, tint: v.off ? .systemOrange : .secondaryLabelColor) }
         if case .video(let t) = row, rect.height > 38 {
             let count = project.videoTracks[t].clips.count
             ("\(count) clip\(count == 1 ? "" : "s")" as NSString).draw(at: CGPoint(x: 24, y: rect.minY + 19),
@@ -618,6 +642,7 @@ final class TimelineView: NSView {
             let b = headerButtonRects(f)
             if row != .audio && b.add.insetBy(dx: -3, dy: -3).contains(p) { return .headerButton(row, .add) }
             if canRemove(row) && b.remove.insetBy(dx: -3, dy: -3).contains(p) { return .headerButton(row, .remove) }
+            if visibilityState(row) != nil && b.visibility.insetBy(dx: -2, dy: -3).contains(p) { return .headerButton(row, .visibility) }
             if p.y > f.maxY - 6 { return .headerResize(row) }
             return .headerBody(row)
         }
@@ -1019,6 +1044,12 @@ final class TimelineView: NSView {
         case (.video(let t), .remove): confirmRemoveTrack(row) { self.editor.edit("Remove Video Track") { $0.removeVideoTrack(at: t) } }
         case (.lyric(let t), .remove): confirmRemoveTrack(row) { self.editor.edit("Remove Lyrics Track") { $0.removeLyricTrack(at: t) } }
         case (.audio, .remove): editor.edit("Remove Audio") { $0.removeAudio() }
+        case (.audio, .visibility):
+            editor.edit(project.audio?.isMuted == true ? "Unmute Song" : "Mute Song") { $0.toggleAudioMuted() }
+        case (.video(let t), .visibility):
+            editor.edit(project.videoTracks[t].isHidden ? "Show Video Track" : "Hide Video Track") { $0.toggleVideoTrackHidden(t) }
+        case (.lyric(let t), .visibility):
+            editor.edit(project.lyricTracks[t].isHidden ? "Show Lyrics Track" : "Hide Lyrics Track") { $0.toggleLyricTrackHidden(t) }
         default: break
         }
     }
