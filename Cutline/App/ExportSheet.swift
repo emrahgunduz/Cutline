@@ -81,24 +81,37 @@ struct ExportProgressView: View {
     let cancel: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Exporting \(fileName)", systemImage: "square.and.arrow.up").font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.arrow.up.circle.fill").font(.system(size: 32)).foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Exporting").font(.title3.bold())
+                    Text(fileName).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+            }
             ProgressView(value: model.progress)
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Text(remaining).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                HStack {
+                    Text("Elapsed \(Self.clock(Date().timeIntervalSince(model.started)))")
+                    Spacer()
+                    Text("\(Int(model.progress * 100))%").bold()
+                    Spacer()
+                    Text(remaining)
+                }
+                .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             }
-            HStack { Spacer(); Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction) }
+            HStack { Spacer(); Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction).controlSize(.large) }
         }
-        .padding(20)
-        .frame(width: 420)
+        .padding(24)
+        .frame(width: 460)
     }
+
+    static func clock(_ s: Double) -> String { String(format: "%d:%02d", Int(s) / 60, Int(s) % 60) }
 
     private var remaining: String {
         let elapsed = Date().timeIntervalSince(model.started)
-        let pct = Int(model.progress * 100)
-        guard model.progress > 0.02 else { return "\(pct)% · estimating time…" }
-        let left = elapsed / model.progress - elapsed
-        return "\(pct)% · about \(Int(left.rounded()))s left"
+        guard model.progress > 0.02 else { return "Remaining —" }
+        return "Remaining \(Self.clock(elapsed / model.progress - elapsed))"
     }
 }
 
@@ -116,79 +129,103 @@ struct ExportSettingsView: View {
         _settings = State(initialValue: ExportSettings.defaults(for: editor.project))
     }
 
+    private let labelWidth: CGFloat = 110
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Export \(editor.project.type.title)", systemImage: "square.and.arrow.up").font(.title3.bold())
-            Text(verbatim: "\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Timecode.string(editor.project.duration, fps: editor.project.fps)) · \(settings.codec == .hevc ? "H.265 (HEVC, 10-bit)" : "H.264")")
-                .foregroundStyle(.secondary)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
-                GridRow {
-                    Text("Format").gridColumnAlignment(.trailing)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.arrow.up.circle.fill").font(.system(size: 36)).foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Export \(editor.project.type.title)").font(.title2.bold())
+                    Text(verbatim: "\(editor.project.canvas.width)×\(editor.project.canvas.height) · \(Timecode.string(editor.project.duration, fps: editor.project.fps)) · \(settings.codec == .hevc ? "H.265 (HEVC, 10-bit)" : "H.264")")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            card("Format", "doc") {
+                row("Container") {
                     Picker("", selection: $settings.container) {
                         ForEach(ExportSettings.Container.allCases) { Text($0.title).tag($0) }
                     }
-                    .labelsHidden().frame(width: 200)
+                    .labelsHidden().fixedSize()
                 }
-                GridRow {
-                    Text("Rate control")
+                row("Audio") {
+                    Picker("", selection: $settings.audioBitrateKbps) {
+                        ForEach([128.0, 192, 256, 320], id: \.self) { Text("AAC \(Int($0)) kbit/s").tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+            }
+
+            card("Video", "film") {
+                row("Rate control") {
                     Picker("", selection: $settings.rateMode) {
                         Text("Constant quality").tag(ExportSettings.RateMode.quality)
                         Text("Target bitrate").tag(ExportSettings.RateMode.bitrate)
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 260)
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 if settings.rateMode == .quality {
-                    GridRow {
-                        Text("Quality")
-                        HStack {
-                            Slider(value: $settings.quality, in: 0.3...1).frame(width: 220)
-                            Text("\(Int(settings.quality * 100))%").monospacedDigit().frame(width: 40, alignment: .trailing)
-                        }
+                    row("Quality") {
+                        ValueRow(label: "", value: settings.quality * 100, range: 30...100, step: 1, format: "%.0f%%", defaultValue: 100,
+                                 onChange: { settings.quality = $0 / 100 }, onCommit: {})
                     }
                 } else {
-                    GridRow {
-                        Text("Video bitrate")
+                    row("Video bitrate") {
                         HStack {
                             TextField("", value: $settings.bitrateMbps, format: .number.precision(.fractionLength(0...1)))
-                                .textFieldStyle(.roundedBorder).frame(width: 70)
-                            Text("Mbit/s")
+                                .textFieldStyle(.roundedBorder).frame(width: 80).multilineTextAlignment(.trailing)
+                            Text("Mbit/s").foregroundStyle(.secondary)
                         }
                     }
                 }
-                GridRow {
-                    Text("Audio")
-                    Picker("", selection: $settings.audioBitrateKbps) {
-                        ForEach([128.0, 192, 256, 320], id: \.self) { Text("AAC \(Int($0)) kbit/s").tag($0) }
-                    }
-                    .labelsHidden().frame(width: 200)
-                }
-                GridRow {
-                    Text("Estimated size")
-                    HStack {
+                row("Estimated size") {
+                    HStack(spacing: 8) {
                         if estimating { ProgressView().controlSize(.small); Text("Measuring…").foregroundStyle(.secondary) }
-                        else if let estimate { Text(ByteCountFormatter.string(fromByteCount: Int64(estimate), countStyle: .file)).bold() }
-                        else { Text("—").foregroundStyle(.secondary) }
+                        else if let estimate { Text(ByteCountFormatter.string(fromByteCount: Int64(estimate), countStyle: .file)).font(.body.bold()) }
+                        else { Text("Couldn't estimate").foregroundStyle(.secondary) }
                     }
                 }
             }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
-            Text(settings.rateMode == .quality
-                 ? "Constant quality keeps the picture at a chosen quality; busy scenes use more data, so the size is estimated from short test encodes of your clips."
-                 : "Target bitrate keeps the data rate fixed, so the file size is predictable (bitrate × length). Use it when a platform limits file size.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+
+            Label {
+                Text(settings.rateMode == .quality
+                     ? "Constant quality keeps the picture at the chosen quality, so busy scenes use more data. The size is measured by test-encoding the busiest parts of your timeline."
+                     : "Target bitrate keeps the data rate fixed, so the size is predictable: bitrate × length. Use it when a platform limits file size.")
+            } icon: { Image(systemName: "info.circle") }
+            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+
             HStack {
                 Spacer()
-                Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction)
-                Button("Export…") { finish(settings) }.keyboardShortcut(.defaultAction)
+                Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
+                Button("Export…") { finish(settings) }.keyboardShortcut(.defaultAction).controlSize(.large)
                     .disabled(editor.project.duration <= 0)
             }
         }
-        .padding(20)
-        .frame(width: 500)
+        .padding(24)
+        .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: refreshEstimate)
         .onChange(of: settings) { _, _ in refreshEstimate() }
+    }
+
+    private func card<C: View>(_ title: String, _ icon: String, @ViewBuilder content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon).font(.headline)
+            VStack(alignment: .leading, spacing: 10) { content() }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.08)))
+    }
+
+    private func row<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label).frame(width: labelWidth, alignment: .leading)
+            content()
+            Spacer(minLength: 0)
+        }
     }
 
     private func refreshEstimate() {
@@ -206,7 +243,7 @@ struct ExportSettingsView: View {
             guard !Task.isCancelled else { return }
             let value = try? await SizeEstimator.estimateBytes(project: project, settings: s)
             guard !Task.isCancelled else { return }
-            estimate = value
+            estimate = value          // nil shows "Couldn't estimate" instead of spinning forever
             estimating = false
         }
     }

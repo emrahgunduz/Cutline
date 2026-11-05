@@ -123,8 +123,11 @@ final class SizeEstimatorSamplingTests: XCTestCase {
         p.audio = AudioClip(assetID: UUID(), duration: 200)
         p.addClip(assetID: a.id, track: 0, at: 0)      // 0-5
         p.addClip(assetID: a.id, track: 0, at: 10)     // 10-15
-        for s in SizeEstimator.sampleStarts(p) {
-            XCTAssertTrue((0...5).contains(s) || (10...15).contains(s), "\(s)")
-        }
+        p.addVideoTrack()
+        p.addClip(assetID: a.id, track: 1, at: 11)     // 11-16 overlaps: the busiest part
+        let starts = SizeEstimator.sampleStarts(p)
+        XCTAssertFalse(starts.isEmpty)
+        XCTAssertTrue(starts.contains { $0 + 1 >= 10 && $0 + 1 <= 16 }, "\(starts)")
+        for s in starts { XCTAssertGreaterThan(SizeEstimator.busyness(p, at: s + 1), 0, "\(s)") }
     }
 }

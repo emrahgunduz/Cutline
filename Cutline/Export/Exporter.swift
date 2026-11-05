@@ -26,24 +26,22 @@ final class Exporter {
         reader?.cancelReading()
     }
 
-    /// Export the whole project, or only `range` (seconds) — used for size-estimate probes.
-    func export(project: Project, settings: ExportSettings, to url: URL, range: ClosedRange<Double>? = nil,
-                progress: @escaping (Double) -> Void) async throws {
+    /// Export the whole project. Size probes pass an excerpt project and `includeAudio: false`.
+    func export(project: Project, settings: ExportSettings, to url: URL,
+                includeAudio: Bool = true, progress: @escaping (Double) -> Void) async throws {
         guard project.duration > 0 else { throw ExportError.empty }
         let snapshot = RenderSnapshot(project: project, images: FrameRenderer.loadImages(project), lyrics: LyricRenderer(project: project))
         let built = try await CompositionBuilder.build(project: project, mediaURL: { $0.url }, snapshot: snapshot)
         try? FileManager.default.removeItem(at: url)
 
         let reader = try AVAssetReader(asset: built.composition)
-        let span: CMTimeRange = range.map {
-            CMTimeRange(start: CompositionBuilder.time($0.lowerBound), end: CompositionBuilder.time(min($0.upperBound, built.duration.seconds)))
-        } ?? CMTimeRange(start: .zero, duration: built.duration)
+        let span = CMTimeRange(start: .zero, duration: built.duration)
         reader.timeRange = span
         let videoOut = AVAssetReaderVideoCompositionOutput(videoTracks: built.composition.tracks(withMediaType: .video), videoSettings: nil)
         videoOut.videoComposition = built.videoComposition
         videoOut.alwaysCopiesSampleData = false
         reader.add(videoOut)
-        let audioTracks = built.composition.tracks(withMediaType: .audio)
+        let audioTracks = includeAudio ? built.composition.tracks(withMediaType: .audio) : []
         var audioOut: AVAssetReaderAudioMixOutput?
         if !audioTracks.isEmpty {
             let o = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: [AVFormatIDKey: kAudioFormatLinearPCM])

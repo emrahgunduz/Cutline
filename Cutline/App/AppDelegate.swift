@@ -2,7 +2,14 @@ import AppKit
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// True when the app is only hosting unit tests.
+    static let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     static func main() {
+        if isTestHost {
+            // Never reopen the user's projects (or autosave them) while hosting tests.
+            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
@@ -22,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         // Window restoration and Finder opens finish just after launch; only offer a new
         // project if nothing was opened by then.
+        guard !Self.isTestHost else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             if NSDocumentController.shared.documents.isEmpty { NSDocumentController.shared.newDocument(nil) }
         }

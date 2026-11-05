@@ -251,3 +251,37 @@ extension Project {
         }
     }
 }
+
+extension Project {
+    /// A standalone copy of `start..<end`, shifted to begin at 0, without audio. Used for
+    /// size probes so they export a whole (small) project instead of seeking into this one.
+    func excerpt(from start: Double, to end: Double) -> Project {
+        var p = self
+        p.audio = nil
+        let len = end - start
+        for t in p.videoTracks.indices {
+            p.videoTracks[t].clips = p.videoTracks[t].clips.compactMap { c in
+                guard c.end > start, c.start < end else { return nil }
+                var n = c
+                let cutHead = max(0, start - c.start)
+                n.start = max(0, c.start - start)
+                n.duration = min(c.end, end) - max(c.start, start)
+                if asset(c.assetID)?.kind == .video { n.sourceIn += cutHead }
+                return n.duration > 0 ? n : nil
+            }
+        }
+        for t in p.lyricTracks.indices {
+            p.lyricTracks[t].lines = p.lyricTracks[t].lines.compactMap { l in
+                guard l.end > start, l.start < end else { return nil }
+                var n = l
+                n.start -= start; n.end -= start
+                n.words = l.words.map { var w = $0; w.start -= start; w.end -= start; return w }
+                return n
+            }
+        }
+        p.cinemascope.startMarker -= start
+        p.cinemascope.endMarker -= start
+        _ = len
+        return p
+    }
+}
