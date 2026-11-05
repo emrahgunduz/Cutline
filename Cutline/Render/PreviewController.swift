@@ -49,6 +49,10 @@ final class PreviewController: ObservableObject {
         }
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 60), queue: .main) { [weak self] time in
             guard let self, self.player.rate != 0 else { return }
+            if let stop = self.editor.transport.stopAt, time.seconds >= stop {
+                self.editor.reachedStopPoint()
+                return
+            }
             if let loop = self.editor.transport.loop, time.seconds >= loop.upperBound {
                 self.player.seek(to: CompositionBuilder.time(loop.lowerBound), toleranceBefore: .zero, toleranceAfter: .zero)
                 return

@@ -82,6 +82,11 @@ final class LyricCorrectionTests: XCTestCase {
         XCTAssertEqual(ws[0].start, 10); XCTAssertEqual(ws[4].start, 12)
         XCTAssertTrue(ws[1...3].allSatisfy { $0.start > 10 && $0.end <= 12 })
         XCTAssertNil(e.transport.tapWordID, "tap mode ends after the last word")
+        XCTAssertEqual(e.transport.stopAt ?? 0, ws[4].end + EditorModel.tapTailTime, accuracy: 1e-9, "the song plays on 5 s, then pauses")
+        XCTAssertTrue(e.isPlaying)
+        e.reachedStopPoint()
+        XCTAssertFalse(e.isPlaying)
+        XCTAssertNil(e.transport.stopAt)
     }
 
     func testTapSnapsToANearbyVocalOnsetOnly() {
@@ -184,5 +189,14 @@ final class LyricCorrectionTests: XCTestCase {
         p.applyAlignment(r, track: 0, audioStart: 0, keepConfirmed: false)
         XCTAssertFalse(p.lyricTracks[0].lines[0].words[0].confirmed)
         XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 20)
+    }
+
+    func testTapModeStartsFiveSecondsBeforeTheWord() {
+        let e = editor()
+        let song = Asset(kind: .audio, name: "s", path: "/s", duration: 30)
+        e.edit("x") { $0.assets = [song]; $0.setAudio(assetID: song.id) }
+        e.selection = .lyricWord(id(e, 2))   // w3 at 12 s
+        e.startTapMode()
+        XCTAssertEqual(e.playhead, 7, accuracy: 1e-9)
     }
 }

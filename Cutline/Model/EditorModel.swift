@@ -222,6 +222,8 @@ final class TransportState: ObservableObject {
     @Published var rate: Float = 1
     /// Tap mode: the word the next tap times (nil = off).
     @Published var tapWordID: UUID?
+    /// Playback pauses when it reaches this time (the tail after the last tapped word).
+    @Published var stopAt: Double?
     /// Song time right now, read from the player (exact even between 60 Hz playhead updates).
     var currentTime: () -> Double = { 0 }
 }
