@@ -106,6 +106,7 @@ The user edits their own music videos and used After Effects for the sample proj
 - R33. The timeline shows a cache strip marking valid, stale and uncached ranges.
 - R34. Re-exporting after a small edit re-renders only the changed ranges, and a cancelled export can resume.
 - R42. A **Clear Cache** button in the window toolbar (and a matching menu item) empties the render cache: preview frames in memory and the encoded export segments on disk. Proxies, thumbnails, waveforms and music analysis are kept. The button shows how much space is used and how much was freed.
+- R43. A separate **Reset Media Caches…** toolbar button (and menu item) rebuilds the slow caches. Its sheet lists each kind with its disk size and a checkbox: thumbnails and waveforms, music analysis, and proxies. Rebuilding runs in the background with progress. Proxies are recreated at their current sizes, never just deleted. It never touches the render cache, which Clear Cache handles.
 
 **Limits and export**
 
@@ -464,6 +465,20 @@ Waits on: PR 2 merged.
 - Changing the export bitrate re-encodes every segment.
 - Clear Cache empties `cache/segments/` and the memory cache, leaves `proxies/`, `thumbnails/` and `analysis/` untouched, and the next export re-encodes everything.
 **Verification:** After a one-word fix, re-exporting the full sample song takes a small fraction of the first export.
+
+### U16. Reset media caches
+
+**Goal:** Let the user rebuild thumbnails, waveforms, music analysis and proxies from a toolbar button, separately from Clear Cache.
+**Requirements:** R43
+**Dependencies:** U2, U8, U14
+**Files:** `Cutline/App/WindowToolbar.swift`, `Cutline/App/ResetCachesSheet.swift`, `Cutline/Assets/MediaCacheReset.swift`, `CutlineTests/MediaCacheResetTests.swift`
+**Approach:** The sheet measures `thumbnails/`, `analysis/` and `proxies/` sizes, and the user ticks which to rebuild (all ticked by default). The chosen folders are deleted, then rebuilt through the existing builders: thumbnails, the waveform pyramid, the analysis job, and proxies at each asset's recorded scale. Progress shows in the status bar and the button is disabled while a rebuild runs. Lyric timing and other edits are untouched, because they live in `project.json`.
+**Test scenarios:**
+- Rebuilding thumbnails only leaves proxies and analysis files unchanged.
+- After rebuilding proxies, each proxied asset has a proxy at the same scale.
+- Lyric line and word times are identical before and after a full reset.
+- Clear Cache (R42) and Reset Media Caches never touch each other's folders.
+**Verification:** On the sample project, a full reset rebuilds everything and the project plays and exports as before.
 
 ### U15. Import from another project
 
