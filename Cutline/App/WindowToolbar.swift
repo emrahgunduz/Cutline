@@ -71,7 +71,7 @@ final class WindowToolbar: NSObject, NSToolbarDelegate, NSToolbarItemValidation 
         case ID.importMedia: return item("Import", "square.and.arrow.down", "Import media (⌘I)", #selector(importMedia))
         case ID.undo: return item("Undo", "arrow.uturn.backward", "Undo (⌘Z)", #selector(undo))
         case ID.redo: return item("Redo", "arrow.uturn.forward", "Redo (⇧⌘Z)", #selector(redo))
-        case ID.split: return item("Split", "scissors", "Split at playhead (⌘B)", #selector(split))
+        case ID.split: return item("Split", "scissors", "Cut at playhead (C)", #selector(split))
         case ID.delete: return item("Delete", "trash", "Delete selection (⌫)", #selector(delete))
         case ID.addVideo: return item("Video Track", "rectangle.stack.badge.plus", "Add a video track", #selector(addVideo))
         case ID.addLyrics: return item("Lyrics Track", "text.badge.plus", "Add a lyrics track", #selector(addLyrics))

@@ -982,7 +982,7 @@ final class TimelineView: NSView {
         case (_, "=") where cmd, (_, "+") where cmd: zoomAroundPlayhead(1.5)
         case (_, "-") where cmd: zoomAroundPlayhead(1 / 1.5)
         case (_, "0") where cmd: zoomToFit()
-        case (_, "n") where !cmd: snappingEnabled.toggle()
+        case (_, "s") where !cmd: snappingEnabled.toggle()
         default: super.keyDown(with: event)
         }
     }

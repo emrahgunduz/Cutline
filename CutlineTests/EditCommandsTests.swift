@@ -147,3 +147,24 @@ final class MultiSelectTests: XCTestCase {
         XCTAssertTrue(doc.editor.selectedItems.isEmpty)
     }
 }
+
+@MainActor
+final class EditPointTests: XCTestCase {
+    func testJumpBetweenEditPoints() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let a = Asset(kind: .image, name: "i", path: "/i")
+        p.assets = [a]
+        p.addClip(assetID: a.id, track: 0, at: 2)      // 2–7
+        let doc = ProjectDocument(project: p)
+        let e = doc.editor
+        e.jumpToEditPoint(forward: true)
+        XCTAssertEqual(e.playhead, 2)
+        e.jumpToEditPoint(forward: true)
+        XCTAssertEqual(e.playhead, 7)
+        e.jumpToEditPoint(forward: false)
+        XCTAssertEqual(e.playhead, 2)
+        e.step(seconds: 1)
+        XCTAssertEqual(e.playhead, 3)
+    }
+}

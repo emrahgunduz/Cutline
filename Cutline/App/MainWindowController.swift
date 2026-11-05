@@ -69,19 +69,34 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
     private var keyMonitor: Any?
     private var toolbar: WindowToolbar?
 
-    /// Space, arrows, Home and End drive playback anywhere in the window except text fields.
+    /// Single-key shortcuts that work anywhere in the window except while typing in a field.
+    /// The list shown in the inspector lives in `Shortcuts` and must match this.
     private func installTransportKeys() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.window === self.window, !event.modifierFlags.contains(.command),
-                  !(self.window?.firstResponder is NSText) else { return event }
+            guard let self, event.window === self.window, !(self.window?.firstResponder is NSText) else { return event }
+            let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
             let editor = self.projectDocument.editor
-            switch event.keyCode {
-            case 49: editor.togglePlay()
-            case 123: editor.stepFrame(-1)
-            case 124: editor.stepFrame(1)
-            case 115: editor.goToStart()
-            case 119: editor.goToEnd()
-            default: return event
+            let timeline = (self.vertical.arrangedSubviews.last as? TimelineContainer)?.timeline
+            switch (event.keyCode, flags) {
+            case (49, []): editor.togglePlay()
+            case (123, []): editor.stepFrame(-1)
+            case (124, []): editor.stepFrame(1)
+            case (123, [.shift]): editor.step(seconds: -1)
+            case (124, [.shift]): editor.step(seconds: 1)
+            case (126, []): editor.jumpToEditPoint(forward: false)
+            case (125, []): editor.jumpToEditPoint(forward: true)
+            case (115, []): editor.goToStart()
+            case (119, []): editor.goToEnd()
+            case (51, []), (117, []): editor.deleteSelection()
+            default:
+                guard flags.isEmpty, let ch = event.charactersIgnoringModifiers?.lowercased() else { return event }
+                switch ch {
+                case "c": editor.splitAtPlayhead()
+                case "s": timeline?.snappingEnabled.toggle()
+                case "=", "+": timeline?.zoomAroundPlayhead(1.5)
+                case "-": timeline?.zoomAroundPlayhead(1 / 1.5)
+                default: return event
+                }
             }
             return nil
         }
