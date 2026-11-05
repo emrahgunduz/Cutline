@@ -16,6 +16,12 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Plain `run:` steps get `bash -e`, without pipefail; `shell: bash` adds it, so a command
+# piped into tail still fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   release:
     runs-on: macos-26
