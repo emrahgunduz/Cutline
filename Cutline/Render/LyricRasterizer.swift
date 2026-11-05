@@ -19,7 +19,8 @@ final class LyricRenderer {
     private let platformSafeArea: CGRect?
     func safeArea(_ t: Double) -> CGRect? { platformSafeArea }
 
-    /// Where each drawn line sits on the canvas at time t (y up), plus its raster and scale.
+    /// Where each drawn line sits on the canvas at time t (y up), plus its raster. `fit` is
+    /// always 1: lyrics are drawn at the font size and never scaled to fit the frame.
     struct PlacedLine { let line: LyricLine; let rect: CGRect; let raster: LineRaster; let fit: CGFloat }
 
     func placedLines(at t: Double) -> [PlacedLine] {
@@ -29,10 +30,9 @@ final class LyricRenderer {
         guard !lines.isEmpty else { return [] }
         let fontSize = LyricLayout.fontSize(style, canvas: canvas)
         let safe = safeArea(t)
-        let maxWidth = (safe?.width ?? CGFloat(canvas.width)) * 0.92
         let centerX = safe?.midX ?? CGFloat(canvas.width) / 2
-        // Long lines wrap onto more rows at the same font size; they take more room in the stack.
-        let rasters = lines.map { raster(for: $0, style: style, fontSize: fontSize, maxWidth: $0.hasPosition ? CGFloat(canvas.width) * 0.92 : maxWidth) }
+        let rasters = lines.map { raster(for: $0, style: style, fontSize: fontSize) }
+        // Wrapped lines take one stack slot per row.
         let pad = ceil(fontSize * 0.15)
         var heights: [CGFloat] = []
         for (line, r) in zip(lines, rasters) where !line.hasPosition {
@@ -45,36 +45,35 @@ final class LyricRenderer {
         var out: [PlacedLine] = []
         for (line, r) in zip(lines, rasters) {
             guard let raster = r else { if !line.hasPosition { autoIndex += 1 }; continue }
-            // Only a single word wider than the frame is scaled down.
-            let limit = line.hasPosition ? CGFloat(canvas.width) * 0.92 : maxWidth
-            let fit = min(1, limit / raster.size.width)
-            let size = CGSize(width: raster.size.width * fit, height: raster.size.height * fit)
+            let size = raster.size
             let origin: CGPoint
-            if let cx = line.centerX, let cy = line.centerY {
-                origin = CGPoint(x: cx - size.width / 2, y: cy - size.height / 2)
+            if let ax = line.centerX, let cy = line.centerY {
+                // The anchor is the box's left edge, middle or right edge, by the text alignment.
+                origin = CGPoint(x: LineLayout.boxMinX(anchor: CGFloat(ax), width: size.width, align: line.layout.align), y: CGFloat(cy) - size.height / 2)
             } else {
-                // The raster's bottom sits at the bottom of its slot (wrapped lines get taller slots).
+                // Automatic stack: boxes centred, each raster's bottom at the bottom of its slot.
                 origin = CGPoint(x: centerX - size.width / 2, y: origins[autoIndex])
                 autoIndex += 1
             }
-            out.append(PlacedLine(line: line, rect: CGRect(origin: origin, size: size), raster: raster, fit: fit))
+            out.append(PlacedLine(line: line, rect: CGRect(origin: origin, size: size), raster: raster, fit: 1))
         }
         return out
     }
 
-    /// A line's drawn box and where its letters are in it (for alignment), at the size it is
-    /// drawn when it has its own position.
+    /// A line's drawn box and where its letters are in it (for alignment).
     func box(of line: LyricLine) -> LyricPlacement.Box? {
         let style = project.lyricStyle
-        let maxWidth = CGFloat(project.canvas.width) * 0.92
-        guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas), maxWidth: maxWidth) else { return nil }
-        let fit = min(1, maxWidth / r.size.width)
-        let ink = r.ink.applying(CGAffineTransform(scaleX: fit, y: fit))
-        return LyricPlacement.Box(size: CGSize(width: r.size.width * fit, height: r.size.height * fit), ink: ink)
+        guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas)) else { return nil }
+        return LyricPlacement.Box(size: r.size, ink: r.ink)
     }
 
     /// Canvas size of a line's text block.
     func size(of line: LyricLine) -> CGSize? { box(of: line)?.size }
+
+    /// Where a line's anchor x is for a box drawn at `rect` (see `LyricLine.centerX`).
+    static func anchor(of line: LyricLine, rect: CGRect) -> CGFloat {
+        LineLayout.anchor(boxMidX: rect.midX, width: rect.width, align: line.layout.align)
+    }
 
     func image(at t: Double) -> CIImage? {
         let style = project.lyricStyle
@@ -126,10 +125,12 @@ final class LyricRenderer {
 
     var animation: LyricAnimation { LyricAnimation(style: project.lyricStyle, fps: project.fps) }
 
-    private func raster(for line: LyricLine, style: LyricStyle, fontSize: CGFloat, maxWidth: CGFloat) -> LineRaster? {
-        let key = "\(line.words.map(\.text).joined(separator: "\u{1}"))|\(style.fontName)|\(fontSize)|\(Int(maxWidth))|\(style.color.r),\(style.color.g),\(style.color.b),\(style.color.a)" as NSString
+    private func raster(for line: LyricLine, style: LyricStyle, fontSize: CGFloat) -> LineRaster? {
+        let l = line.layout
+        let wrap = l.wrapWidth.map { CGFloat($0) }
+        let key = "\(line.words.map(\.text).joined(separator: "\u{1}"))|\(style.fontName)|\(fontSize)|\(wrap.map { "\($0)" } ?? "single")|\(l.align.rawValue)|\(style.color.r),\(style.color.g),\(style.color.b),\(style.color.a)" as NSString
         if let box = Self.cache.object(forKey: key) { return box.raster }
-        guard let r = LineRasterizer.rasterize(words: line.words.map(\.text), style: style, fontSize: fontSize, maxWidth: maxWidth) else { return nil }
+        guard let r = LineRasterizer.rasterize(words: line.words.map(\.text), style: style, fontSize: fontSize, wrapWidth: wrap, align: l.align) else { return nil }
         Self.cache.setObject(RasterBox(r), forKey: key)
         return r
     }

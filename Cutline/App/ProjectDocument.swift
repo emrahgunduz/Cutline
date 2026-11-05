@@ -132,6 +132,7 @@ final class ProjectDocument: NSDocument {
         guard header.schemaVersion <= projectSchemaVersion else { throw ProjectFileError.unsupportedSchema(header.schemaVersion) }
         var project = try JSONDecoder().decode(Project.self, from: data)
         project.migrateFrameRate()
+        project.migrateLineLayouts()
         var layout = LayoutState()
         if let ld = try? Data(contentsOf: url.appendingPathComponent("layout.json")),
            let l = try? JSONDecoder().decode(LayoutState.self, from: ld) {
