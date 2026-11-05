@@ -11,8 +11,6 @@ enum ExportSheet {
         let host = NSHostingController(rootView: ExportSettingsView(editor: editor, finish: { settings in
             window.endSheet(sheet)
             guard let settings else { return }
-            // Remember the choices for the next export and for the budget bar.
-            if editor.project.exportSettings != settings { editor.edit("Export Settings") { $0.exportSettings = settings } }
             DispatchQueue.main.async { chooseDestination(editor: editor, settings: settings, window: window) }
         }))
         host.sizingOptions = [.preferredContentSize]
@@ -51,8 +49,12 @@ enum ExportSheet {
             var failure: Error?
             var sizeNote: String?
             do {
-                if settings.rateMode == .size, let mb = settings.sizeTargetMB {
-                    sizeNote = try await exportToSize(project: project, settings: settings, targetMB: mb, to: url, exporter: exporter, model: model)
+                if settings.rateMode == .size {
+                    sizeNote = try await exportToSize(project: project, settings: settings, targetMB: settings.sizeTarget, to: url, exporter: exporter, model: model) { solved in
+                        var s = editor.project.exportSettings ?? settings
+                        s.solvedSize = solved
+                        editor.rememberExportSettings(s)
+                    }
                 } else {
                     let stats = try await exporter.export(project: project, settings: settings, to: url) { p in
                         Task { @MainActor in model.progress = p }
@@ -86,11 +88,14 @@ extension ExportSheet {
     /// one is kept. Returns a note for the finish alert.
     @MainActor
     static func exportToSize(project: Project, settings: ExportSettings, targetMB: Double, to url: URL,
-                             exporter: SegmentExporter, model: ExportProgressModel) async throws -> String {
+                             exporter: SegmentExporter, model: ExportProgressModel,
+                             onSolved: (ExportSettings.SolvedSize) -> Void = { _ in }) async throws -> String {
         let target = targetMB * 1_000_000
         var made: [URL] = []
         defer { made.forEach { try? FileManager.default.removeItem(at: $0) } }
-        let outcome = try await SizeSolver.run(targetBytes: target, duration: project.duration, audioKbps: settings.audioBitrateKbps) { bitrate, pass in
+        var reused = 0, total = 0
+        let outcome = try await SizeSolver.run(targetBytes: target, duration: project.duration, audioKbps: settings.audioBitrateKbps,
+                                               start: settings.solvedBitrate(duration: project.duration)) { bitrate, pass in
             model.pass = pass
             model.progress = 0
             var s = settings
@@ -98,7 +103,8 @@ extension ExportSheet {
             let passURL = url.deletingLastPathComponent()
                 .appendingPathComponent(".\(url.deletingPathExtension().lastPathComponent)-pass\(pass + 1).\(url.pathExtension)")
             made.append(passURL)
-            try await exporter.export(project: project, settings: s, to: passURL) { p in Task { @MainActor in model.progress = p } }
+            let stats = try await exporter.export(project: project, settings: s, to: passURL) { p in Task { @MainActor in model.progress = p } }
+            if pass == 0 { reused = stats.reused; total = stats.reused + stats.encoded }
 
             let bytes = (try FileManager.default.attributesOfItem(atPath: passURL.path)[.size] as? NSNumber)?.int64Value ?? 0
             return SizeSolver.Attempt(bitrate: bitrate, bytes: bytes, url: passURL)
@@ -108,11 +114,15 @@ extension ExportSheet {
         } else {
             try FileManager.default.moveItem(at: outcome.best.url, to: url)
         }
+        if outcome.met {
+            onSolved(ExportSettings.SolvedSize(targetMB: targetMB, duration: project.duration, audioKbps: settings.audioBitrateKbps, bitrate: outcome.best.bitrate))
+        }
         let size = ByteCountFormatter.string(fromByteCount: outcome.best.bytes, countStyle: .file)
         let passes = outcome.attempts.count == 1 ? "1 pass" : "\(outcome.attempts.count) passes"
-        return outcome.met
+        let cache = reused > 0 ? " Reused \(reused) of \(total) unchanged segments from the cache." : ""
+        return (outcome.met
             ? "Fits the \(formatMB(targetMB)) target (\(size), \(passes))."
-            : "Couldn't get under \(formatMB(targetMB)) in \(passes). Kept the smallest file (\(size)); try a lower target or a shorter cut."
+            : "Couldn't get under \(formatMB(targetMB)) in \(passes). Kept the smallest file (\(size)); try a lower target or a shorter cut.") + cache
     }
 
     static func formatMB(_ mb: Double) -> String { mb.rounded() == mb ? "\(Int(mb)) MB" : String(format: "%.1f MB", mb) }
@@ -219,7 +229,7 @@ struct ExportSettingsView: View {
                 if settings.rateMode == .size {
                     row("Maximum size") {
                         HStack {
-                            TextField("", value: Binding(get: { settings.sizeTargetMB ?? 50 }, set: { settings.sizeTargetMB = max(0.1, $0) }),
+                            TextField("", value: Binding(get: { settings.sizeTarget }, set: { settings.sizeTargetMB = max(0.1, $0) }),
                                       format: .number.precision(.fractionLength(0...1)))
                                 .textFieldStyle(.roundedBorder).frame(width: 80).multilineTextAlignment(.trailing)
                             Text("MB").foregroundStyle(.secondary)
@@ -273,7 +283,11 @@ struct ExportSettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: refreshEstimate)
         .onDisappear { estimateTask?.cancel() }
-        .onChange(of: settings) { _, _ in refreshEstimate() }
+        .onChange(of: settings) { _, s in
+            // Remembered as soon as they change, for the next export and the budget bar.
+            editor.rememberExportSettings(s)
+            refreshEstimate()
+        }
     }
 
     private func card<C: View>(_ title: String, _ icon: String, @ViewBuilder content: () -> C) -> some View {

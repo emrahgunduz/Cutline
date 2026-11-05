@@ -19,7 +19,7 @@ enum MediaCacheKind: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: "Asset and timeline pictures and the audio waveform."
         case .analysis: "Runs the song analysis again. Your beat and section fixes are kept."
-        case .proxies: "Re-encodes every proxy at its current size."
+        case .proxies: "Re-encodes every proxy at its current size, or removes them all."
         }
     }
 }
@@ -46,11 +46,31 @@ extension EditorModel {
         }
     }
 
-    /// Delete the chosen kinds and rebuild them through the normal builders.
+    /// Run a reset in the background (it can be stopped with `stopMediaReset`).
     @MainActor
-    func resetMediaCaches(_ kinds: Set<MediaCacheKind>) async {
+    func startMediaReset(_ kinds: Set<MediaCacheKind>, removeProxies: Bool = false) {
+        guard mediaResetTask == nil else { return }
+        mediaResetTask = Task { @MainActor [weak self] in
+            await self?.resetMediaCaches(kinds, removeProxies: removeProxies)
+            self?.mediaResetTask = nil
+        }
+    }
+
+    /// Stop after the step that is running.
+    @MainActor
+    func stopMediaReset() {
+        mediaResetTask?.cancel()
+    }
+
+    /// Delete the chosen kinds and rebuild them through the normal builders. With
+    /// `removeProxies`, proxies are deleted instead of re-encoded (preview then uses the originals).
+    @MainActor
+    func resetMediaCaches(_ kinds: Set<MediaCacheKind>, removeProxies: Bool = false) async {
         guard !kinds.isEmpty, mediaResetMessage == nil else { return }
-        defer { mediaResetMessage = nil }
+        defer {
+            mediaResetMessage = nil
+            for id in proxyProgress.keys where !proxyJobs.contains(id) { proxyProgress[id] = nil }
+        }
         let fm = FileManager.default
         if kinds.contains(.thumbnails) {
             mediaResetMessage = "Rebuilding thumbnails and waveforms…"
@@ -58,6 +78,7 @@ extension EditorModel {
             thumbnails.removeAll()
             waveforms.removeAll()
             for a in project.assets {
+                if Task.isCancelled { return }
                 switch a.kind {
                 case .video, .image: await thumbnails.ensureThumbnail(for: a)
                 case .audio: await waveforms.ensureWaveform(for: a)
@@ -65,6 +86,7 @@ extension EditorModel {
                 }
             }
         }
+        if Task.isCancelled { return }
         if kinds.contains(.analysis) {
             mediaResetMessage = "Rebuilding music analysis…"
             mediaCacheFiles(.analysis).forEach { try? fm.removeItem(at: $0) }
@@ -73,13 +95,21 @@ extension EditorModel {
                 await audioAnalysis.wait()
             }
         }
-        if kinds.contains(.proxies) {
+        if Task.isCancelled { return }
+        if kinds.contains(.proxies) && removeProxies {
+            mediaCacheFiles(.proxies).forEach { try? fm.removeItem(at: $0) }
+            FrameCache.shared.removeAll()
+            edit("Remove Proxies") { p in for i in p.assets.indices { p.assets[i].proxy = nil } }
+        } else if kinds.contains(.proxies) {
             // Files no asset uses go; every proxy in use is re-encoded at its scale (the new
             // file replaces the old one, so preview keeps working meanwhile).
             let used = Set(project.assets.compactMap { $0.proxy?.fileName })
             mediaCacheFiles(.proxies).filter { !used.contains($0.lastPathComponent) }.forEach { try? fm.removeItem(at: $0) }
             let proxied = project.assets.filter { $0.proxy != nil }
+            // Every proxy waiting to be rebuilt shows a spinner on its tile.
+            for a in proxied where proxyProgress[a.id] == nil { proxyProgress[a.id] = 0 }
             for (i, a) in proxied.enumerated() {
+                if Task.isCancelled { return }
                 guard let scale = a.proxy?.scale else { continue }
                 mediaResetMessage = "Rebuilding proxies \(i + 1) of \(proxied.count)…"
                 try? await createProxy(assetID: a.id, scale: scale)

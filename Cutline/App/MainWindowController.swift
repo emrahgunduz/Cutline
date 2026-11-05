@@ -34,7 +34,9 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         horizontal.delegate = self
         vertical.delegate = self
 
-        horizontal.addArrangedSubview(NSHostingView(rootView: AssetsPanelView().environmentObject(editor)))
+        let assets = NSHostingView(rootView: AssetsPanelView().environmentObject(editor))
+        assetsPanel = assets
+        horizontal.addArrangedSubview(assets)
         horizontal.addArrangedSubview(PreviewContainer.make(editor: editor))
         horizontal.addArrangedSubview(NSHostingView(rootView: InspectorView().environmentObject(editor)))
         vertical.addArrangedSubview(horizontal)
@@ -61,13 +63,39 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         ])
         window?.contentView = root
         installTransportKeys()
+        installClickToEndEditing()
         editor.warmCaches()
         toolbar = WindowToolbar(editor: editor, windowController: self)
         if let window { toolbar?.install(on: window) }
     }
 
     private var keyMonitor: Any?
+    private var clickMonitor: Any?
     private var toolbar: WindowToolbar?
+    private weak var assetsPanel: NSView?
+
+    /// The last click was in the assets panel: Backspace then deletes the selected assets.
+    private var lastClickInAssets = false
+
+    private var assetsHaveFocus: Bool {
+        if lastClickInAssets { return true }
+        guard let panel = assetsPanel, let r = window?.firstResponder as? NSView else { return false }
+        return r.isDescendant(of: panel)
+    }
+
+    /// A click outside the text field being edited ends the editing (and commits it), so
+    /// inspector fields don't keep the keyboard after you click the timeline or the preview.
+    private func installClickToEndEditing() {
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let window = self.window, event.window === window, let content = window.contentView else { return event }
+            let hit = content.hitTest(content.convert(event.locationInWindow, from: nil))
+            if let panel = self.assetsPanel { self.lastClickInAssets = hit?.isDescendant(of: panel) ?? false }
+            guard let editing = window.firstResponder as? NSText, let field = editing.delegate as? NSView else { return event }
+            if let hit, hit === field || hit.isDescendant(of: field) || hit === editing { return event }
+            window.makeFirstResponder(nil)
+            return event
+        }
+    }
 
     /// Single-key shortcuts that work anywhere in the window except while typing in a field.
     /// The list shown in the inspector lives in `Shortcuts` and must match this.
@@ -102,7 +130,8 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
             case (125, []): editor.jumpToEditPoint(forward: true)
             case (115, []): editor.goToStart()
             case (119, []): editor.goToEnd()
-            case (51, []), (117, []): editor.deleteSelection()
+            case (51, []), (117, []):
+                if self.assetsHaveFocus { editor.confirmDeleteAssets(editor.selectedAssets, window: self.window) } else { editor.deleteSelection() }
             default:
                 guard flags.isEmpty || flags == [.shift], let ch = event.charactersIgnoringModifiers?.lowercased() else { return event }
                 if flags == [.shift] && ch != "n" { return event }
@@ -120,7 +149,10 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    deinit { if let keyMonitor { NSEvent.removeMonitor(keyMonitor) } }
+    deinit {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+    }
 
     override func windowDidLoad() { super.windowDidLoad() }
 

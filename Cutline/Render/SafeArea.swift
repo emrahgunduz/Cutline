@@ -52,9 +52,12 @@ enum SafeArea {
     }
 
     /// Safe area for a project: portrait projects avoid the overlays they have switched on.
+    /// Portrait projects keep automatically placed lyrics clear of every platform's UI, whether
+    /// or not its zones are shown: the Platform UI menu only draws them in the preview, so
+    /// switching it doesn't move anything (and the export is safe on every platform).
     static func rect(for project: Project) -> CGRect? {
-        guard project.type.isPortrait, let ids = project.platformOverlays, !ids.isEmpty else { return nil }
-        let zones = PlatformOverlay.all.filter { ids.contains($0.id) }.flatMap { $0.rects(on: project.canvas) }
+        guard project.type.isPortrait else { return nil }
+        let zones = PlatformOverlay.all.flatMap { $0.rects(on: project.canvas) }
         return rect(canvas: project.canvas, avoiding: zones)
     }
 }

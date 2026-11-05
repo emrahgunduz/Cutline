@@ -337,3 +337,32 @@ final class EditCommandBranchTests: XCTestCase {
         XCTAssertEqual(p.fps, 24)
     }
 }
+
+final class DefaultClipScaleTests: XCTestCase {
+    private func scale(_ type: ProjectType, canvas: CanvasSize, video: CanvasSize, kind: AssetKind = .video) -> Double {
+        var p = Project(type: type, canvas: canvas)
+        let a = Asset(kind: kind, name: "v", path: "/v", pixelSize: video, duration: 10, frameRate: 24)
+        p.assets = [a]
+        let id = p.addClip(assetID: a.id, track: 0, at: 0)!
+        return p.videoTracks[0].clips.first { $0.id == id }!.transform.scale
+    }
+
+    func testVideoFillsAHorizontalFrame() {
+        XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 3840, height: 2160)), 1, accuracy: 1e-9)
+        // 2.39:1 footage would leave bars top and bottom when fitted.
+        XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 1920, height: 804)), (1920.0 / 804) / (16.0 / 9), accuracy: 1e-6)
+        // 4:3 footage fills the width.
+        XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 1440, height: 1080)), (16.0 / 9) / (4.0 / 3), accuracy: 1e-6)
+    }
+
+    func testVideoFillsAPortraitFrame() {
+        // 16:9 footage in 9:16: tall enough to cover the frame top to bottom.
+        XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 1920, height: 1080)), (16.0 / 9) * (16.0 / 9), accuracy: 1e-6)
+        XCTAssertEqual(scale(.social, canvas: .init(width: 1080, height: 1920), video: .init(width: 1080, height: 1920)), 1, accuracy: 1e-9)
+    }
+
+    func testImagesStartFitted() {
+        XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 400, height: 400), kind: .image), 1)
+        XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 400, height: 900), kind: .image), 1)
+    }
+}

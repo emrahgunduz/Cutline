@@ -14,6 +14,22 @@ struct ExportSettings: Equatable, Codable {
     var container: Container = .mp4
     /// MB (10^6 bytes), used in size mode: the file must come out at or under this.
     var sizeTargetMB: Double?
+    /// The bitrate whose file last met the size target, and what it was for. The next export to
+    /// the same target and length starts there, so its unchanged segments come from the cache.
+    var solvedSize: SolvedSize?
+
+    struct SolvedSize: Equatable, Codable {
+        var targetMB: Double
+        var duration: Double
+        var audioKbps: Double
+        var bitrate: Double
+    }
+
+    /// The remembered bitrate, when it still applies.
+    func solvedBitrate(duration: Double) -> Double? {
+        guard let s = solvedSize, s.targetMB == sizeTarget, s.audioKbps == audioBitrateKbps, abs(s.duration - duration) < 0.001 else { return nil }
+        return s.bitrate
+    }
 
     enum Container: String, CaseIterable, Identifiable, Codable {
         case mp4, mov
@@ -22,16 +38,19 @@ struct ExportSettings: Equatable, Codable {
         var fileType: AVFileType { self == .mp4 ? .mp4 : .mov }
     }
 
+    static let fallbackSizeTargetMB = 50.0
+    /// The size target in effect (the field shows this even before it is edited).
+    var sizeTarget: Double { sizeTargetMB ?? Self.fallbackSizeTargetMB }
+
     /// Size estimate for bitrate mode (exact up to container overhead); the target in size mode.
     func estimatedBytes(duration: Double) -> Double {
-        if rateMode == .size, let mb = sizeTargetMB { return mb * 1_000_000 }
+        if rateMode == .size { return sizeTarget * 1_000_000 }
         return (bitrateMbps * 1_000_000 + audioBitrateKbps * 1000) * duration / 8
     }
 
     /// The video bitrate (Mbit/s) a size target leaves for this length.
     func sizeTargetBitrateMbps(duration: Double) -> Double? {
-        guard let mb = sizeTargetMB else { return nil }
-        return SizeSolver.videoBitrate(targetBytes: mb * 1_000_000, duration: duration, audioKbps: audioBitrateKbps) / 1_000_000
+        SizeSolver.videoBitrate(targetBytes: sizeTarget * 1_000_000, duration: duration, audioKbps: audioBitrateKbps) / 1_000_000
     }
 
     /// The project's saved choices, else the type's defaults: music videos highest-quality
@@ -47,7 +66,7 @@ struct ExportSettings: Equatable, Codable {
             return ExportSettings(codec: preset.codec, rateMode: .quality, quality: 1, bitrateMbps: project.canvas.height >= 2160 ? 80 : 30)
         case .social, .ad:
             var s = ExportSettings(codec: preset.codec, rateMode: .bitrate, quality: 0.8, bitrateMbps: preset.defaultBitrateMbps ?? 12,
-                                   sizeTargetMB: preset.defaultSizeTargetMB)
+                                   sizeTargetMB: preset.defaultSizeTargetMB ?? fallbackSizeTargetMB)
             if preset.defaultSizeTargetMB != nil { s.rateMode = .size }
             return s
         }

@@ -13,6 +13,9 @@ enum Presets {
 
     private static var cached: [FormatPreset]?
 
+    /// Posted after the presets are saved or restored (length limits, codecs ... changed).
+    static let didChange = Notification.Name("CutlinePresetsDidChange")
+
     static func all() -> [FormatPreset] {
         if let cached { return cached }
         let loaded = load()
@@ -30,12 +33,14 @@ enum Presets {
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try enc.encode(presets).write(to: editableURL, options: .atomic)
         cached = presets
+        NotificationCenter.default.post(name: didChange, object: nil)
     }
 
     /// Drop the user's edits and go back to the bundled table.
     static func restoreDefaults() {
         try? FileManager.default.removeItem(at: editableURL)
         cached = nil
+        NotificationCenter.default.post(name: didChange, object: nil)
     }
 
     /// The bundled values, for comparison in Settings.

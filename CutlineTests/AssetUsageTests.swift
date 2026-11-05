@@ -48,4 +48,32 @@ final class AssetUsageTests: XCTestCase {
         XCTAssertNotNil(doc.editor.project.asset(v))
         XCTAssertEqual(doc.editor.project.usageCount(of: v), 2)
     }
+
+    func testDeletingTheSongClearsItsAnalysisAndFixes() throws {
+        var (p, _, _, a) = project()
+        p.beatCorrections = BeatCorrections(audioHash: "x")
+        p.cinemascope.startAnchor = BeatAnchor(kind: .downbeat, index: 2, offset: 0, audioHash: "x")
+        let doc = ProjectDocument(project: p)
+        let dir = try XCTUnwrap(doc.editor.folder("analysis"))
+        let wave = dir.appendingPathComponent("waveform-\(a.id.uuidString).plist")
+        try Data("w".utf8).write(to: wave)
+        doc.editor.deleteAssets([a.id])
+        XCTAssertNil(doc.editor.project.audio)
+        XCTAssertNil(doc.editor.project.beatCorrections)
+        XCTAssertNil(doc.editor.project.cinemascope.startAnchor)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: wave.path))
+    }
+
+    func testDeletingTheLyricsClearsEveryLyricTrack() {
+        var (p, _, _, _) = project()
+        let txt = Asset(kind: .lyrics, name: "l.txt", path: "/l.txt")
+        p.assets.append(txt)
+        p.lyricTracks = [LyricTrack(lines: [LyricLine(start: 1, end: 2, words: [LyricWord(text: "a", start: 1, end: 2, confidence: 0.3)])]),
+                         LyricTrack(lines: [LyricLine(start: 1, end: 2, words: [LyricWord(text: "b", start: 1, end: 2)])])]
+        p.lyricsLanguage = "tr"
+        p.removeAssets([txt.id])
+        XCTAssertEqual(p.lyricTracks.count, 1)
+        XCTAssertTrue(p.lyricTracks[0].lines.isEmpty)
+        XCTAssertNil(p.lyricsLanguage)
+    }
 }

@@ -18,17 +18,21 @@ final class SafeAreaTests: XCTestCase {
         for zone in tiktok.rects(on: canvas) { XCTAssertFalse(safe.intersects(zone.insetBy(dx: 0.5, dy: 0.5))) }
     }
 
-    func testSeveralPlatformsTakeTheDeepestZoneOnEachEdge() throws {
-        var p = Project(type: .social, canvas: canvas)
-        p.platformOverlays = ["tiktok", "reels"]
+    func testPortraitProjectsAvoidEveryPlatformsZones() throws {
+        let p = Project(type: .social, canvas: canvas)
         let safe = try XCTUnwrap(SafeArea.rect(for: p))
-        XCTAssertEqual(safe.maxY, 1920 - 220, accuracy: 0.01)   // Reels' top bar is deeper
-        XCTAssertEqual(safe.minY, 440, accuracy: 0.01)          // TikTok's caption is deeper
+        XCTAssertLessThanOrEqual(safe.maxY, 1920 - 220 + 0.01)   // Reels' top bar is the deepest top zone
+        XCTAssertGreaterThanOrEqual(safe.minY, 440 - 0.01)       // at least TikTok's caption
+        for zone in PlatformOverlay.all.flatMap({ $0.rects(on: canvas) }) {
+            XCTAssertFalse(safe.intersects(zone.insetBy(dx: 0.5, dy: 0.5)), "\(zone)")
+        }
     }
 
-    func testNoOverlaysOrMusicVideoMeansNoSafeArea() {
+    func testShowingZonesDoesNotChangeTheSafeArea() {
         var p = Project(type: .social, canvas: canvas)
-        XCTAssertNil(SafeArea.rect(for: p))
+        let hidden = SafeArea.rect(for: p)
+        p.platformOverlays = ["tiktok"]
+        XCTAssertEqual(SafeArea.rect(for: p), hidden, "the Platform UI menu only draws the zones")
         p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         p.platformOverlays = ["tiktok"]
         XCTAssertNil(SafeArea.rect(for: p), "landscape projects have no platform zones")
@@ -46,12 +50,11 @@ final class SafeAreaTests: XCTestCase {
         p.lyricStyle.verticalPosition = 0.95            // would sit in the caption zone
         p.lyricTracks[0].lines = [LyricLine(start: 0, end: 5, words: [LyricWord(text: "Hello", start: 0, end: 5)]),]
         p.lyricTracks.append(LyricTrack(lines: [LyricLine(start: 0, end: 5, words: [LyricWord(text: "There", start: 0, end: 5)])]))
-        let before = LyricRenderer(project: p).placedLines(at: 1).map(\.rect)
-        p.platformOverlays = ["tiktok"]
         let safe = try XCTUnwrap(SafeArea.rect(for: p))
-        let after = LyricRenderer(project: p).placedLines(at: 1).map(\.rect)
-        XCTAssertTrue(before.contains { $0.minY < 440 }, "the test starts inside the caption zone")
-        for r in after { XCTAssertTrue(safe.contains(r), "\(r) inside \(safe)") }
+        let placed = LyricRenderer(project: p).placedLines(at: 1).map(\.rect)
+        for r in placed { XCTAssertTrue(safe.contains(r), "\(r) inside \(safe)") }
+        p.platformOverlays = ["tiktok", "reels", "shorts"]
+        XCTAssertEqual(LyricRenderer(project: p).placedLines(at: 1).map(\.rect), placed, "showing the zones doesn't move the lyrics")
 
         p.lyricTracks[0].lines[0].centerX = 540; p.lyricTracks[0].lines[0].centerY = 200
         let manual = LyricRenderer(project: p).placedLines(at: 1).first { $0.line.id == p.lyricTracks[0].lines[0].id }
