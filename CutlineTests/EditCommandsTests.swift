@@ -228,64 +228,69 @@ final class EditCommandBranchTests: XCTestCase {
         return p
     }
 
-    /// Words end with their line: a word's new end moves the line's end, but never before
-    /// one frame after the line's last word starts.
-    func testRetimeWordEndMovesTheLineEndWithinLimits() {
+    func testRetimeWordEndBeforeStartKeepsStartAndMinimumLength() {
         var p = lyricProject()
         let w = p.lyricTracks[0].lines[0].words[0].id
-        p.retimeWord(w, end: 8)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 8, accuracy: 1e-9)
-        XCTAssertTrue(p.lyricTracks[0].lines[0].words.allSatisfy { $0.end == 8 })
         p.retimeWord(w, end: 4)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 6.2 + p.frameDuration, accuracy: 1e-9)
-        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 5, accuracy: 1e-9)
+        let word = p.lyricTracks[0].lines[0].words[0]
+        XCTAssertEqual(word.start, 5, accuracy: 1e-9)
+        XCTAssertEqual(word.end, 5 + p.frameDuration, accuracy: 1e-9)
     }
 
-    func testRetimeWordStartPastTheLineEndExtendsTheLine() {
+    /// A word's end is its own: changing it leaves the line and the other words alone.
+    func testRetimeWordEndChangesOnlyThatWord() {
         var p = lyricProject()
         let w = p.lyricTracks[0].lines[0].words[0].id
-        p.retimeWord(w, start: 9.5)
+        p.retimeWord(w, end: 7.4)
         let line = p.lyricTracks[0].lines[0]
-        XCTAssertEqual(line.words[0].start, p.quantize(9.5), accuracy: 1e-9)
-        XCTAssertEqual(line.end, p.quantize(9.5) + p.frameDuration, accuracy: 1e-9)
-        XCTAssertTrue(line.words.allSatisfy { $0.end == line.end })
+        XCTAssertEqual(line.words[0].end, 7.4, accuracy: 1e-9)
+        XCTAssertEqual(line.words[1].end, 8.8, accuracy: 1e-9)
+        XCTAssertEqual(line.end, 9, accuracy: 1e-9)
+        p.retimeWord(w, end: 9.6)                // past the line end: the line grows
+        XCTAssertEqual(p.lyricTracks[0].lines[0].end, 9.6, accuracy: 1e-9)
     }
 
-    /// Words: "one" at 5 (0 s from the start), "two" at 6.2 (1.2 s); the line ends at 9.
-    func testDraggingTheLineStartCarriesWordsAtTheirOffsets() {
+    func testRetimeWordStartAfterEndKeepsEndAndMinimumLength() {
+        var p = lyricProject()
+        let w = p.lyricTracks[0].lines[0].words[0].id
+        p.retimeWord(w, start: 7)
+        let word = p.lyricTracks[0].lines[0].words[0]
+        XCTAssertEqual(word.end, 6, accuracy: 1e-9)
+        XCTAssertEqual(word.start, 6 - p.frameDuration, accuracy: 1e-9)
+    }
+
+    /// Words: "one" 5-6, "two" 6.2-8.8; the line is 5-9.
+    func testDraggingTheLineStartMovesWordStartsOnly() {
         var p = lyricProject()
         let id = p.lyricTracks[0].lines[0].id
         p.retimeLine(id, start: 4)
         let line = p.lyricTracks[0].lines[0]
         XCTAssertEqual(line.start, 4)
-        XCTAssertEqual(line.words.map(\.start), [4, 5.2])
-        XCTAssertEqual(line.end, 9, "the end stays")
-        XCTAssertTrue(line.words.allSatisfy { $0.end == 9 }, "words stretch to the line end")
+        XCTAssertEqual(line.words.map(\.start), [4, 5.2], "starts keep their distance from the line start")
+        XCTAssertEqual(line.words.map(\.end), [6, 8.8], "ends stay")
+        XCTAssertEqual(line.end, 9)
     }
 
-    func testDraggingTheLineEndCarriesWordsAtTheirDistanceFromTheEnd() {
+    func testDraggingTheLineEndMovesWordEndsOnly() {
         var p = lyricProject()
         let id = p.lyricTracks[0].lines[0].id
         p.retimeLine(id, end: 9.6)
         let line = p.lyricTracks[0].lines[0]
-        XCTAssertEqual(line.start, 5, "the start stays")
+        XCTAssertEqual(line.start, 5)
         XCTAssertEqual(line.end, 9.6, accuracy: 1e-9)
-        XCTAssertEqual(line.words[0].start, 5.6, accuracy: 1e-9)
-        XCTAssertEqual(line.words[1].start, 6.8, accuracy: 1e-9)
+        XCTAssertEqual(line.words.map(\.start), [5, 6.2], "starts stay")
+        XCTAssertEqual(line.words[0].end, 6.6, accuracy: 1e-9, "ends keep their distance from the line end")
+        XCTAssertEqual(line.words[1].end, 9.4, accuracy: 1e-9)
     }
 
-    func testWordsNeverCrossTheFixedEdge() {
+    func testLineEdgeDragStopsAtTheShortestWord() {
         var p = lyricProject()
         let id = p.lyricTracks[0].lines[0].id
-        p.retimeLine(id, start: 8.5)            // "two" (1.2 s in) would pass the end at 9
-        var line = p.lyricTracks[0].lines[0]
-        XCTAssertEqual(line.words[1].start, 9 - p.frameDuration, accuracy: 1e-9)
-        XCTAssertEqual(line.words[1].start - line.words[0].start, 1.2, accuracy: 1e-9, "offsets are kept")
+        p.retimeLine(id, start: 8)               // "one" (5-6) can only lose 1 s minus a frame
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].start, 6 - p.frameDuration, accuracy: 1e-9)
         p = lyricProject()
-        p.retimeLine(id, end: 6)                // "one" can't move before the start at 5
-        line = p.lyricTracks[0].lines[0]
-        XCTAssertEqual(line.words[0].start, 5, accuracy: 1e-9)
-        XCTAssertEqual(line.end, 9, accuracy: 1e-9)
+        p.retimeLine(p.lyricTracks[0].lines[0].id, end: 6)   // "one" can only lose its length minus a frame
+        XCTAssertEqual(p.lyricTracks[0].lines[0].words[0].end, 5 + p.frameDuration, accuracy: 1e-9)
     }
 
     func testDeletingLastWordRemovesLineButNotOthers() {

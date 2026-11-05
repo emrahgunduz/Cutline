@@ -180,7 +180,7 @@ final class LyricCorrectionTests: XCTestCase {
         e.transport.currentTime = { 11.4 }   // 0.4 s late; the word lasts 0.5 s, w3 starts at 12
         e.tap(snap: false)
         XCTAssertEqual(w(e, 2).start, 12, "the next aligned word keeps its time")
-        XCTAssertEqual(w(e, 1).end, e.project.lyricTracks[0].lines[0].end, "words end with their line")
+        XCTAssertGreaterThanOrEqual(w(e, 1).end - w(e, 1).start, e.project.frameDuration - 1e-9)
     }
 
     func testRetimeAllClearsConfirmation() {
