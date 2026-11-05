@@ -4,7 +4,8 @@ import SwiftUI
 /// The single project-wide lyric style: font, size, color and drop shadow.
 struct LyricStyleView: View {
     @EnvironmentObject var editor: EditorModel
-    @AppStorage("lyricAlignPadding") private var padding = 60.0
+    @AppStorage("lyricAlignPaddingX") private var paddingX = 60.0
+    @AppStorage("lyricAlignPaddingY") private var paddingY = 60.0
     @AppStorage("lyricLineGap") private var gap = 0.0
     @AppStorage(NudgeStep.key) private var nudgeStep = NudgeStep.defaultValue
     private static let families = NSFontManager.shared.availableFontFamilies
@@ -64,16 +65,20 @@ struct LyricStyleView: View {
         if !ids.isEmpty {
             InspectorSection(title: ids.count > 1 ? "Placement · \(ids.count) lines" : "Placement", icon: "rectangle.dashed") {
                 HStack(spacing: 4) {
-                    alignButton("align.horizontal.left", "Align left") { editor.alignLines(horizontal: .left, vertical: nil, padding: padding, gap: gap) }
-                    alignButton("align.horizontal.center", "Center horizontally") { editor.alignLines(horizontal: .center, vertical: nil, padding: padding, gap: gap) }
-                    alignButton("align.horizontal.right", "Align right") { editor.alignLines(horizontal: .right, vertical: nil, padding: padding, gap: gap) }
+                    alignButton("align.horizontal.left", "Align left") { editor.alignLines(horizontal: .left, vertical: nil, paddingX: paddingX, paddingY: paddingY, gap: gap) }
+                    alignButton("align.horizontal.center", "Center horizontally") { editor.alignLines(horizontal: .center, vertical: nil, paddingX: paddingX, paddingY: paddingY, gap: gap) }
+                    alignButton("align.horizontal.right", "Align right") { editor.alignLines(horizontal: .right, vertical: nil, paddingX: paddingX, paddingY: paddingY, gap: gap) }
                     Divider().frame(height: 18)
-                    alignButton("align.vertical.top", ids.count > 1 ? "Stack at top" : "Align top") { editor.alignLines(horizontal: nil, vertical: .top, padding: padding, gap: gap) }
-                    alignButton("align.vertical.center", ids.count > 1 ? "Stack in the middle" : "Center vertically") { editor.alignLines(horizontal: nil, vertical: .center, padding: padding, gap: gap) }
-                    alignButton("align.vertical.bottom", ids.count > 1 ? "Stack at bottom" : "Align bottom") { editor.alignLines(horizontal: nil, vertical: .bottom, padding: padding, gap: gap) }
+                    alignButton("align.vertical.top", ids.count > 1 ? "Stack at top" : "Align top") { editor.alignLines(horizontal: nil, vertical: .top, paddingX: paddingX, paddingY: paddingY, gap: gap) }
+                    alignButton("align.vertical.center", ids.count > 1 ? "Stack in the middle" : "Center vertically") { editor.alignLines(horizontal: nil, vertical: .center, paddingX: paddingX, paddingY: paddingY, gap: gap) }
+                    alignButton("align.vertical.bottom", ids.count > 1 ? "Stack at bottom" : "Align bottom") { editor.alignLines(horizontal: nil, vertical: .bottom, paddingX: paddingX, paddingY: paddingY, gap: gap) }
                 }
-                ValueRow(label: "Padding", value: padding, range: 0...400, step: 1, format: "%.0f px", defaultValue: 60,
-                         onChange: { padding = $0 }, onCommit: {})
+                ValueRow(label: "Padding ↔", value: paddingX, range: 0...600, step: 1, format: "%.0f px", defaultValue: 60,
+                         onChange: { paddingX = $0.rounded() }, onCommit: {})
+                    .help("Distance of the letters from the left or right edge of the frame")
+                ValueRow(label: "Padding ↕", value: paddingY, range: 0...600, step: 1, format: "%.0f px", defaultValue: 60,
+                         onChange: { paddingY = $0.rounded() }, onCommit: {})
+                    .help("Distance of the letters from the top or bottom edge of the frame")
                 ValueRow(label: "⇧ Nudge", value: nudgeStep, range: 1...200, step: 1, format: "%.0f px", defaultValue: NudgeStep.defaultValue,
                          onChange: { nudgeStep = $0.rounded() }, onCommit: {})
                     .help("Arrow keys move the selected lines 1 px in the preview; with ⇧ they move this far.")

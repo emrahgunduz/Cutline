@@ -62,14 +62,19 @@ final class LyricRenderer {
         return out
     }
 
-    /// Canvas size of a line's text block (for alignment).
-    func size(of line: LyricLine) -> CGSize? {
+    /// A line's drawn box and where its letters are in it (for alignment), at the size it is
+    /// drawn when it has its own position.
+    func box(of line: LyricLine) -> LyricPlacement.Box? {
         let style = project.lyricStyle
         let maxWidth = CGFloat(project.canvas.width) * 0.92
         guard let r = raster(for: line, style: style, fontSize: LyricLayout.fontSize(style, canvas: project.canvas), maxWidth: maxWidth) else { return nil }
         let fit = min(1, maxWidth / r.size.width)
-        return CGSize(width: r.size.width * fit, height: r.size.height * fit)
+        let ink = r.ink.applying(CGAffineTransform(scaleX: fit, y: fit))
+        return LyricPlacement.Box(size: CGSize(width: r.size.width * fit, height: r.size.height * fit), ink: ink)
     }
+
+    /// Canvas size of a line's text block.
+    func size(of line: LyricLine) -> CGSize? { box(of: line)?.size }
 
     func image(at t: Double) -> CIImage? {
         let style = project.lyricStyle
