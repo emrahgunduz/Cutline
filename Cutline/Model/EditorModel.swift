@@ -67,7 +67,11 @@ final class EditorModel: ObservableObject {
     @Published private(set) var revision = 0
 
     weak var document: ProjectDocument?
-    private(set) lazy var thumbnails = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
+    private(set) lazy var thumbnails: ThumbnailGenerator = {
+        let t = ThumbnailGenerator { [weak self] in self?.folder("thumbnails") }
+        t.dummyBarFraction = { [weak self] in self.map { DummyRenderer.barFraction(for: $0.project) } ?? 0 }
+        return t
+    }()
     private(set) lazy var waveforms = WaveformStore { [weak self] in self?.folder("analysis") }
     /// Analysis jobs on the bundled helper (progress shown in the status bar).
     lazy var jobs = JobRunner()   // replaceable in tests
@@ -77,6 +81,7 @@ final class EditorModel: ObservableObject {
     var autoAnalyze = !AppDelegate.isTestHost
     private var analysisWatch: AnyCancellable?
     private var presetsWatch: AnyCancellable?
+    private var dummyBarsWatch: AnyCancellable?
     /// What Reset Media Caches is doing right now (nil when idle).
     @Published var mediaResetMessage: String?
     /// Export segment files in `cache/segments/` (see CacheStrip).
@@ -95,6 +100,9 @@ final class EditorModel: ObservableObject {
     @MainActor
     func warmCaches() {
         watchSong()
+        // Dummy thumbnails follow the cinemascope setting (their text stays inside the bars).
+        dummyBarsWatch = dummyBarsWatch ?? $project.map { DummyRenderer.barFraction(for: $0) }.removeDuplicates().dropFirst()
+            .receive(on: RunLoop.main).sink { [weak self] _ in guard let self else { return }; self.thumbnails.refreshDummies(self.project.assets) }
         // A changed length limit redraws the limit line, the budget bar and the trim button.
         presetsWatch = presetsWatch ?? NotificationCenter.default.publisher(for: Presets.didChange)
             .receive(on: RunLoop.main).sink { [weak self] _ in self?.revision += 1 }
