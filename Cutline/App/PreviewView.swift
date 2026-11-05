@@ -19,19 +19,19 @@ struct PreviewView: View {
             Divider()
             HStack(spacing: 12) {
                 Group {
-                    Button(action: editor.goToStart) { Image(systemName: "backward.end.fill") }.help("Go to start (Home)")
-                    Button { editor.stepFrame(-1) } label: { Image(systemName: "backward.frame.fill") }.help("Previous frame (←)")
+                    Button(action: editor.goToStart) { Image(systemName: "backward.end.fill") }.tip("Go to start (Home)")
+                    Button { editor.stepFrame(-1) } label: { Image(systemName: "backward.frame.fill") }.tip("Previous frame (←)")
                     Button(action: editor.togglePlay) { Image(systemName: editor.isPlaying ? "pause.fill" : "play.fill").frame(width: 18) }
-                        .help("Play / pause (Space)")
-                    Button { editor.stepFrame(1) } label: { Image(systemName: "forward.frame.fill") }.help("Next frame (→)")
-                    Button(action: editor.goToEnd) { Image(systemName: "forward.end.fill") }.help("Go to end (End)")
+                        .tip("Play / pause (Space)")
+                    Button { editor.stepFrame(1) } label: { Image(systemName: "forward.frame.fill") }.tip("Next frame (→)")
+                    Button(action: editor.goToEnd) { Image(systemName: "forward.end.fill") }.tip("Go to end (End)")
                 }
                 .font(.system(size: 14))
                 Spacer()
                 Text("\(Timecode.string(editor.playhead, fps: editor.project.fps)) / \(Timecode.string(editor.project.duration, fps: editor.project.fps))")
                     .font(.system(.body, design: .monospaced))
                 Spacer()
-                Button { controller.stepZoom(1 / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }.help("Zoom out (⌥-scroll or pinch)")
+                Button { controller.stepZoom(1 / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }.tip("Zoom out (mouse wheel or pinch zooms at the pointer)")
                 Menu(zoomLabel) {
                     Button("Fit") { controller.resetView() }
                     Divider()
@@ -39,9 +39,13 @@ struct PreviewView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
-                Button { controller.stepZoom(1.25) } label: { Image(systemName: "plus.magnifyingglass") }.help("Zoom in")
+                .tip("Preview zoom")
+                Button { controller.stepZoom(1.25) } label: { Image(systemName: "plus.magnifyingglass") }.tip("Zoom in")
+                Button { controller.center() } label: { Image(systemName: "scope") }
+                    .tip("Center the canvas (keep zoom)")
+                    .disabled(controller.pan == .zero)
                 Button { controller.resetView() } label: { Image(systemName: "arrow.up.left.and.down.right.magnifyingglass") }
-                    .help("Fit and center (reset zoom and pan)")
+                    .tip("Fit to view and center")
                     .disabled(controller.zoom == nil && controller.pan == .zero)
             }
             .buttonStyle(.borderless)
@@ -59,4 +63,16 @@ private struct CanvasRepresentable: NSViewRepresentable {
     let editor: EditorModel
     func makeNSView(context: Context) -> PreviewCanvasView { PreviewCanvasView(controller: controller, editor: editor) }
     func updateNSView(_ nsView: PreviewCanvasView, context: Context) {}
+}
+
+/// Tooltip backed by AppKit's toolTip, which shows reliably inside hosted SwiftUI views.
+private struct ToolTipView: NSViewRepresentable {
+    let text: String
+    func makeNSView(context: Context) -> NSView { let v = PassthroughView(); v.toolTip = text; return v }
+    func updateNSView(_ nsView: NSView, context: Context) { nsView.toolTip = text }
+    final class PassthroughView: NSView { override func hitTest(_ point: NSPoint) -> NSView? { nil } }
+}
+
+extension View {
+    func tip(_ text: String) -> some View { help(text).overlay(ToolTipView(text: text)) }
 }
