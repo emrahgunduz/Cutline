@@ -1,7 +1,7 @@
 import CoreImage
 import Foundation
 
-/// Animated cinemascope bars (music videos only): none before the start marker, easing in
+/// Animated cinemascope bars (music videos only): none before the start marker, easing out
 /// between the markers, a full 2.35:1 frame from the end marker on.
 enum Letterbox {
     static let ratio = 2.35
@@ -17,7 +17,7 @@ enum Letterbox {
         if t <= s { return 0 }
         if t >= e { return 1 }
         let x = (t - s) / max(e - s, 1e-6)
-        return x * x * (3 - 2 * x)          // smoothstep ease-in-out
+        return 1 - pow(1 - x, 3)            // cubic ease-out: moves quickly, settles gently
     }
 
     static func barHeight(project: Project, at t: Double) -> Double {
