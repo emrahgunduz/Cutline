@@ -89,16 +89,62 @@ final class LyricCorrectionTests: XCTestCase {
         XCTAssertNil(e.transport.stopAt)
     }
 
-    func testTapSnapsToANearbyVocalOnsetOnly() {
+    /// The song starts at 2 s on the timeline; the vocal onset at song time 8.5 is 10.5 on the timeline.
+    private func editorWithOnsets() -> EditorModel {
         let e = editor()
         let asset = Asset(kind: .audio, name: "s", path: "/s", duration: 30)
-        e.edit("x") { $0.assets = [asset]; $0.setAudio(assetID: asset.id) }
-        // No analysis in this test, so snapping falls back to the raw time.
+        e.edit("x") { $0.assets = [asset]; $0.setAudio(assetID: asset.id); $0.moveAudio(start: 2, alone: true) }
+        e.audioAnalysis.adopt(AudioAnalysis(hash: "h", result: .init(duration: 30, tempo: 120, beats: [], downbeats: [],
+                                                                      onsets: [8.5], sections: [], vocals: "")))
+        return e
+    }
+
+    func testTapSnapsToANearbyVocalOnset() {
+        let e = editorWithOnsets()
         e.selection = .lyricWord(id(e, 0))
         e.startTapMode()
-        e.transport.currentTime = { 10.3 }
+        e.transport.currentTime = { 10.53 }       // 30 ms from the onset at 10.5
         e.tap(snap: true)
-        XCTAssertEqual(w(e, 0).start, e.project.quantize(10.3))
+        XCTAssertEqual(w(e, 0).start, e.project.quantize(10.5))
+    }
+
+    func testTapFarFromAnOnsetOrWithSnappingOffStaysRaw() {
+        var e = editorWithOnsets()
+        e.selection = .lyricWord(id(e, 0))
+        e.startTapMode()
+        e.transport.currentTime = { 10.56 }       // 60 ms away: outside the 40 ms window
+        e.tap(snap: true)
+        XCTAssertEqual(w(e, 0).start, e.project.quantize(10.56))
+        e = editorWithOnsets()
+        e.selection = .lyricWord(id(e, 0))
+        e.startTapMode()
+        e.transport.currentTime = { 10.53 }
+        e.tap(snap: false)
+        XCTAssertEqual(w(e, 0).start, e.project.quantize(10.53))
+    }
+
+    func testTapLaterThanTheWordsEndMovesTheWordThere() {
+        let e = editor()                           // w1 is 10-10.5
+        e.selection = .lyricWord(id(e, 0))
+        e.startTapMode()
+        e.transport.currentTime = { 12.25 }        // well after w1's end
+        e.tap(snap: false)
+        XCTAssertEqual(w(e, 0).start, e.project.quantize(12.25))
+        XCTAssertEqual(w(e, 0).end - w(e, 0).start, 0.5, accuracy: 1e-9, "the word keeps its length")
+        // The next tap also lands where it is played, not clamped.
+        e.transport.currentTime = { 14.0 }
+        e.tap(snap: false)
+        XCTAssertEqual(w(e, 1).start, 14)
+    }
+
+    func testTapUsesTheLeadIn() {
+        let e = editor()
+        e.edit("x") { $0.lyricStyle.leadIn = 0.25 }
+        e.selection = .lyricWord(id(e, 0))
+        e.startTapMode()
+        e.transport.currentTime = { 10.5 }
+        e.tap(snap: false)
+        XCTAssertEqual(w(e, 0).start, e.project.quantize(10.25))
     }
 
     func testEndTapModeResetsSpeed() {
