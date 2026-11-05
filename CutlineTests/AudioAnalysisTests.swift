@@ -144,6 +144,18 @@ final class AudioAnalysisTests: XCTestCase {
         XCTAssertNil(s.analysis)
     }
 
+    func testCancelledReanalysisKeepsTheOldResult() async throws {
+        let song = Asset(kind: .audio, name: "song.wav", path: try tone("song.wav").path)
+        let calls = Counter()
+        let s = store(calls)
+        s.ensure(for: song); await s.wait()
+        let first = try XCTUnwrap(s.analysis)
+        s.ensure(for: song, force: true)
+        s.cancel()
+        await s.wait()
+        XCTAssertEqual(s.analysis, first)
+    }
+
     func testDecodeWritesStereo44k() async throws {
         let src = try tone("src.wav")
         let wav = dir.appendingPathComponent("decoded.wav")
