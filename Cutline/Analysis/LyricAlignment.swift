@@ -156,7 +156,10 @@ extension EditorModel {
                 // The song the result belongs to: if it moves or changes during the job, the
                 // result is stale (word times are relative to where the song sits).
                 let songAtStart = (asset: audio.assetID, start: audio.start, hash: a.audioHash)
-                let order = self.project.lyricLineOrder()
+                // Sung order comes from the lyrics file, not the timeline: lines moved to other
+                // tracks or out of order still get the times of the words they contain.
+                self.recoverTextOrderIfNeeded()
+                let order = self.project.lyricTextOrder()
                 let ids = order.map(\.id)
                 let lines = order.map { $0.words.map(\.text) }
                 var args: [String: Any] = ["vocals": vocals.path, "lines": lines]
@@ -179,6 +182,16 @@ extension EditorModel {
                 if let window { NSAlert(error: error).beginSheetModal(for: window) { _ in } }
             }
         }
+    }
+
+    /// Older projects don't know each line's place in the lyrics file: read it from the file.
+    @MainActor
+    func recoverTextOrderIfNeeded() {
+        guard !project.lyricTracks.flatMap(\.lines).contains(where: { $0.textOrder != nil }),
+              let asset = project.assets.first(where: { $0.kind == .lyrics }),
+              let text = (try? String(contentsOf: asset.url, encoding: .utf8)) ?? (try? String(contentsOf: asset.url, encoding: .isoLatin1)) else { return }
+        var p = project
+        if p.recoverTextOrder(from: text, group: asset.id) { replaceWithoutUndo(p); document?.updateChangeCount(.changeDone) }
     }
 
     /// Stop running analysis and alignment jobs (status bar cancel button).
