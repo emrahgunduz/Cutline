@@ -47,6 +47,23 @@ enum MainMenu {
         let align = lyrics.addItem(withTitle: "Align Words to Song", action: #selector(MainWindowController.alignLyrics(_:)), keyEquivalent: "l")
         align.keyEquivalentModifierMask = [.command, .option]
         lyrics.addItem(withTitle: "Analyze Song Again", action: #selector(MainWindowController.analyzeSongAgain(_:)), keyEquivalent: "")
+        lyrics.addItem(.separator())
+        // Plain-key shortcuts (N, Return, T) are handled by the window, so they show in the titles.
+        lyrics.addItem(withTitle: "Next Unsure Word  (N)", action: #selector(MainWindowController.nextUnsureWord(_:)), keyEquivalent: "")
+        lyrics.addItem(withTitle: "Previous Unsure Word  (⇧N)", action: #selector(MainWindowController.previousUnsureWord(_:)), keyEquivalent: "")
+        lyrics.addItem(withTitle: "Confirm Word  (Return)", action: #selector(MainWindowController.confirmWord(_:)), keyEquivalent: "")
+        lyrics.addItem(withTitle: "Stop Looping  (Esc)", action: #selector(MainWindowController.stopLooping(_:)), keyEquivalent: "")
+        lyrics.addItem(.separator())
+        lyrics.addItem(withTitle: "Tap Mode  (T)", action: #selector(MainWindowController.toggleTapMode(_:)), keyEquivalent: "")
+        lyrics.addItem(withTitle: "Tap  (Space in tap mode)", action: #selector(MainWindowController.tapWord(_:)), keyEquivalent: "")
+        let speed = NSMenuItem(title: "Tap Speed", action: nil, keyEquivalent: "")
+        let speeds = NSMenu(title: "Tap Speed")
+        for (i, r) in EditorModel.tapRates.enumerated() {
+            let item = speeds.addItem(withTitle: "\(Int(r * 100))%  (\(i + 1))", action: #selector(MainWindowController.setTapSpeed(_:)), keyEquivalent: "")
+            item.tag = i
+        }
+        speed.submenu = speeds
+        lyrics.addItem(speed)
         lyricsItem.submenu = lyrics
         main.addItem(lyricsItem)
 

@@ -35,6 +35,14 @@ enum Shortcuts {
             ("Double-click header", "Collapse / expand track"),
             ("Drag header ≡", "Reorder tracks"),
         ]),
+        ShortcutGroup(section: "Lyrics", icon: "text.quote", items: [
+            ("N / ⇧N", "Next / previous unsure word (loops it)"),
+            ("Return", "Confirm the selected word"),
+            ("Esc", "Stop looping"),
+            ("T", "Tap mode: Space times each word in turn"),
+            ("1 / 2 / 3", "Tap mode speed 100% / 75% / 50%"),
+            ("⌥⌘L", "Align words to the song"),
+        ]),
         ShortcutGroup(section: "Preview", icon: "rectangle.on.rectangle", items: [
             ("Scroll / pinch", "Zoom at pointer"),
             ("Drag empty area", "Pan when zoomed"),

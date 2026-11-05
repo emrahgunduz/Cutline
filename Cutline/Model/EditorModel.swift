@@ -216,4 +216,12 @@ final class EditorModel: ObservableObject {
 final class TransportState: ObservableObject {
     @Published var playhead: Double = 0
     @Published var isPlaying = false
+    /// Playback repeats this range while set (next-unsure-word loop).
+    @Published var loop: ClosedRange<Double>?
+    /// Playback speed; below 1 keeps the pitch (tap mode).
+    @Published var rate: Float = 1
+    /// Tap mode: the word the next tap times (nil = off).
+    @Published var tapWordID: UUID?
+    /// Song time right now, read from the player (exact even between 60 Hz playhead updates).
+    var currentTime: () -> Double = { 0 }
 }

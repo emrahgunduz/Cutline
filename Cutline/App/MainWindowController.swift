@@ -77,8 +77,23 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
             let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
             let editor = self.projectDocument.editor
             let timeline = (self.vertical.arrangedSubviews.last as? TimelineContainer)?.timeline
+            // Tap mode owns Space (tap), Esc (stop) and 1/2/3 (speed).
+            if editor.isTapping {
+                switch (event.keyCode, event.charactersIgnoringModifiers ?? "") {
+                case (49, _): editor.tap(snap: timeline?.snappingEnabled ?? true); return nil
+                case (53, _): editor.endTapMode(); return nil
+                case (_, "1"): editor.setTapRate(1); return nil
+                case (_, "2"): editor.setTapRate(0.75); return nil
+                case (_, "3"): editor.setTapRate(0.5); return nil
+                default: break
+                }
+            }
             switch (event.keyCode, flags) {
             case (49, []): editor.togglePlay()
+            case (53, []): editor.clearLoop()
+            case (36, []), (76, []):
+                guard case .lyricWord = editor.selection else { return event }
+                editor.toggleConfirmSelectedWords()
             case (123, []): editor.stepFrame(-1)
             case (124, []): editor.stepFrame(1)
             case (123, [.shift]): editor.step(seconds: -1)
@@ -89,9 +104,12 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
             case (119, []): editor.goToEnd()
             case (51, []), (117, []): editor.deleteSelection()
             default:
-                guard flags.isEmpty, let ch = event.charactersIgnoringModifiers?.lowercased() else { return event }
+                guard flags.isEmpty || flags == [.shift], let ch = event.charactersIgnoringModifiers?.lowercased() else { return event }
+                if flags == [.shift] && ch != "n" { return event }
                 switch ch {
                 case "c": editor.splitAtPlayhead()
+                case "n": editor.jumpToUnsureWord(forward: !event.modifierFlags.contains(.shift))
+                case "t": editor.isTapping ? editor.endTapMode() : editor.startTapMode()
                 case "s": timeline?.snappingEnabled.toggle()
                 case "=", "+": timeline?.zoomAroundPlayhead(1.5)
                 case "-": timeline?.zoomAroundPlayhead(1 / 1.5)
@@ -152,18 +170,24 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         AssetImporter.presentOpenPanel(for: projectDocument.editor, window: window)
     }
 
-    /// Aligns the lyrics track of the selected line or word, else the first track with lines.
+    /// Aligns all lyric lines (every track) to the song.
     @objc func alignLyrics(_ sender: Any?) {
-        let editor = projectDocument.editor
-        let p = editor.project
-        let selected: Int? = switch editor.selection {
-        case .lyricLine(let id): p.lineLocation(id)?.track
-        case .lyricWord(let id): p.wordLocation(id)?.track
-        default: nil
-        }
-        guard let track = selected ?? p.lyricTracks.firstIndex(where: { !$0.lines.isEmpty }) else { return }
-        editor.alignLyrics(track: track, window: window)
+        projectDocument.editor.alignLyrics(window: window)
     }
+
+    @objc func nextUnsureWord(_ sender: Any?) { projectDocument.editor.jumpToUnsureWord(forward: true) }
+    @objc func previousUnsureWord(_ sender: Any?) { projectDocument.editor.jumpToUnsureWord(forward: false) }
+    @objc func confirmWord(_ sender: Any?) { projectDocument.editor.toggleConfirmSelectedWords() }
+    @objc func stopLooping(_ sender: Any?) { projectDocument.editor.clearLoop() }
+    @objc func toggleTapMode(_ sender: Any?) {
+        let e = projectDocument.editor
+        e.isTapping ? e.endTapMode() : e.startTapMode()
+    }
+    @objc func tapWord(_ sender: Any?) {
+        let snapping = (vertical.arrangedSubviews.last as? TimelineContainer)?.timeline.snappingEnabled ?? true
+        projectDocument.editor.tap(snap: snapping)
+    }
+    @objc func setTapSpeed(_ sender: NSMenuItem) { projectDocument.editor.setTapRate(EditorModel.tapRates[sender.tag]) }
 
     @objc func analyzeSongAgain(_ sender: Any?) {
         let editor = projectDocument.editor
@@ -181,6 +205,19 @@ extension MainWindowController: NSMenuItemValidation {
         switch item.action {
         case #selector(alignLyrics(_:)): return p.audio != nil && p.lyricTracks.contains { !$0.lines.isEmpty }
         case #selector(analyzeSongAgain(_:)): return p.audio != nil && projectDocument.editor.audioAnalysis.state != .unavailable
+        case #selector(nextUnsureWord(_:)), #selector(previousUnsureWord(_:)):
+            return p.lyricTracks.flatMap(\.lines).flatMap(\.words).contains(where: LyricAlignment.isLow)
+        case #selector(confirmWord(_:)):
+            if case .lyricWord = projectDocument.editor.selection { return true }
+            return false
+        case #selector(stopLooping(_:)): return projectDocument.editor.transport.loop != nil
+        case #selector(toggleTapMode(_:)):
+            item.state = projectDocument.editor.isTapping ? .on : .off
+            return p.lyricTracks.contains { !$0.lines.isEmpty }
+        case #selector(tapWord(_:)): return projectDocument.editor.isTapping
+        case #selector(setTapSpeed(_:)):
+            item.state = projectDocument.editor.transport.rate == EditorModel.tapRates[item.tag] ? .on : .off
+            return projectDocument.editor.isTapping
         default: return responds(to: item.action)
         }
     }

@@ -72,6 +72,8 @@ final class TimelineView: NSView {
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.audioAnalysis.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
+        editor.transport.$loop.removeDuplicates().receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
+        editor.transport.$tapWordID.removeDuplicates().receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.transport.$playhead.receive(on: RunLoop.main).sink { [weak self] t in self?.followPlayhead(t) }.store(in: &cancellables)
         playheadLayer.fillColor = NSColor.systemRed.cgColor
         playheadLayer.zPosition = 10
@@ -464,6 +466,13 @@ final class TimelineView: NSView {
                 let selected = editor.isSelected(.lyricWord(wd.id))
                 (selected ? NSColor.controlAccentColor : Self.wordColor).setFill()
                 NSBezierPath(roundedRect: wr, xRadius: 2, yRadius: 2).fill()
+                if wd.id == editor.transport.tapWordID {
+                    // The word the next tap will time.
+                    NSColor.systemGreen.setStroke()
+                    let ring = NSBezierPath(roundedRect: wr.insetBy(dx: -1.5, dy: -1.5), xRadius: 3, yRadius: 3)
+                    ring.lineWidth = 2
+                    ring.stroke()
+                }
                 if LyricAlignment.isLow(wd) {
                     // Unsure timing (R22): an orange outline and a bar along the bottom.
                     NSColor.systemOrange.setStroke()
@@ -503,6 +512,14 @@ final class TimelineView: NSView {
                 (Timecode.string(t, fps: project.fps) as NSString).draw(at: CGPoint(x: x + 3, y: 3), withAttributes: attrs)
             }
             t += step
+        }
+        if let loop = editor.transport.loop {
+            // Looping region (next unsure word): a yellow band on the ruler.
+            let x0 = max(TimelineLayout.headerWidth, l.x(for: loop.lowerBound)), x1 = min(bounds.width, l.x(for: loop.upperBound))
+            if x1 > x0 {
+                NSColor.systemYellow.withAlphaComponent(0.35).setFill()
+                CGRect(x: x0, y: 0, width: x1 - x0, height: r.height - 1).fill()
+            }
         }
         drawCinemascopeMarkers(l, ruler: r)
         NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
@@ -874,7 +891,9 @@ final class TimelineView: NSView {
             editor.replaceWithoutUndo(original)
             editor.edit("Move Items") { $0 = final }
         case .edit(let hit, let original) where d.didEdit:
-            let final = editor.project
+            var final = editor.project
+            // An edited word is confirmed; re-time the unconfirmed words around it (R25).
+            if case .word = hit { final.applyAnchorStretch(from: original) }
             editor.replaceWithoutUndo(original)
             editor.edit(actionName(for: hit)) { $0 = final }
         default: break
@@ -1002,7 +1021,7 @@ final class TimelineView: NSView {
             if t > 0 { item("Move Down") { self.editor.edit("Move Track") { $0.moveVideoTrack(from: t, to: t - 1) } } }
         case .lyric(let t):
             if !project.lyricTracks[t].lines.isEmpty, project.audio != nil {
-                item("Align Words to Song") { self.editor.alignLyrics(track: t, window: self.window) }
+                item("Align Words to Song") { self.editor.alignLyrics(window: self.window) }
                 menu.addItem(.separator())
             }
             item("Add Lyrics Track Below") { self.headerAction(row, .add) }
