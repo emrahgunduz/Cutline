@@ -105,20 +105,41 @@ final class TrackMuteHideTests: XCTestCase {
 
     // MARK: Audio
 
-    func testAMutedSongIsLeftOutOfThePreviewComposition() async throws {
+    func testThePreviewKeepsTheSongAndHiddenClipsSoSwitchingIsInstant() async throws {
         let wav = try TestMedia.sineWAV(seconds: 2)
-        defer { try? FileManager.default.removeItem(at: wav) }
+        let video = try await TestMedia.video(width: 320, height: 180, fps: 24, frames: 24)
+        defer { try? FileManager.default.removeItem(at: wav); try? FileManager.default.removeItem(at: video) }
         var p = Project(type: .musicVideo, canvas: .init(width: 320, height: 180))
-        let a = try await AssetLibrary.makeAsset(from: wav)
-        p.assets = [a]
+        let a = try await AssetLibrary.makeAsset(from: wav), v = try await AssetLibrary.makeAsset(from: video)
+        p.assets = [a, v]
         p.setAudio(assetID: a.id)
-        let snap = RenderSnapshot(project: p, images: [:], lyrics: nil)
-        let audible = try await CompositionBuilder.build(project: p, mediaURL: { $0.url }, snapshot: snap)
-        XCTAssertEqual(audible.composition.tracks(withMediaType: .audio).count, 1)
+        _ = p.addClip(assetID: v.id, track: 0, at: 0)
         p.toggleAudioMuted()
-        let muted = try await CompositionBuilder.build(project: p, mediaURL: { $0.url }, snapshot: RenderSnapshot(project: p, images: [:], lyrics: nil))
-        XCTAssertTrue(muted.composition.tracks(withMediaType: .audio).isEmpty)
-        XCTAssertEqual(muted.duration.seconds, audible.duration.seconds, accuracy: 0.01, "still as long as the song")
+        p.toggleVideoTrackHidden(0)
+        let b = try await CompositionBuilder.build(project: p, mediaURL: { $0.url }, snapshot: RenderSnapshot(project: p, images: [:], lyrics: nil))
+        XCTAssertEqual(b.composition.tracks(withMediaType: .audio).count, 1, "unmuting needs no rebuild")
+        XCTAssertNotNil(b.clipTracks[p.videoTracks[0].clips[0].id], "showing the track needs no rebuild")
+        // Muting and hiding don't count as structural changes.
+        var q = p
+        q.toggleAudioMuted(); q.toggleVideoTrackHidden(0)
+        XCTAssertEqual(PreviewController.structureKey(p, useProxies: false), PreviewController.structureKey(q, useProxies: false))
+    }
+
+    @MainActor
+    func testMuteSilencesThePreviewPlayerAtOnce() throws {
+        var p = project()
+        p.toggleAudioMuted(); p.toggleAudioMuted()
+        let doc = ProjectDocument(project: p)
+        let preview = PreviewController(editor: doc.editor)
+        XCTAssertFalse(preview.player.isMuted)
+        let um = doc.undoManager!
+        um.groupsByEvent = false
+        um.beginUndoGrouping(); doc.editor.edit("Mute Song") { $0.toggleAudioMuted() }; um.endUndoGrouping()
+        XCTAssertTrue(preview.player.isMuted, "muted straight away, no rebuild")
+        um.beginUndoGrouping(); doc.editor.edit("Unmute Song") { $0.toggleAudioMuted() }; um.endUndoGrouping()
+        XCTAssertFalse(preview.player.isMuted)
+        doc.undoManager?.undo()
+        XCTAssertTrue(preview.player.isMuted, "undo follows too")
     }
 
     @MainActor

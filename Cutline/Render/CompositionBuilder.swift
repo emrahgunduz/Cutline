@@ -37,7 +37,9 @@ enum CompositionBuilder {
         // Greedy track assignment: reuse a composition track when the clip starts after its last end.
         var pool: [(track: AVMutableCompositionTrack, end: Double)] = []
         var clipTracks: [UUID: (CMPersistentTrackID, CGAffineTransform)] = [:]
-        let videoClips = project.videoTracks.filter { !$0.isHidden }.flatMap(\.clips)
+        // Hidden tracks' clips stay in the composition: the compositor skips them, so showing a
+        // track again is instant (no rebuild) in the preview.
+        let videoClips = project.videoTracks.flatMap(\.clips)
             .filter { project.asset($0.assetID)?.kind == .video }
             .sorted { $0.start < $1.start }
         var loaded: [URL: (AVURLAsset, AVAssetTrack, CGAffineTransform)] = [:]   // asset kept alive while its track is used
@@ -64,7 +66,9 @@ enum CompositionBuilder {
         }
 
         var audioAsset: AVURLAsset?
-        if let audio = project.audio, !audio.isMuted, let asset = project.asset(audio.assetID) {
+        // The song is always in the composition; the preview mutes the player and the export
+        // leaves the audio out when it's muted.
+        if let audio = project.audio, let asset = project.asset(audio.assetID) {
             let av = AVURLAsset(url: asset.url)
             audioAsset = av
             if let src = try await av.loadTracks(withMediaType: .audio).first {

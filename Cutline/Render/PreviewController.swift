@@ -39,6 +39,10 @@ final class PreviewController: ObservableObject {
             .throttle(for: .milliseconds(40), scheduler: RunLoop.main, latest: true)
             .sink { [weak self] _ in self?.scheduleRebuild() }
             .store(in: &cancellables)
+        // Mute is the player's: instant, no rebuild (the song stays in the composition).
+        editor.$project.map { $0.audio?.isMuted == true }.removeDuplicates()
+            .sink { [weak self] muted in self?.player.isMuted = muted }
+            .store(in: &cancellables)
         editor.transport.$playhead.removeDuplicates().sink { [weak self] t in self?.playheadChanged(t) }.store(in: &cancellables)
         editor.transport.$isPlaying.removeDuplicates().sink { [weak self] playing in self?.setPlaying(playing) }.store(in: &cancellables)
         editor.transport.$rate.removeDuplicates().sink { [weak self] rate in
