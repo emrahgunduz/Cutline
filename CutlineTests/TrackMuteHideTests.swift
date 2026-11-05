@@ -145,3 +145,16 @@ final class TrackMuteHideTests: XCTestCase {
         XCTAssertEqual(duration, 2, accuracy: 0.1)
     }
 }
+
+final class HeaderIconTests: XCTestCase {
+    func testIconsKeepTheirProportions() {
+        let box = CGRect(x: 10, y: 20, width: 16, height: 16)
+        let wide = TimelineView.aspectFit(CGSize(width: 24, height: 16), in: box)
+        XCTAssertEqual(wide.width / wide.height, 1.5, accuracy: 1e-9, "a wide symbol stays wide")
+        XCTAssertEqual(wide.width, 16)
+        XCTAssertEqual(wide.midY, box.midY)
+        let tall = TimelineView.aspectFit(CGSize(width: 8, height: 16), in: box)
+        XCTAssertEqual(tall, CGRect(x: 14, y: 20, width: 8, height: 16))
+        XCTAssertEqual(TimelineView.aspectFit(CGSize(width: 16, height: 16), in: box), box)
+    }
+}
