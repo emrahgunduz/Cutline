@@ -76,3 +76,35 @@ final class ShadowStrengthTests: XCTestCase {
         XCTAssertGreaterThan(try meanAlpha(3), try meanAlpha(1))
     }
 }
+
+final class LyricAnimationTests: XCTestCase {
+    let word = LyricWord(text: "abcd", start: 10, end: 12)
+
+    func testCustomWordFadeTimes() {
+        let a = LyricAnimation(fadeIn: 0.4, fadeOut: 0.2)
+        XCTAssertEqual(LyricLayout.alpha(of: word, at: 10.2, animation: a), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(LyricLayout.alpha(of: word, at: 11, animation: a), 1)
+        XCTAssertEqual(LyricLayout.alpha(of: word, at: 12.1, animation: a), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(LyricLayout.alpha(of: word, at: 12.2, animation: a), 0)
+    }
+
+    func testLettersStaggerInsideTheWordFade() {
+        // 0.5 s fade, 4 letters, 50% overlap: each letter fades 0.2 s, starting every 0.1 s.
+        let a = LyricAnimation(fadeIn: 0.5, fadeOut: 0.5, letterByLetter: true, overlap: 0.5)
+        let timing = LyricLayout.letterTiming(total: 0.5, letters: 4, overlap: 0.5)
+        XCTAssertEqual(timing.length, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(timing.step, 0.1, accuracy: 1e-9)
+        XCTAssertEqual(LyricLayout.alpha(of: word, letter: 0, of: 4, at: 10.1, animation: a), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(LyricLayout.alpha(of: word, letter: 1, of: 4, at: 10.1, animation: a), 0)
+        XCTAssertEqual(LyricLayout.alpha(of: word, letter: 3, of: 4, at: 10.5, animation: a), 1, accuracy: 1e-9)   // whole word in by 0.5 s
+        XCTAssertEqual(LyricLayout.alpha(of: word, letter: 3, of: 4, at: 12.49, animation: a), 1 - (12.49 - 12.3) / 0.2, accuracy: 1e-6)
+        XCTAssertEqual(LyricLayout.alpha(of: word, letter: 3, of: 4, at: 12.5, animation: a), 0)
+        XCTAssertEqual(LyricLayout.visibleEnd(of: word, letters: 4, animation: a), 12.5, accuracy: 1e-9)
+    }
+
+    func testRasterHasOneBoxPerLetterIncludingTurkish() throws {
+        let r = try XCTUnwrap(LineRasterizer.rasterize(words: ["Sığınak", "değil"], style: LyricStyle(), fontSize: 60))
+        XCTAssertEqual(r.letterRects.map(\.count), [7, 5])
+        XCTAssertTrue(zip(r.letterRects[0], r.letterRects[0].dropFirst()).allSatisfy { $0.maxX <= $1.minX + 0.5 })
+    }
+}

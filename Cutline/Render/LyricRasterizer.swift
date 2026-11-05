@@ -59,14 +59,17 @@ final class LyricRenderer {
         var text = CIImage.empty()
         for p in placed {
             let base = CIImage(cgImage: p.raster.image)
+            let anim = animation
+            let place = CGAffineTransform(scaleX: p.fit, y: p.fit).concatenating(CGAffineTransform(translationX: p.rect.minX, y: p.rect.minY))
             for (w, word) in p.line.words.enumerated() where w < p.raster.wordRects.count {
-                let a = LyricLayout.alpha(of: word, at: t, fps: project.fps)
-                guard a > 0 else { continue }
-                var piece = base.cropped(to: p.raster.wordRects[w])
-                piece = FilterChain.withOpacity(piece, a)
-                piece = piece.transformed(by: CGAffineTransform(scaleX: p.fit, y: p.fit))
-                    .transformed(by: CGAffineTransform(translationX: p.rect.minX, y: p.rect.minY))
-                text = piece.composited(over: text)
+                // Whole word, or each letter on its own staggered fade.
+                let boxes = anim.letterByLetter && w < p.raster.letterRects.count ? p.raster.letterRects[w] : [p.raster.wordRects[w]]
+                for (i, box) in boxes.enumerated() {
+                    let a = LyricLayout.alpha(of: word, letter: i, of: boxes.count, at: t, animation: anim)
+                    guard a > 0 else { continue }
+                    let piece = FilterChain.withOpacity(base.cropped(to: box), a).transformed(by: place)
+                    text = piece.composited(over: text)
+                }
             }
         }
         guard style.shadowEnabled else { return text }
@@ -91,10 +94,13 @@ final class LyricRenderer {
 
     /// Lines on screen at t, in track order (track 1 first, drawn on top of the stack).
     func drawnLines(at t: Double) -> [LyricLine] {
-        project.lyricTracks.flatMap { track in
-            track.lines.filter { LyricLayout.isDrawn($0, at: t, fps: project.fps) }
+        let a = animation
+        return project.lyricTracks.flatMap { track in
+            track.lines.filter { LyricLayout.isDrawn($0, at: t, animation: a) }
         }
     }
+
+    var animation: LyricAnimation { LyricAnimation(style: project.lyricStyle, fps: project.fps) }
 
     private func raster(for line: LyricLine, style: LyricStyle, fontSize: CGFloat) -> LineRaster? {
         let key = "\(line.words.map(\.text).joined(separator: "\u{1}"))|\(style.fontName)|\(fontSize)|\(style.color.r),\(style.color.g),\(style.color.b),\(style.color.a)" as NSString
