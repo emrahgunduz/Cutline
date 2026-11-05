@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The "New Project" window: pick what you're making as a card, then a resolution.
-enum NewProjectChoice { case create(Project), open, openRecent(URL) }
+enum NewProjectChoice { case create(Project), open, openRecent(URL), importFrom(URL, ProjectType, CanvasSize) }
 
 enum NewProjectPrompt {
     /// nil when cancelled.
@@ -54,7 +54,7 @@ struct NewProjectView: View {
                 }
             }
             HStack {
-                Text("Resolution").foregroundStyle(.secondary)
+                Text("Resolution").foregroundStyle(.secondary).fixedSize()
                 Picker("", selection: $canvasIndex) {
                     ForEach(preset.canvases.indices, id: \.self) { i in
                         let c = preset.canvases[i]
@@ -66,7 +66,12 @@ struct NewProjectView: View {
                 .fixedSize()
                 .disabled(preset.canvases.count < 2)
                 Spacer()
+            }
+            HStack {
                 Button("Open…") { finish(.open) }.controlSize(.large).help("Open an existing project")
+                Button("Import from Project…", action: importFromProject).controlSize(.large)
+                    .help("Create this project with the song, lyric timing, clips and tracks of another project (a one-time copy)")
+                Spacer()
                 Button("Cancel") { finish(nil) }.keyboardShortcut(.cancelAction).controlSize(.large)
                 Button("Create Project", action: create).keyboardShortcut(.defaultAction).controlSize(.large)
             }
@@ -106,9 +111,20 @@ struct NewProjectView: View {
         }
     }
 
+    private var canvas: CanvasSize { preset.canvases[min(canvasIndex, preset.canvases.count - 1)] }
+
     private func create() {
-        let canvases = preset.canvases
-        finish(.create(Project(type: type, canvas: canvases[min(canvasIndex, canvases.count - 1)])))
+        finish(.create(Project(type: type, canvas: canvas)))
+    }
+
+    private func importFromProject() {
+        let panel = NSOpenPanel()
+        panel.message = "Choose the project to copy the song, lyrics and clips from"
+        panel.prompt = "Import"
+        panel.allowedContentTypes = [.init(filenameExtension: "cutline")].compactMap { $0 }
+        panel.treatsFilePackagesAsDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        finish(.importFrom(url, type, canvas))
     }
 }
 
