@@ -2,24 +2,32 @@ import AppKit
 import CoreImage
 import CoreText
 
-/// Draws a dummy card: the color fills the frame, the title is centred in the middle, and its
-/// length sits under it in a smaller size, aligned to the title's left edge. Sizes follow the
-/// frame, so the card looks the same at any resolution.
+/// Draws a dummy card: the color fills the frame; the title sits at the top left, the scene
+/// description under it (wrapped across the frame), and the length at the bottom right. All
+/// measurements are for an HD frame (1080 px on the short side) and scale with the frame, so
+/// the card looks the same at any resolution.
 enum DummyRenderer {
-    /// Title size as a fraction of the frame height, shrunk if the title would be wider than
-    /// `maxWidth` of the frame.
-    static let titleFraction: CGFloat = 0.085
-    static let maxWidth: CGFloat = 0.8
-    /// The length line, relative to the title size.
-    static let subtitleScale: CGFloat = 0.42
+    /// Padding from the frame's edges, in HD pixels.
+    static let padding: CGFloat = 100
+    /// Font sizes in HD pixels.
+    static let titleSize: CGFloat = 110
+    static let descriptionSize: CGFloat = 44
+    static let timeSize: CGFloat = 56
 
     struct Layout: Equatable {
+        /// HD pixels → frame pixels.
+        var scale: CGFloat
+        var padding: CGFloat
         var titleSize: CGFloat
-        var subtitleSize: CGFloat
+        var descriptionSize: CGFloat
+        var timeSize: CGFloat
         /// Baseline origins (y up).
         var titleOrigin: CGPoint
-        var subtitleOrigin: CGPoint
         var titleWidth: CGFloat
+        /// Where the description wraps (y up); empty when there is none.
+        var descriptionRect: CGRect
+        var timeOrigin: CGPoint
+        var timeWidth: CGFloat
     }
 
     /// Black text on light colors, white on dark ones.
@@ -45,21 +53,51 @@ enum DummyRenderer {
     private static func width(_ l: CTLine) -> CGFloat { CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil)) }
 
     static func layout(_ card: DummyCard, size: CGSize) -> Layout {
-        var titleSize = max(1, size.height * titleFraction)
-        let probe = line(card.title, font(card.fontName, size: titleSize, bold: true), .white)
-        let w = width(probe)
-        if w > size.width * maxWidth { titleSize *= size.width * maxWidth / w }
-        let titleFont = font(card.fontName, size: titleSize, bold: true)
-        let title = line(card.title, titleFont, .white)
-        let titleWidth = width(title)
-        let subtitleSize = titleSize * subtitleScale
-        // The title's letters are centred in the frame (cap height around the middle).
-        let capHeight = CTFontGetCapHeight(titleFont)
-        let titleOrigin = CGPoint(x: (size.width - titleWidth) / 2, y: (size.height - capHeight) / 2)
-        let gap = titleSize * 0.35
-        let subtitleFont = font(card.fontName, size: subtitleSize, bold: false)
-        let subtitleOrigin = CGPoint(x: titleOrigin.x, y: titleOrigin.y - CTFontGetDescent(titleFont) - gap - CTFontGetAscent(subtitleFont) * 0.75)
-        return Layout(titleSize: titleSize, subtitleSize: subtitleSize, titleOrigin: titleOrigin, subtitleOrigin: subtitleOrigin, titleWidth: titleWidth)
+        let scale = max(0.01, min(size.width, size.height) / 1080)
+        let pad = padding * scale
+        let textWidth = max(1, size.width - pad * 2)
+        // Title: one line, shrunk only if it wouldn't fit between the paddings.
+        var tSize = titleSize * scale
+        let probe = width(line(card.title, font(card.fontName, size: tSize, bold: true), .white))
+        if probe > textWidth { tSize *= textWidth / probe }
+        let titleFont = font(card.fontName, size: tSize, bold: true)
+        let titleWidth = width(line(card.title, titleFont, .white))
+        // Top left: the title's ascent touches the top padding.
+        let titleOrigin = CGPoint(x: pad, y: size.height - pad - CTFontGetAscent(titleFont))
+        // Time: bottom right, its descent on the bottom padding.
+        let timeSize = Self.timeSize * scale
+        let timeFont = font(card.fontName, size: timeSize, bold: true)
+        let timeWidth = width(line(card.lengthText, timeFont, .white))
+        let timeOrigin = CGPoint(x: size.width - pad - timeWidth, y: pad + CTFontGetDescent(timeFont))
+        // Description: under the title, across the frame, down to just above the time.
+        let gap = tSize * 0.35
+        let top = titleOrigin.y - CTFontGetDescent(titleFont) - gap
+        let bottom = timeOrigin.y + CTFontGetAscent(timeFont) + gap
+        let rect = card.sceneDescription.isEmpty || top <= bottom ? .zero : CGRect(x: pad, y: bottom, width: textWidth, height: top - bottom)
+        return Layout(scale: scale, padding: pad, titleSize: tSize, descriptionSize: descriptionSize * scale, timeSize: timeSize,
+                      titleOrigin: titleOrigin, titleWidth: titleWidth, descriptionRect: rect, timeOrigin: timeOrigin, timeWidth: timeWidth)
+    }
+
+    /// The description wrapped into its rect (left aligned, a little line spacing).
+    static func descriptionFrame(_ card: DummyCard, _ l: Layout, color: RGBA) -> CTFrame? {
+        guard !l.descriptionRect.isEmpty else { return nil }
+        var spacing = l.descriptionSize * 0.25
+        let settings = [CTParagraphStyleSetting(spec: .lineSpacingAdjustment, valueSize: MemoryLayout<CGFloat>.size, value: &spacing)]
+        let paragraph = CTParagraphStyleCreate(settings, settings.count)
+        let text = NSAttributedString(string: card.sceneDescription, attributes: [
+            NSAttributedString.Key(kCTFontAttributeName as String): font(card.fontName, size: l.descriptionSize, bold: false),
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): color.cgColor,
+            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraph,
+        ])
+        let setter = CTFramesetterCreateWithAttributedString(text)
+        return CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), CGPath(rect: l.descriptionRect, transform: nil), nil)
+    }
+
+    /// How many lines of the description fit (the rest is cut at the time line).
+    static func descriptionLineCount(_ card: DummyCard, size: CGSize) -> Int {
+        let l = layout(card, size: size)
+        guard let f = descriptionFrame(card, l, color: .white) else { return 0 }
+        return CFArrayGetCount(CTFrameGetLines(f))
     }
 
     private static let cache = NSCache<NSString, CGImage>()
@@ -77,12 +115,13 @@ enum DummyRenderer {
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         let l = layout(card, size: CGSize(width: w, height: h))
         let ink = textColor(on: bg)
-        var dim = ink
-        dim.a = 0.72
+        var soft = ink
+        soft.a = 0.85
         ctx.textPosition = l.titleOrigin
         CTLineDraw(line(card.title, font(card.fontName, size: l.titleSize, bold: true), ink), ctx)
-        ctx.textPosition = l.subtitleOrigin
-        CTLineDraw(line(card.lengthText, font(card.fontName, size: l.subtitleSize, bold: false), dim), ctx)
+        if let frame = descriptionFrame(card, l, color: soft) { CTFrameDraw(frame, ctx) }
+        ctx.textPosition = l.timeOrigin
+        CTLineDraw(line(card.lengthText, font(card.fontName, size: l.timeSize, bold: true), soft), ctx)
         guard let image = ctx.makeImage() else { return nil }
         cache.setObject(image, forKey: key)
         return image
