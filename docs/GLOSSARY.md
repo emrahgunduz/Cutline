@@ -110,3 +110,4 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Wrapped lines** | A lyric line too wide for the frame (or the portrait safe area) wraps onto balanced rows at the same font size instead of shrinking. |
 | **Group drag** | Dragging several selected items: the earliest one snaps, the rest keep their distance from it. |
 | **Fill / Fit** | Clip inspector > Size & Position: Fill scales the clip to cover the whole frame (centred, overflow cropped); Fit shows the whole picture. New video clips start filled in every project type; images start fitted. |
+| **Nudge** | Preview: after clicking the preview, the arrow keys move the selected clip or lyric lines 1 px; with ⇧ they move by the ⇧ Nudge step (clip or lyric inspector, default 10 px, an app-wide setting). ⇧ while dragging in the preview keeps the move to one axis. |
