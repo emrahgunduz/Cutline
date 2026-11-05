@@ -5,7 +5,6 @@ import SwiftUI
 struct ClipInspectorView: View {
     @EnvironmentObject var editor: EditorModel
     let clipID: UUID
-    @AppStorage(NudgeStep.key) private var nudgeStep = NudgeStep.defaultValue
 
     var body: some View {
         if let clip = editor.clip(clipID) {
@@ -31,10 +30,8 @@ struct ClipInspectorView: View {
                             Button("Reset Position") { editor.edit("Reset Position") { $0.updateClip(clipID) { $0.transform.offsetX = 0; $0.transform.offsetY = 0 } } }
                                 .controlSize(.small).disabled(clip.transform.offsetX == 0 && clip.transform.offsetY == 0)
                         }
-                        ValueRow(label: "⇧ Nudge", value: nudgeStep, range: 1...200, step: 1, format: "%.0f px", defaultValue: NudgeStep.defaultValue,
-                                 onChange: { nudgeStep = $0.rounded() }, onCommit: {})
-                            .help("Arrow keys move the selection 1 px in the preview; with ⇧ they move it this far.")
                     }
+                    NudgeSection(what: "the clip")
                     InspectorSection(title: "Color", icon: "paintpalette", isOn: toggle(clip.filters.color.enabled, "Color") { $0.filters.color.enabled = $1 }) {
                         row("Hue", clip.filters.color.hue, -180...180, step: 1, format: "%.0f°", reset: 0) { $0.filters.color.hue = $1 }
                         row("Saturation", clip.filters.color.saturation, 0...2, reset: 1) { $0.filters.color.saturation = $1 }

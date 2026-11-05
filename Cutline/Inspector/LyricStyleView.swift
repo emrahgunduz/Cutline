@@ -7,7 +7,6 @@ struct LyricStyleView: View {
     @AppStorage("lyricAlignPaddingX") private var paddingX = 60.0
     @AppStorage("lyricAlignPaddingY") private var paddingY = 60.0
     @AppStorage("lyricLineGap") private var gap = 0.0
-    @AppStorage(NudgeStep.key) private var nudgeStep = NudgeStep.defaultValue
     private static let families = NSFontManager.shared.availableFontFamilies
 
     var body: some View {
@@ -16,6 +15,7 @@ struct LyricStyleView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if let text = selectedText { Text(text).font(.headline).lineLimit(3) }
                 placement
+                if !editor.placementLineIDs.isEmpty { NudgeSection(what: editor.placementLineIDs.count > 1 ? "the selected lines" : "the line") }
                 InspectorSection(title: "Text", icon: "textformat") {
                     Picker("Font", selection: binding(\.fontName, "Font")) {
                         ForEach(fontChoices(current: style.fontName), id: \.self) { Text($0).tag($0) }
@@ -79,9 +79,6 @@ struct LyricStyleView: View {
                 ValueRow(label: "Padding ↕", value: paddingY, range: 0...600, step: 1, format: "%.0f px", defaultValue: 60,
                          onChange: { paddingY = $0.rounded() }, onCommit: {})
                     .help("Distance of the letters from the top or bottom edge of the frame")
-                ValueRow(label: "⇧ Nudge", value: nudgeStep, range: 1...200, step: 1, format: "%.0f px", defaultValue: NudgeStep.defaultValue,
-                         onChange: { nudgeStep = $0.rounded() }, onCommit: {})
-                    .help("Arrow keys move the selected lines 1 px in the preview; with ⇧ they move this far.")
                 if ids.count > 1 {
                     ValueRow(label: "Line gap", value: gap, range: -20...200, step: 1, format: "%.0f px", defaultValue: 0,
                              onChange: { gap = $0 }, onCommit: {})
