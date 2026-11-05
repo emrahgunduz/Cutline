@@ -11,7 +11,7 @@ enum ProjectImport {
     }
 
     /// The imported model for a project of `type` on `canvas`.
-    /// - Clips keep their scale and are centred on the new canvas.
+    /// - Clips are centred on the new canvas and cover it as much as they covered the old one.
     /// - Lyric lines go back to automatic placement (the old positions were for another frame).
     /// - Cinemascope is kept only for a music video.
     static func make(from source: Project, type: ProjectType, canvas: CanvasSize) -> Result {
@@ -39,6 +39,11 @@ enum ProjectImport {
                 n.assetID = id
                 n.transform.offsetX = 0
                 n.transform.offsetY = 0
+                // Keep how much the clip covers the frame: a video that filled the old canvas
+                // fills the new one (a 16:9 shot in a 9:16 ad), and one zoomed in stays zoomed.
+                if let a = source.asset(c.assetID) {
+                    n.transform.scale = c.transform.scale / Project.fillScale(for: a, canvas: source.canvas) * Project.fillScale(for: a, canvas: canvas)
+                }
                 return n
             })
         }

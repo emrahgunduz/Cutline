@@ -355,8 +355,14 @@ final class DefaultClipScaleTests: XCTestCase {
         XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 1440, height: 1080)), (16.0 / 9) / (4.0 / 3), accuracy: 1e-6)
     }
 
-    func testImagesAndPortraitProjectsStartFitted() {
+    func testVideoFillsAPortraitFrame() {
+        // 16:9 footage in 9:16: tall enough to cover the frame top to bottom.
+        XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 1920, height: 1080)), (16.0 / 9) * (16.0 / 9), accuracy: 1e-6)
+        XCTAssertEqual(scale(.social, canvas: .init(width: 1080, height: 1920), video: .init(width: 1080, height: 1920)), 1, accuracy: 1e-9)
+    }
+
+    func testImagesStartFitted() {
         XCTAssertEqual(scale(.musicVideo, canvas: .init(width: 1920, height: 1080), video: .init(width: 400, height: 400), kind: .image), 1)
-        XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 1920, height: 1080)), 1)
+        XCTAssertEqual(scale(.ad, canvas: .init(width: 1080, height: 1920), video: .init(width: 400, height: 900), kind: .image), 1)
     }
 }
