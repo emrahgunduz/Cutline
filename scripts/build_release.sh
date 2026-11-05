@@ -35,6 +35,7 @@ if (( ${#missing} )); then
 fi
 [[ $(uname -m) == arm64 ]] || { echo "Cutline is built for Apple Silicon (arm64) only." >&2; exit 1; }
 
+mkdir -p build  # a fresh checkout (CI) has none; the logs below go into it
 out=build/Release
 if (( clean )); then
   echo "==> Clean build"
