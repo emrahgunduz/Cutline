@@ -57,7 +57,9 @@ extension EditorModel {
     /// Imports files into the assets. With `reuseExisting`, a file the project already has is not
     /// added again; its asset is returned instead. Returns the assets in the order of `urls` (to
     /// place them on the timeline) and the files that couldn't be imported. A lyrics file replaces
-    /// the lyrics asset (a project keeps one).
+    /// the lyrics asset (a project keeps one). Main actor: it edits the project, and the edit
+    /// updates the window (off the main thread AppKit aborts).
+    @MainActor
     func importAssets(_ urls: [URL], reuseExisting: Bool = false) async -> (assets: [Asset], errors: [Error]) {
         var errors: [Error] = []
         var result: [Asset] = []
