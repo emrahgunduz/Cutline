@@ -52,13 +52,28 @@ enum AssetLibrary {
 extension EditorModel {
     /// Import files as assets. A second TXT replaces the existing lyrics file.
     @MainActor
-    func importFiles(_ urls: [URL]) async -> [Error] {
+    func importFiles(_ urls: [URL]) async -> [Error] { await importAssets(urls).errors }
+
+    /// Imports files into the assets. With `reuseExisting`, a file the project already has is not
+    /// added again; its asset is returned instead. Returns the assets in the order of `urls` (to
+    /// place them on the timeline) and the files that couldn't be imported. A lyrics file replaces
+    /// the lyrics asset (a project keeps one).
+    func importAssets(_ urls: [URL], reuseExisting: Bool = false) async -> (assets: [Asset], errors: [Error]) {
         var errors: [Error] = []
+        var result: [Asset] = []
         var imported: [Asset] = []
         for url in urls {
-            do { imported.append(try await AssetLibrary.makeAsset(from: url)) } catch { errors.append(error) }
+            if reuseExisting, let existing = project.assets.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
+                result.append(existing)
+                continue
+            }
+            do {
+                let a = try await AssetLibrary.makeAsset(from: url)
+                imported.append(a)
+                result.append(a)
+            } catch { errors.append(error) }
         }
-        guard !imported.isEmpty else { return errors }
+        guard !imported.isEmpty else { return (result, errors) }
         edit("Import Media") { p in
             for a in imported {
                 if a.kind == .lyrics { p.assets.removeAll { $0.kind == .lyrics } }
@@ -71,6 +86,6 @@ extension EditorModel {
         for a in imported where a.kind == .audio {
             Task { await waveforms.ensureWaveform(for: a) }
         }
-        return errors
+        return (result, errors)
     }
 }
