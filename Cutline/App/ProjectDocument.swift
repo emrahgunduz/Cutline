@@ -10,6 +10,8 @@ struct LayoutState: Codable, Equatable {
     var snapping: Bool?
     /// Snap-target groups that are on (nil = all).
     var snapGroups: [SnapGroup]?
+    /// The editor window's frame (x, y, width, height in screen points); nil = not saved yet.
+    var windowFrame: [Double]?
 }
 
 enum ProjectFileError: LocalizedError {
