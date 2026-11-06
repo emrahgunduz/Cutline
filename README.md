@@ -163,7 +163,7 @@ PYTHONPATH=build/ml-dev build/ml/python/bin/python3 -B -m pytest -c helper/pytes
 | `Cutline/Settings` | The Settings window: Presets and Models |
 | `Cutline/Resources` | Format presets, platform UI zones, the document icon |
 | `CutlineTests` | Unit and integration tests |
-| `Tools/cutline-ctl` | Command-line client for the control channel, shipped inside the app |
+| `Tools/cutline-ctl` | Command-line client for the control channel, shipped inside the app and linked to `~/Library/Application Support/Cutline/cutline-ctl` when Cutline opens |
 | `helper` | The offline Python helper, its pinned requirements, the model list and its tests |
 | `scripts` | Build scripts: Python runtime, Release app, smoke test, version stamp, icons, model download |
 | `docs` | The glossary, the original plan, the Claude skill and README images |

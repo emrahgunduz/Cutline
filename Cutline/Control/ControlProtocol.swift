@@ -25,6 +25,13 @@ enum ControlProtocol {
 
     /// One socket per running Cutline, named by its process id.
     static func socketURL(pid: Int32) -> URL { directory.appendingPathComponent("\(pid).sock") }
+
+    /// ~/Library/Application Support/Cutline/cutline-ctl: a link to the client inside the Cutline
+    /// that was opened last, wherever it's installed. Claude (the cutline-dummies skill) runs it
+    /// from here, so it needs no app path.
+    static var clientLink: URL {
+        directory.deletingLastPathComponent().appendingPathComponent("cutline-ctl")
+    }
 }
 
 /// Any JSON value (tool arguments and results).
