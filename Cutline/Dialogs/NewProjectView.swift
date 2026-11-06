@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The "New Project" window: pick what you're making as a card, then a resolution.
-enum NewProjectChoice { case create(Project), open, openRecent(URL), importFrom(URL, ProjectType, CanvasSize) }
+enum NewProjectChoice { case create(Project), open, openRecent(URL), importFrom(URL, ProjectType, CanvasSize, fps: Double) }
 
 enum NewProjectPrompt {
     /// The window while it's up (it runs modally, so there is at most one).
@@ -42,6 +42,8 @@ struct NewProjectView: View {
     let finish: (NewProjectChoice?) -> Void
     @State private var type: ProjectType = .musicVideo
     @State private var canvasIndex = 0
+    /// The project's frame rate, chosen here; 24 unless you pick another.
+    @State private var fps: Double = 24
     @State private var recents: [URL] = RecentProjects.list()
     /// Projects can't be made or opened until the analysis models are downloaded.
     private var models: ModelStore { .shared }
@@ -81,6 +83,17 @@ struct NewProjectView: View {
                 .labelsHidden()
                 .fixedSize()
                 .disabled(preset.canvases.count < 2)
+                Spacer()
+            }
+            HStack {
+                Text("Frame rate").foregroundStyle(.secondary).fixedSize()
+                Picker("", selection: $fps) {
+                    ForEach(Project.standardRates, id: \.self) { r in Text(verbatim: Self.rateLabel(r)).tag(r) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Frames per second. The project keeps this rate; videos with another rate play at it.")
                 Spacer()
             }
             HStack {
@@ -139,9 +152,17 @@ struct NewProjectView: View {
 
     private var canvas: CanvasSize { preset.canvases[min(canvasIndex, preset.canvases.count - 1)] }
 
+    /// 24, 25, 30… and the NTSC rates as 23.976, 29.97, 59.94.
+    static func rateLabel(_ r: Double) -> String {
+        r.rounded() == r ? String(Int(r)) : String(format: r < 25 ? "%.3f" : "%.2f", r)
+    }
+
     private func create() {
         guard ready else { return }
-        finish(.create(Project(type: type, canvas: canvas)))
+        var p = Project(type: type, canvas: canvas)
+        p.fps = fps
+        p.fpsLocked = true   // chosen here: the first video added doesn't change it
+        finish(.create(p))
     }
 
     private func importFromProject() {
@@ -153,7 +174,7 @@ struct NewProjectView: View {
         panel.treatsFilePackagesAsDirectories = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        finish(.importFrom(url, type, canvas))
+        finish(.importFrom(url, type, canvas, fps: fps))
     }
 }
 

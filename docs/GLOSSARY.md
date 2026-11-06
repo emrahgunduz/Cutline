@@ -13,7 +13,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Timeline** | Bottom area with the tracks. |
 | **Divider** | Draggable line between two panels. Panel sizes are saved per project when you drag a divider; resizing the window only changes the preview, and each project keeps its own panel sizes and window frame. |
 | **Status bar** | Bottom strip of the window: selection details, project length vs. limit, estimated size, format, save state, render cache size, and Disconnect while a program uses the control channel. |
-| **New Project window** | Shown at launch and by File > New Project… (⌘N): pick the project type and resolution, then Create Project, Open…, Import from Project… or a recent project. While the analysis models are missing it shows the **models card** at the top and none of these work. |
+| **New Project window** | Shown at launch and by File > New Project… (⌘N): pick the project type, resolution and frame rate (24 fps unless you choose another; the project keeps it, and videos at other rates play at it), then Create Project, Open…, Import from Project… or a recent project. While the analysis models are missing it shows the **models card** at the top and none of these work. |
 | **Models card** | The top of the New Project window until the models are ready: Download (to Library) or Choose Folder…, live progress with speed and time left, Cancel to pause, Resume Download, and "Models folder not found" when a chosen disk isn't connected. |
 | **Settings** | Cutline > Settings… (⌘,), with two tabs: **Presets** (format presets) and **Models** (see **Settings > Models**). |
 

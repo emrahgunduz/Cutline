@@ -95,8 +95,8 @@ final class CutlineDocumentController: NSDocumentController {
             }
         case .create(let project):
             show(ProjectDocument(project: project))
-        case .importFrom(let url, let type, let canvas):
-            do { show(try ProjectImport.document(importing: url, type: type, canvas: canvas)) } catch { NSAlert(error: error).runModal() }
+        case .importFrom(let url, let type, let canvas, let fps):
+            do { show(try ProjectImport.document(importing: url, type: type, canvas: canvas, fps: fps)) } catch { NSAlert(error: error).runModal() }
         }
     }
 
