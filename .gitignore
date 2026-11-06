@@ -9,3 +9,6 @@ build/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Planning documents stay local
+docs/plans/
