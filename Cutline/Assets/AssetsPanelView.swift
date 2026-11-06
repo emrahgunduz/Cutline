@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Sections of the assets panel: dummies are images, but get their own section.
-enum AssetGroup: Hashable {
+enum AssetGroup: String, Codable, Hashable, CaseIterable {
     case video, image, dummy, audio, lyrics
     init(_ a: Asset) {
         switch a.kind {
@@ -18,6 +18,7 @@ struct AssetsPanelView: View {
     @EnvironmentObject var editor: EditorModel
     @State private var errorText: String?
     @State private var lastClicked: UUID?
+    /// Collapsed sections, saved with the project's layout.
     @State private var collapsed: Set<AssetGroup> = []
 
     private let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
@@ -58,6 +59,7 @@ struct AssetsPanelView: View {
             }
             footer
         }
+        .onAppear { collapsed = Set(editor.document?.layout.collapsedAssetGroups ?? []) }
     }
 
     // MARK: Header and footer
@@ -106,6 +108,13 @@ struct AssetsPanelView: View {
 
     // MARK: Sections
 
+    private func toggle(_ kind: AssetGroup) {
+        if collapsed.contains(kind) { collapsed.remove(kind) } else { collapsed.insert(kind) }
+        guard let doc = editor.document else { return }
+        doc.layout.collapsedAssetGroups = AssetGroup.allCases.filter(collapsed.contains)
+        doc.persistLayout()
+    }
+
     private func section(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(kind, title, icon, items)
@@ -122,7 +131,7 @@ struct AssetsPanelView: View {
 
     private func sectionHeader(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
             Button {
-                if collapsed.contains(kind) { collapsed.remove(kind) } else { collapsed.insert(kind) }
+                toggle(kind)
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: collapsed.contains(kind) ? "chevron.right" : "chevron.down").font(.caption2)

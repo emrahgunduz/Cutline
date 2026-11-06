@@ -5,6 +5,8 @@ struct LayoutState: Codable, Equatable {
     var assetsWidth: Double = 280
     var inspectorWidth: Double = 300
     var timelineHeight: Double = 320
+    /// Assets panel sections that are collapsed (nil = all open).
+    var collapsedAssetGroups: [AssetGroup]?
     /// Timeline row heights keyed by track id ("audio" for the audio row).
     var trackHeights: [String: Double]?
     var snapping: Bool?
