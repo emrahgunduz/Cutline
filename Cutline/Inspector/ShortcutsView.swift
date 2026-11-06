@@ -29,7 +29,7 @@ enum Shortcuts {
         ShortcutGroup(section: "Timeline", icon: "rectangle.split.3x1", items: [
             ("S", "Snapping on / off"),
             ("⌘ while dragging", "Bypass snapping"),
-            ("Bar toggles", "Snap to sections, downbeats, beats, edges"),
+            ("Bar toggles", "Snap to clips & audio, lyrics & words, beats, downbeats, sections"),
             ("= / −", "Zoom in / out"),
             ("⌘0", "Zoom to fit"),
             ("Mouse wheel", "Zoom at pointer"),
