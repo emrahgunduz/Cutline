@@ -2,7 +2,7 @@
 
 A simple, native macOS video editor made for music videos: cut your footage to the song, time the lyrics word by word, and export for YouTube, TikTok, Reels, Shorts or a paid ad.
 
-![Cutline editing a music video: assets on the left, preview in the middle, shortcuts on the right, and the timeline with the song, lyrics and video tracks below](docs/images/cutline.png)
+![Cutline editing a music video: assets on the left, preview in the middle, a lyric line's settings in the inspector on the right, and the timeline with the song, lyrics, video and dummy tracks below](docs/images/cutline.png)
 
 ## What it's for
 
