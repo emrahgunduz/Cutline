@@ -22,7 +22,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | Term | What it is |
 |---|---|
 | **Asset** | One imported file (video, image, audio or lyrics TXT). |
-| **Tile** | One asset's thumbnail card. The slider in the panel's header sets the tile size (80–192 pt, saved per project); as many tiles as fit go in a row, stretched to fill it, and a narrow panel drops to fewer. Names show on tiles 100 pt wide and up. |
+| **Tile** | One asset's thumbnail card. The slider in the panel's header sets the tile size (80–192 pt, saved per project); as many tiles as fit go in a row, stretched to fill it, and a narrow panel drops to fewer. Names show on tiles 100 pt wide and up; from 130 pt a colored bar under the name gives the asset's details: a video's size, length and frame rate, an image's size, a dummy's size and length, the song's length (lyrics files have none). |
 | **Group / section** | Videos, Images, Dummies, Audio and Lyrics, each collapsible. Which ones are collapsed is saved with the project. |
 | **Used mark** | Green check on an asset that is on the timeline. |
 | **Proxy badge** | Orange "PROXY 1/4" label. |

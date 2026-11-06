@@ -152,10 +152,7 @@ struct NewProjectView: View {
 
     private var canvas: CanvasSize { preset.canvases[min(canvasIndex, preset.canvases.count - 1)] }
 
-    /// 24, 25, 30… and the NTSC rates as 23.976, 29.97, 59.94.
-    static func rateLabel(_ r: Double) -> String {
-        r.rounded() == r ? String(Int(r)) : String(format: r < 25 ? "%.3f" : "%.2f", r)
-    }
+    static func rateLabel(_ r: Double) -> String { Project.rateLabel(r) }
 
     private func create() {
         guard ready else { return }
