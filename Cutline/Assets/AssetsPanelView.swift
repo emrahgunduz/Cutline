@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -21,7 +22,8 @@ struct AssetsPanelView: View {
     /// Collapsed sections, saved with the project's layout.
     @State private var collapsed: Set<AssetGroup> = []
 
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
+    /// The panel's width (outside the scroll view, so it doesn't change when the scroll bar shows).
+    @State private var panelWidth: CGFloat = 280
     private static let groups: [(AssetGroup, String, String)] = [
         (.video, "Videos", "film"), (.image, "Images", "photo"), (.dummy, "Dummies", "rectangle.dashed"),
         (.audio, "Audio", "waveform"), (.lyrics, "Lyrics", "text.quote"),
@@ -50,6 +52,9 @@ struct AssetsPanelView: View {
                     if let id = ids.first, ids.count == 1 { withAnimation { reader.scrollTo(id, anchor: .center) } }
                 }
             }
+            .background(GeometryReader { geo in
+                Color.clear.onAppear { panelWidth = geo.size.width }.onChange(of: geo.size.width) { _, w in panelWidth = w }
+            })
             .contentShape(Rectangle())
             .onTapGesture { editor.selectedAssets = [] }
             .onDrop(of: [.fileURL], isTargeted: nil, perform: dropFiles)
@@ -119,7 +124,7 @@ struct AssetsPanelView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(kind, title, icon, items)
             if !collapsed.contains(kind) {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: Self.columns(panelWidth: panelWidth), spacing: 8) {
                     ForEach(items) { asset in tile(asset, items) }
                 }
                 .padding(8)
@@ -127,6 +132,18 @@ struct AssetsPanelView: View {
                 .padding(.horizontal, 6)
             }
         }
+    }
+
+    /// Fixed tile columns for the panel's width, with room always kept for a scroll bar that
+    /// takes space (macOS's "always show" scroll bars): showing or hiding the scroll bar then
+    /// changes neither the number of tiles in a row nor their size. Tiles are at least 96 pt.
+    static func columns(panelWidth: CGFloat, scrollerStyle: NSScroller.Style = NSScroller.preferredScrollerStyle) -> [GridItem] {
+        let scroller = scrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        let inner = panelWidth - scroller - 28   // the section's outer (6 + 6) and inner (8 + 8) padding
+        let spacing: CGFloat = 8, minimum: CGFloat = 96
+        let count = max(1, Int((inner + spacing) / (minimum + spacing)))
+        let width = max(minimum, floor((inner - CGFloat(count - 1) * spacing) / CGFloat(count)))
+        return Array(repeating: GridItem(.fixed(width), spacing: spacing), count: count)
     }
 
     private func sectionHeader(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
