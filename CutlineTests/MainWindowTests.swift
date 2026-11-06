@@ -72,6 +72,9 @@ final class MainWindowTests: XCTestCase {
         let split = try XCTUnwrap(horizontal as? DividerTrackingSplitView)
         split.isDraggingDivider = true
         horizontal.setPosition(333, ofDividerAt: 0)
+        // The split view may apply the position in the next layout pass (it does when the
+        // window isn't on screen); the drag lasts until then, as a real one would.
+        horizontal.window?.contentView?.layoutSubtreeIfNeeded()
         split.isDraggingDivider = false
         XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
         horizontal.setPosition(500, ofDividerAt: 0)  // not a drag: not saved

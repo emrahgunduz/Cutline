@@ -348,6 +348,7 @@ final class TimelineView: NSView {
                 NSColor.systemOrange.setFill()
                 CGRect(x: r.minX, y: r.maxY - 3, width: r.width, height: 3).fill()
             }
+            drawClipLength(Self.clipLength(clip.duration, fps: project.fps), in: r)
             NSColor.white.withAlphaComponent(selected ? 1 : 0.25).setStroke()
             path.lineWidth = selected ? 2 : 1
             path.stroke()
@@ -358,6 +359,34 @@ final class TimelineView: NSView {
                 NSBezierPath(roundedRect: CGRect(x: r.maxX - 5, y: r.midY - 8, width: 3, height: 16), xRadius: 1.5, yRadius: 1.5).fill()
             }
         }
+    }
+
+    /// The clip's length on the timeline (not its source file's), as MM:SS (FF) in a small dark
+    /// pill at the bottom right. A clip running past the right edge keeps it in view; it's left
+    /// out when the clip is too small to fit it.
+    private func drawClipLength(_ label: String, in r: CGRect) {
+        let text = label as NSString
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
+                                                    .foregroundColor: NSColor.white]
+        let size = text.size(withAttributes: attrs)
+        let pill = CGSize(width: ceil(size.width) + 8, height: 14)
+        let bottomGap: CGFloat = 7   // space between the label and the clip's bottom edge
+        guard r.width >= pill.width + 16, r.height >= Self.titleBarHeight + pill.height + bottomGap + 1 else { return }
+        let right = min(r.maxX, bounds.maxX) - 4
+        guard right - pill.width >= r.minX + 8 else { return }
+        let box = CGRect(x: right - pill.width, y: r.maxY - pill.height - bottomGap, width: pill.width, height: pill.height)
+        NSColor.black.withAlphaComponent(0.6).setFill()
+        NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4).fill()
+        text.draw(at: CGPoint(x: box.minX + 4, y: box.midY - size.height / 2), withAttributes: attrs)
+    }
+
+    /// MM:SS (FF): minutes and seconds, then the frames past the last whole second at the
+    /// project's frame rate (00 to fps − 1; a full second's worth rolls over into SS).
+    static func clipLength(_ seconds: Double, fps: Double) -> String {
+        let rate = max(1, Int(fps.rounded()))
+        let frames = Int((max(0, seconds) * fps).rounded())
+        let s = frames / rate, f = frames % rate
+        return String(format: "%02d:%02d (%02d)", s / 60, s % 60, f)
     }
 
     /// Tiles across the clip, each showing the source frame at its own time.
