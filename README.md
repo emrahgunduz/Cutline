@@ -17,18 +17,22 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
   - **Music video**: 16:9, HD or 4K, no length limit, H.265.
   - **Portrait social**: 9:16, 1080×1920, up to 3 minutes, H.264.
   - **Portrait ad**: 9:16, 1080×1920, up to 30 seconds, H.264, with a file-size target.
+- A frame rate for each project, chosen when you create it (24 fps by default).
 - Length limits, codecs and export defaults are editable in Settings > Presets.
 - Import from Project: start a new format with another project's song, lyric timing, clips and tracks (a one-time copy).
-- Panel sizes and track heights are saved with each project.
+- Panel sizes, track heights, the window's size and which asset sections are open are saved with each project.
 
 **Editing**
-- Assets panel with thumbnails: videos, images (PNG with transparency), the song and lyrics TXT files.
+- Assets panel with thumbnails: videos, images (PNG with transparency, JPEG and others), the song and lyrics TXT files.
+- Drag files from the Finder or the assets panel onto the timeline: clips land where you drop them, and a song or lyrics file replaces the current one.
 - Live preview with frame stepping, zoom and pan; drag clips in the preview to move and scale them.
 - One audio track and any number of video and lyrics tracks; mute the song, hide any track.
+- Each clip shows its length on the timeline as MM:SS (FF).
 - Trim, split, move and group-drag clips, with snapping you can switch on and off for each kind of target: clips and the song (and the playhead), lyrics and words, beats, downbeats and sections.
 - Per-clip size and position (Fill or Fit), horizontal flip, and filters: Color (hue, saturation, contrast, brightness) and Fade, each with an on/off switch.
 - Proxies (½, ¼, ⅛ size) for smooth preview of heavy footage; export always uses the originals.
-- Cinemascope bars for music videos: animated from 16:9 to 2.35:1 between two markers on the timeline.
+- Cinemascope bars for music videos: they close between two markers on the timeline, to a bar height you set in pixels (by default the one that leaves a 2.35:1 picture).
+- Inspector sliders take typed values too, and move one step for each scroll wheel click.
 
 **The song**
 - Waveform, loudness curve with loud and quiet stretches, beats, downbeats and song sections, drawn on the audio track.
