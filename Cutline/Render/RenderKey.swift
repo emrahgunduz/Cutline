@@ -28,6 +28,8 @@ enum RenderKey {
         var start: Double; var duration: Double; var sourceIn: Double
         var transform: ClipTransform; var filters: FilterSettings
         var dummy: DummyCard?
+        /// Dummy cards keep their text inside the bars: the bar share they're drawn with.
+        var dummyBars: Double?
     }
     private struct LineSig: Encodable { var id: UUID; var track: Int; var text: String; var x: Double?; var y: Double?; var layout: LineLayout; var drawn: [Double] }
     private struct WordSig: Encodable { var line: UUID; var text: String; var start: Double; var end: Double }
@@ -50,7 +52,8 @@ enum RenderKey {
                 let asset = p.asset(c.assetID)
                 sig.clips.append(ClipSig(track: t, asset: c.assetID, path: asset?.path ?? "", media: mediaStamp(asset),
                                          start: c.start, duration: c.duration, sourceIn: c.sourceIn, transform: c.transform, filters: c.filters,
-                                         dummy: asset?.dummy))
+                                         dummy: asset?.dummy,
+                                         dummyBars: asset?.isDummy == true ? Double(DummyRenderer.barFraction(for: p)) : nil))
             }
         }
         if proxies {
@@ -73,12 +76,15 @@ enum RenderKey {
     }
 
     /// Letterbox contribution: fully open, fully closed, or the transition when it is inside.
+    /// From the start marker on, the bars' height is part of it, so changing the height
+    /// re-renders from there to the end; before the start marker the bars are open.
     private static func letterbox(_ p: Project, _ start: Double, _ end: Double) -> String {
         let c = p.cinemascope
         guard p.type == .musicVideo, c.enabled else { return "off" }
         if end <= c.startMarker { return "open" }
-        if start >= c.endMarker { return "closed" }
-        return "\(c.startMarker)-\(c.endMarker)"
+        let bars = String(format: "%.3f", Letterbox.fullBarHeight(p))
+        if start >= c.endMarker { return "closed:\(bars)" }
+        return "\(c.startMarker)-\(c.endMarker):\(bars)"
     }
 
     /// File size and modification date, so replacing media on disk invalidates its ranges.
