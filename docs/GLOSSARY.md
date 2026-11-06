@@ -60,7 +60,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Scroller** | The horizontal scrollbar just under the button bar (vertical one on the right). |
 | **Word rows** | The rows under a lyric line, one per word (word 1 on row 1, …). |
 | **Name bar** | The darker strip on top of a clip or lyric line showing its name. |
-| **Clip length** | The MM:SS:FF label at the bottom right of each clip: how long the clip is on the timeline (not its source file), with frames at the project's rate (00 to fps − 1). Hidden when the clip is too small for it. |
+| **Clip length** | The MM:SS (FF) label at the bottom right of each clip: how long the clip is on the timeline (not its source file), with frames at the project's rate (00 to fps − 1). Hidden when the clip is too small for it. |
 | **Edit point** | Any clip, line, audio or cinemascope edge; ↑/↓ jump between them. |
 | **Multi-selection** | Several items selected with ⌘-click or a **selection box** (⇧-drag on empty space). |
 | **Cinemascope markers** | Two orange flags on the ruler: bars start closing at the first, frame is fully 2.35:1 from the second. |

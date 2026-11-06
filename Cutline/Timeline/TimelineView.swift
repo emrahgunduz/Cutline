@@ -361,7 +361,7 @@ final class TimelineView: NSView {
         }
     }
 
-    /// The clip's length on the timeline (not its source file's), as MM:SS:FF in a small dark
+    /// The clip's length on the timeline (not its source file's), as MM:SS (FF) in a small dark
     /// pill at the bottom right. A clip running past the right edge keeps it in view; it's left
     /// out when the clip is too small to fit it.
     private func drawClipLength(_ label: String, in r: CGRect) {
@@ -379,8 +379,14 @@ final class TimelineView: NSView {
         text.draw(at: CGPoint(x: box.minX + 4, y: box.midY - size.height / 2), withAttributes: attrs)
     }
 
-    /// MM:SS:FF at the project's frame rate (frames run 00 to fps − 1), like the preview's timecode.
-    static func clipLength(_ seconds: Double, fps: Double) -> String { Timecode.string(seconds, fps: fps) }
+    /// MM:SS (FF): minutes and seconds, then the frames past the last whole second at the
+    /// project's frame rate (00 to fps − 1; a full second's worth rolls over into SS).
+    static func clipLength(_ seconds: Double, fps: Double) -> String {
+        let rate = max(1, Int(fps.rounded()))
+        let frames = Int((max(0, seconds) * fps).rounded())
+        let s = frames / rate, f = frames % rate
+        return String(format: "%02d:%02d (%02d)", s / 60, s % 60, f)
+    }
 
     /// Tiles across the clip, each showing the source frame at its own time.
     private func drawFilmstrip(clip: Clip, asset: Asset, in r: CGRect, _ l: TimelineLayout) {
