@@ -34,7 +34,8 @@ final class SnappingTests: XCTestCase {
     func testDraggingTheSongLeavesOutItsBeats() {
         let (p, a) = song()
         let targets = Snapping.targets(in: p, playhead: 100, excluding: [], includeAudio: false, beats: ResolvedBeats(a, nil), groups: Set(SnapGroup.allCases))
-        XCTAssertTrue(targets.allSatisfy { $0.group == .edges })
+        XCTAssertTrue(targets.allSatisfy { $0.group == .clips || $0.group == .lyrics })
+        XCTAssertFalse(targets.contains { $0.time == 20 }, "nor the song's own end")
     }
 
     func testDragNearDownbeatLandsExactlyOnIt() {
@@ -42,25 +43,30 @@ final class SnappingTests: XCTestCase {
         XCTAssertEqual(snap(4.05, p, a), 4)
     }
 
-    func testSectionEdgeWinsOverCloserBeat() {
+    func testMoreImportantGroupWinsOverACloserTarget() {
         var (p, a) = song()
         a.beats.append(8.03)
         a.beats.sort()
-        // 8.04 is closer to the 8.03 beat, but the section edge at 8 has priority.
-        XCTAssertEqual(snap(8.04, p, a), 8)
-        p.beatCorrections = nil
+        // Beats are more important than sections: near a beat that isn't a section edge, the beat wins.
+        XCTAssertEqual(snap(8.01, p, a), 8, "the section edge at 8 is also a beat")
+        XCTAssertEqual(snap(8.04, p, a, groups: [.beats, .sections]), 8.03)
+        // A clip edge beats a closer beat.
+        let img = Asset(kind: .image, name: "i", path: "/i.png")
+        p.assets.append(img)
+        p.addClip(assetID: img.id, track: 0, at: 3.1)
+        XCTAssertEqual(snap(3.04, p, a), p.videoTracks[0].clips[0].start, "clip edge (3.1) over the nearer beat (3.0)")
     }
 
     func testRadiusIsInPixels() {
         let (p, a) = song()
-        XCTAssertEqual(snap(4.3, p, a, pps: 10), 4)      // 3 px away when zoomed out
+        XCTAssertEqual(snap(4.3, p, a, pps: 10), 4.5)    // 2 px from the beat at 4.5 when zoomed out (beats outrank the downbeat at 4)
         XCTAssertNil(snap(4.3, p, a, pps: 100))          // 30 px away zoomed in (beat at 4.5 is 20 px)
     }
 
     func testGroupTogglesFilterTargets() {
         let (p, a) = song()
         // Beats off, downbeats on: near a plain beat does not snap, near a downbeat does.
-        let noBeats: Set<SnapGroup> = [.sections, .downbeats]
+        let noBeats: Set<SnapGroup> = [.sections, .downbeats, .clips, .lyrics]
         XCTAssertNil(snap(2.55, p, a, groups: noBeats))
         XCTAssertEqual(snap(2.05, p, a, groups: noBeats), 2)
         XCTAssertEqual(snap(2.55, p, a, groups: [.beats]), 2.5)
@@ -107,9 +113,9 @@ final class SnappingTests: XCTestCase {
 
     func testSnapGroupsAreSavedInLayout() throws {
         var l = LayoutState()
-        l.snapGroups = [.downbeats, .edges]
+        l.snapGroups = [.lyrics, .downbeats]
         let back = try JSONDecoder().decode(LayoutState.self, from: JSONEncoder().encode(l))
-        XCTAssertEqual(back.snapGroups, [.downbeats, .edges])
+        XCTAssertEqual(back.snapGroups, [.lyrics, .downbeats])
         XCTAssertNil(try JSONDecoder().decode(LayoutState.self, from: Data(#"{"assetsWidth":280,"inspectorWidth":300,"timelineHeight":320}"#.utf8)).snapGroups)
     }
 }
@@ -172,3 +178,39 @@ final class BeatCorrectionAnchorTests: XCTestCase {
         XCTAssertEqual(p.cinemascope.endAnchor?.index, 1)
     }
 }
+
+final class SnapGroupSplitTests: XCTestCase {
+    func testClipsAndLyricsAreSeparateGroups() {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.fps = 24
+        let img = Asset(kind: .image, name: "i", path: "/i.png")
+        p.assets = [img]
+        p.addClip(assetID: img.id, track: 0, at: 4)
+        p.lyricTracks[0].lines = LyricImport.roughlyTimed(LyricImport.parse("one two"), start: 10, end: 12, fps: 24)
+        func snap(_ t: Double, _ g: Set<SnapGroup>) -> Double? {
+            Snapping.snap(t, targets: Snapping.targets(in: p, playhead: 50, excluding: [], beats: nil, groups: g), pixelsPerSecond: 100)?.time
+        }
+        XCTAssertEqual(snap(4.03, [.clips]), 4)
+        XCTAssertNil(snap(4.03, [.lyrics]), "lyrics off the clip's edge")
+        XCTAssertEqual(snap(10.03, [.lyrics]), 10)
+        XCTAssertNil(snap(10.03, [.clips]), "clips don't attract to lyrics")
+        XCTAssertEqual(snap(50.02, [.clips]), 50, "the playhead is with clips")
+    }
+
+    func testOldSavedGroupsAreMapped() throws {
+        let old = #"{"assetsWidth":420,"inspectorWidth":310,"timelineHeight":320,"snapGroups":["sections","beats","edges"]}"#
+        let l = try JSONDecoder().decode(LayoutState.self, from: Data(old.utf8))
+        XCTAssertEqual(l.snapGroups, [.clips, .lyrics, .beats, .sections], "edges is now clips and lyrics")
+        XCTAssertEqual(l.assetsWidth, 420, "the rest of the layout survives")
+        let unknown = #"{"assetsWidth":300,"snapGroups":["sections","nonsense"],"snapping":false}"#
+        let u = try JSONDecoder().decode(LayoutState.self, from: Data(unknown.utf8))
+        XCTAssertEqual(u.snapGroups, [.sections])
+        XCTAssertEqual(u.snapping, false)
+        XCTAssertEqual(u.inspectorWidth, 300, "missing fields keep their defaults")
+    }
+
+    func testTheOrderIsMostToLeastImportant() {
+        XCTAssertEqual(SnapGroup.allCases, [.clips, .lyrics, .beats, .downbeats, .sections])
+    }
+}
+
