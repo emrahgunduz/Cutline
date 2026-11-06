@@ -32,7 +32,25 @@ struct AssetsPanelView: View {
     private var selection: Set<UUID> { editor.selectedAssets }
     private var selectedVideos: [Asset] { editor.project.assets.filter { selection.contains($0.id) && $0.kind == .video } }
 
+    /// Tile width you chose with the header's slider (saved with the project).
+    @State private var tileSize: Double = AssetsPanelView.defaultTileSize
+    /// 96 gives three tiles a row in the usual panel width; the slider goes from a bit smaller
+    /// to double.
+    static let defaultTileSize: Double = 96
+    static let tileSizeRange: ClosedRange<Double> = 80...192
+
     var body: some View {
+        // The whole panel's width: the grid inside can't stretch it (it could stretch a view
+        // inside the scroll view, which kept wide columns in a narrow panel).
+        GeometryReader { geo in
+            panel
+                .onAppear { panelWidth = geo.size.width }
+                .onChange(of: geo.size.width) { _, w in panelWidth = w }
+        }
+        .onAppear { tileSize = editor.document?.layout.assetTileSize ?? Self.defaultTileSize }
+    }
+
+    private var panel: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -52,9 +70,6 @@ struct AssetsPanelView: View {
                     if let id = ids.first, ids.count == 1 { withAnimation { reader.scrollTo(id, anchor: .center) } }
                 }
             }
-            .background(GeometryReader { geo in
-                Color.clear.onAppear { panelWidth = geo.size.width }.onChange(of: geo.size.width) { _, w in panelWidth = w }
-            })
             .contentShape(Rectangle())
             .onTapGesture { editor.selectedAssets = [] }
             .onDrop(of: [.fileURL], isTargeted: nil, perform: dropFiles)
@@ -73,6 +88,18 @@ struct AssetsPanelView: View {
         HStack(spacing: 6) {
             Text("Assets").font(.headline)
             Spacer()
+            if panelWidth >= 220 {
+                Image(systemName: "photo").font(.system(size: 9)).foregroundStyle(.secondary)
+                Slider(value: $tileSize, in: Self.tileSizeRange) { editing in
+                    guard !editing, let doc = editor.document else { return }
+                    doc.layout.assetTileSize = abs(tileSize - Self.defaultTileSize) < 0.5 ? nil : tileSize
+                    doc.persistLayout()
+                }
+                .controlSize(.mini)
+                .frame(width: 64)
+                .help("Tile size")
+                Image(systemName: "photo").font(.system(size: 13)).foregroundStyle(.secondary)
+            }
             Button { AssetImporter.presentOpenPanel(for: editor, window: NSApp.keyWindow) } label: { Image(systemName: "plus") }
                 .help("Import media (⌘I)")
             Menu {
@@ -124,7 +151,7 @@ struct AssetsPanelView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(kind, title, icon, items)
             if !collapsed.contains(kind) {
-                LazyVGrid(columns: Self.columns(panelWidth: panelWidth), spacing: 8) {
+                LazyVGrid(columns: Self.columns(panelWidth: panelWidth, tileSize: tileSize), spacing: 8) {
                     ForEach(items) { asset in tile(asset, items) }
                 }
                 .padding(8)
@@ -134,16 +161,24 @@ struct AssetsPanelView: View {
         }
     }
 
-    /// Fixed tile columns for the panel's width, with room always kept for a scroll bar that
-    /// takes space (macOS's "always show" scroll bars): showing or hiding the scroll bar then
-    /// changes neither the number of tiles in a row nor their size. Tiles are at least 96 pt.
-    static func columns(panelWidth: CGFloat, scrollerStyle: NSScroller.Style = NSScroller.preferredScrollerStyle) -> [GridItem] {
+    /// Tile columns for the panel's width: as many tiles of about `tileSize` as fit, stretched
+    /// to fill the row (one tile, narrower, when even one doesn't fit). Room is always kept for
+    /// a scroll bar that takes space (macOS's "always show" scroll bars), so the scroll bar
+    /// coming and going changes neither the number of tiles in a row nor their size.
+    static func columns(panelWidth: CGFloat, tileSize: Double = defaultTileSize,
+                        scrollerStyle: NSScroller.Style = NSScroller.preferredScrollerStyle) -> [GridItem] {
         let scroller = scrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
-        let inner = panelWidth - scroller - 28   // the section's outer (6 + 6) and inner (8 + 8) padding
-        let spacing: CGFloat = 8, minimum: CGFloat = 96
-        let count = max(1, Int((inner + spacing) / (minimum + spacing)))
-        let width = max(minimum, floor((inner - CGFloat(count - 1) * spacing) / CGFloat(count)))
+        let inner = max(40, panelWidth - scroller - 28)   // the section's outer (6 + 6) and inner (8 + 8) padding
+        let spacing: CGFloat = 8
+        let count = max(1, Int((inner + spacing) / (CGFloat(tileSize) + spacing)))
+        let width = floor((inner - CGFloat(count - 1) * spacing) / CGFloat(count))
         return Array(repeating: GridItem(.fixed(width), spacing: spacing), count: count)
+    }
+
+    /// The width the tiles get in this panel.
+    private var tileWidth: CGFloat {
+        guard case .fixed(let w) = Self.columns(panelWidth: panelWidth, tileSize: tileSize).first?.size else { return CGFloat(tileSize) }
+        return w
     }
 
     private func sectionHeader(_ kind: AssetGroup, _ title: String, _ icon: String, _ items: [Asset]) -> some View {
@@ -178,7 +213,7 @@ struct AssetsPanelView: View {
 
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
         AssetTile(asset: asset, thumbnails: editor.thumbnails, progress: editor.proxyProgress[asset.id],
-                  selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id))
+                  selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id), width: tileWidth)
             .id(asset.id)
             .contentShape(Rectangle())
             .gesture(TapGesture().modifiers(.command).onEnded { toggle(asset.id) })
@@ -247,12 +282,23 @@ struct AssetsPanelView: View {
     }
 }
 
+/// How a tile's parts scale with its width.
+enum AssetTileMetrics {
+    /// The picture's height for a tile `width` wide (about 62 pt for a 104 pt tile).
+    static func pictureHeight(_ width: CGFloat) -> CGFloat { max(36, (width - 6) * 0.63) }
+    /// Names show from 100 pt; smaller tiles show only the picture.
+    static func showsName(_ width: CGFloat) -> Bool { width >= 100 }
+}
+
 private struct AssetTile: View {
     let asset: Asset
     @ObservedObject var thumbnails: ThumbnailGenerator
     let progress: Double?
     let selected: Bool
     let uses: Int
+    /// The tile's width in the grid: the picture scales with it, and the name shows from 100 pt.
+    var width: CGFloat = AssetsPanelView.defaultTileSize
+
 
     var body: some View {
         VStack(spacing: 4) {
@@ -270,7 +316,7 @@ private struct AssetTile: View {
                     ProgressView(value: progress).progressViewStyle(.circular).controlSize(.small)
                 }
             }
-            .frame(height: 62)
+            .frame(height: AssetTileMetrics.pictureHeight(width))
             .background(Color.black.opacity(0.35))
             .overlay(alignment: .topTrailing) {
                 if let proxy = asset.proxy, progress == nil {
@@ -292,8 +338,10 @@ private struct AssetTile: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2.5))
-            Text(asset.name).font(.caption).lineLimit(1).truncationMode(.middle)
-                .foregroundStyle(selected ? Color.accentColor : .primary)
+            if AssetTileMetrics.showsName(width) {
+                Text(asset.name).font(.caption).lineLimit(1).truncationMode(.middle)
+                    .foregroundStyle(selected ? Color.accentColor : .primary)
+            }
         }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.18) : .clear))
