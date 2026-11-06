@@ -2,10 +2,12 @@ import AppKit
 import SwiftUI
 
 /// Four regions: assets (left), preview (center), inspector (right), timeline (bottom).
-/// Divider positions are restored from and saved to the project's layout.
+/// The window frame and the divider positions are restored from and saved to the project's
+/// layout. Panel sizes are saved only when you drag a divider; when the window resizes, the
+/// preview takes the change and the panels keep the project's sizes (as far as they fit).
 final class MainWindowController: NSWindowController, NSSplitViewDelegate {
-    private let vertical = NSSplitView()
-    private let horizontal = NSSplitView()
+    private let vertical = DividerTrackingSplitView()
+    private let horizontal = DividerTrackingSplitView()
     private var restoring = true
     let projectDocument: ProjectDocument
 
@@ -15,7 +17,9 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
                               backing: .buffered, defer: false)
         window.minSize = NSSize(width: 1000, height: 640)
         window.center()
-        window.setFrameAutosaveName("CutlineMainWindow")
+        // New projects open where the last editor window was; saved ones use their own frame.
+        // (Not while hosting tests, which would overwrite the user's.)
+        if !AppDelegate.isTestHost { window.setFrameAutosaveName("CutlineMainWindow") }
         projectDocument = document
         super.init(window: window)
         // `document` is set by NSDocument.addWindowController; setting it here first makes
@@ -176,24 +180,77 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
     deinit {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        windowObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
     override func windowDidLoad() { super.windowDidLoad() }
 
     override func showWindow(_ sender: Any?) {
+        let first = windowObservers.isEmpty
+        if first { restoreWindowFrame() }
         super.showWindow(sender)
-        restoreLayout()
+        guard first else { return }
+        restoring = true
+        applyPanelSizes()
+        observeWindow()
+        // Layout passes right after opening can still move the dividers; ignore them.
+        DispatchQueue.main.async { self.restoring = false }
     }
 
-    private func restoreLayout() {
+    private var windowObservers: [NSObjectProtocol] = []
+
+    /// The project's own window frame, if it was saved and is still on a connected screen.
+    private func restoreWindowFrame() {
+        guard let window, let f = projectDocument.layout.windowFrame, f.count == 4 else { return }
+        let rect = NSRect(x: f[0], y: f[1], width: max(f[2], window.minSize.width), height: max(f[3], window.minSize.height))
+        guard NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) else { return }
+        window.setFrame(rect, display: false)
+    }
+
+    /// Puts the dividers where the project's layout says (clamped by the panels' limits).
+    private func applyPanelSizes() {
+        let was = restoring
         restoring = true
+        defer { restoring = was }
         vertical.layoutSubtreeIfNeeded()
         let l = projectDocument.layout
-        let width = horizontal.bounds.width
         horizontal.setPosition(l.assetsWidth, ofDividerAt: 0)
-        horizontal.setPosition(width - l.inspectorWidth, ofDividerAt: 1)
+        horizontal.setPosition(horizontal.bounds.width - l.inspectorWidth, ofDividerAt: 1)
         vertical.setPosition(vertical.bounds.height - l.timelineHeight, ofDividerAt: 0)
-        DispatchQueue.main.async { self.restoring = false }
+    }
+
+    private func observeWindow() {
+        guard let window else { return }
+        let nc = NotificationCenter.default
+        windowObservers = [
+            nc.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+                self?.applyPanelSizes()
+                self?.windowFrameChanged()
+                // The split views lay out again after this notification (and during animated
+                // resizes such as Fill or full screen); put the panels back once that's done.
+                DispatchQueue.main.async { self?.applyPanelSizes() }
+            },
+            nc.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
+                self?.applyPanelSizes()
+            },
+            nc.addObserver(forName: NSWindow.didMoveNotification, object: window, queue: .main) { [weak self] _ in
+                self?.windowFrameChanged()
+            },
+        ]
+    }
+
+    private func windowFrameChanged() {
+        guard !restoring, let window, !window.styleMask.contains(.fullScreen) else { return }
+        let f = window.frame
+        let frame = [f.minX, f.minY, f.width, f.height].map { Double($0.rounded()) }
+        guard projectDocument.layout.windowFrame != frame else { return }
+        projectDocument.layout.windowFrame = frame
+        scheduleSave()
+    }
+
+    private func scheduleSave() {
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(saveLayout), object: nil)
+        perform(#selector(saveLayout), with: nil, afterDelay: 0.5)
     }
 
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
@@ -206,16 +263,18 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         return dividerIndex == 0 ? splitView.bounds.width - 600 : splitView.bounds.width - 200
     }
 
+    /// Saves the panel sizes while you drag a divider. Window resizes squeeze or stretch the
+    /// panels too, but those aren't saved.
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        guard !restoring, horizontal.arrangedSubviews.count == 3, vertical.arrangedSubviews.count == 2 else { return }
+        guard !restoring, horizontal.isDraggingDivider || vertical.isDraggingDivider,
+              horizontal.arrangedSubviews.count == 3, vertical.arrangedSubviews.count == 2 else { return }
         var l = projectDocument.layout
         l.assetsWidth = horizontal.arrangedSubviews[0].frame.width
         l.inspectorWidth = horizontal.arrangedSubviews[2].frame.width
         l.timelineHeight = vertical.arrangedSubviews[1].frame.height
         guard l != projectDocument.layout else { return }
         projectDocument.layout = l
-        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(saveLayout), object: nil)
-        perform(#selector(saveLayout), with: nil, afterDelay: 0.5)
+        scheduleSave()
     }
 
     @objc private func saveLayout() { projectDocument.persistLayout() }
@@ -290,5 +349,18 @@ extension MainWindowController: NSMenuItemValidation {
             return projectDocument.editor.isTapping
         default: return responds(to: item.action)
         }
+    }
+}
+
+/// A split view that knows when you're dragging one of its dividers: the split view gets the
+/// mouse-down only for its dividers (clicks in a panel go to the panel), and tracks the drag
+/// inside `mouseDown` until the button comes up.
+final class DividerTrackingSplitView: NSSplitView {
+    var isDraggingDivider = false
+
+    override func mouseDown(with event: NSEvent) {
+        isDraggingDivider = true
+        defer { isDraggingDivider = false }
+        super.mouseDown(with: event)
     }
 }
