@@ -14,7 +14,9 @@ enum ProjectImport {
     /// - Clips are centred on the new canvas and cover it as much as they covered the old one.
     /// - Lyric lines go back to automatic placement (the old positions were for another frame).
     /// - Cinemascope is kept only for a music video.
-    static func make(from source: Project, type: ProjectType, canvas: CanvasSize) -> Result {
+    /// - With `fps`, the new project runs at that rate (chosen in New Project) and every time
+    ///   moves onto its frame grid; without, it keeps the source's rate.
+    static func make(from source: Project, type: ProjectType, canvas: CanvasSize, fps: Double? = nil) -> Result {
         var p = Project(type: type, canvas: canvas)
         p.fps = source.fps
         p.fpsLocked = source.fpsLocked
@@ -63,6 +65,11 @@ enum ProjectImport {
         p.beatCorrections = source.beatCorrections
         p.lyricsLanguage = source.lyricsLanguage
         if type == .musicVideo && source.type == .musicVideo { p.cinemascope = source.cinemascope }
+        if let fps, abs(fps - p.fps) > 1e-9 || !p.fpsLocked {
+            p.fps = fps
+            p.fpsLocked = true
+            p.snapAllToFrameGrid()
+        }
         return Result(project: p, assetIDs: ids)
     }
 
@@ -114,9 +121,9 @@ enum ProjectImport {
 extension ProjectImport {
     /// A new, untitled document of `type` on `canvas` holding the import of the project at `url`.
     @MainActor
-    static func document(importing url: URL, type: ProjectType, canvas: CanvasSize) throws -> ProjectDocument {
+    static func document(importing url: URL, type: ProjectType, canvas: CanvasSize, fps: Double? = nil) throws -> ProjectDocument {
         let (source, _) = try ProjectDocument.load(from: url)
-        var result = make(from: source, type: type, canvas: canvas)
+        var result = make(from: source, type: type, canvas: canvas, fps: fps)
         let doc = ProjectDocument()
         copyCaches(from: url, source: source, ids: result.assetIDs) { doc.folder($0) }
         dropMissingProxies(&result.project, in: doc.folder("proxies"))
