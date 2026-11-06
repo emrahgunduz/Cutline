@@ -48,7 +48,8 @@ final class SnappingTests: XCTestCase {
         a.beats.append(8.03)
         a.beats.sort()
         // Beats are more important than sections: near a beat that isn't a section edge, the beat wins.
-        XCTAssertEqual(snap(8.01, p, a), 8, "the section edge at 8 is also a beat")
+        XCTAssertEqual(snap(8.01, p, a), 8.03, "a beat outranks the nearer section start at 8")
+        XCTAssertEqual(snap(8.01, p, a, groups: [.sections]), 8)
         XCTAssertEqual(snap(8.04, p, a, groups: [.beats, .sections]), 8.03)
         // A clip edge beats a closer beat.
         let img = Asset(kind: .image, name: "i", path: "/i.png")
@@ -71,6 +72,21 @@ final class SnappingTests: XCTestCase {
         XCTAssertEqual(snap(2.05, p, a, groups: noBeats), 2)
         XCTAssertEqual(snap(2.55, p, a, groups: [.beats]), 2.5)
         XCTAssertTrue(Snapping.targets(in: p, playhead: 0, excluding: [], beats: nil, groups: []).isEmpty)
+    }
+
+    /// Each song point is in one group: Beats don't attract to downbeats or section starts,
+    /// Downbeats don't attract to section starts.
+    func testBeatGroupsDontOverlap() {
+        let (p, a) = song()
+        XCTAssertNil(snap(2.03, p, a, groups: [.beats]), "2 s is a downbeat, not a Beat")
+        XCTAssertEqual(snap(2.53, p, a, groups: [.beats]), 2.5)
+        XCTAssertEqual(snap(2.03, p, a, groups: [.downbeats]), 2)
+        XCTAssertNil(snap(2.53, p, a, groups: [.downbeats]))
+        XCTAssertNil(snap(8.03, p, a, groups: [.downbeats]), "8 s starts a section")
+        XCTAssertNil(snap(8.03, p, a, groups: [.beats]))
+        XCTAssertEqual(snap(8.03, p, a, groups: [.sections]), 8)
+        let all = Snapping.targets(in: p, playhead: 100, excluding: [], beats: ResolvedBeats(a, nil), groups: [.beats, .downbeats, .sections])
+        XCTAssertEqual(all.count, Set(all.map(\.time)).count, "no point in two groups")
     }
 
     func testBeatTargetsFollowTheAudioStart() {
