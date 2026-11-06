@@ -1267,20 +1267,39 @@ final class TimelineView: NSView {
         }
     }
 
-    // MARK: Drop assets from the panel
+    // MARK: Drop assets from the panel, or files from the Finder
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let ids = (sender.draggingPasteboard.string(forType: .string) ?? "")
-            .split(separator: ",").compactMap { UUID(uuidString: String($0)) }
-        guard !ids.isEmpty else { return false }
+        // Where it was dropped, read now: the view can scroll or zoom while files import.
         let p = convert(sender.draggingLocation, from: nil)
         let l = layout
-        var time = max(0, l.time(for: p.x))
-        let row = l.row(atY: p.y)
-        let assets = ids.compactMap { project.asset($0) }
+        let time = max(0, l.time(for: p.x)), row = l.row(atY: p.y)
+        let ids = (sender.draggingPasteboard.string(forType: .string) ?? "")
+            .split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+        if !ids.isEmpty {
+            placeDropped(ids.compactMap { project.asset($0) }, at: time, on: row)
+            return true
+        }
+        let urls = (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        guard !urls.isEmpty else { return false }
+        // Files from the Finder go into the assets first (a file the project has is reused).
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let (assets, errors) = await self.editor.importAssets(urls, reuseExisting: true)
+            self.placeDropped(assets, at: time, on: row)
+            if let error = errors.first, let window = self.window { NSAlert(error: error).beginSheetModal(for: window) { _ in } }
+        }
+        return true
+    }
+
+    /// Videos and images go where they're dropped (on the video track under the pointer, else
+    /// the bottom one), one after another. A song replaces the song (the timeline has one). A
+    /// lyrics file replaces all the lyrics, after asking.
+    private func placeDropped(_ assets: [Asset], at dropTime: Double, on row: TimelineRow?) {
+        var time = dropTime
         let visuals = assets.filter { $0.kind == .video || $0.kind == .image }
         if !visuals.isEmpty {
             var track = 0
@@ -1301,9 +1320,8 @@ final class TimelineView: NSView {
         if let lyrics = assets.first(where: { $0.kind == .lyrics }) {
             var track = 0
             if case .lyric(let t)? = row { track = t }
-            editor.placeLyrics(lyrics, track: track, at: max(0, layout.time(for: p.x)), window: window)
+            editor.placeLyrics(lyrics, track: track, at: dropTime, window: window)
         }
-        return true
     }
 }
 

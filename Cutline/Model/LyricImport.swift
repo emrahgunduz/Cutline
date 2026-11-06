@@ -59,8 +59,28 @@ enum LyricImport {
     }
 }
 
+extension Project {
+    /// The timeline holds one lyrics file: its lines go on `track` (the first lyrics track when
+    /// that one doesn't exist; one is added when there are none) and every other lyrics track is
+    /// emptied. Returns the track the lines went on.
+    @discardableResult
+    mutating func replaceAllLyrics(with lines: [LyricLine], onTrack track: Int) -> Int {
+        if lyricTracks.isEmpty { addLyricTrack() }
+        let target = lyricTracks.indices.contains(track) ? track : 0
+        for i in lyricTracks.indices { lyricTracks[i].lines = i == target ? lines : [] }
+        return target
+    }
+
+    /// Lyric lines on the timeline, and on how many tracks.
+    var lyricLineCounts: (lines: Int, tracks: Int) {
+        let used = lyricTracks.filter { !$0.lines.isEmpty }
+        return (used.reduce(0) { $0 + $1.lines.count }, used.count)
+    }
+}
+
 extension EditorModel {
-    /// Place the lyrics file on a lyric track, from `time` to the end of the song (or ~3 s per line).
+    /// Place the lyrics file on a lyric track, from `time` to the end of the song (or ~3 s per
+    /// line). It replaces the lyrics on every lyrics track; when there are some, it asks first.
     @MainActor
     func placeLyrics(_ asset: Asset, track: Int, at time: Double, window: NSWindow?) {
         guard let text = (try? String(contentsOf: asset.url, encoding: .utf8)) ?? (try? String(contentsOf: asset.url, encoding: .isoLatin1)) else {
@@ -72,23 +92,21 @@ extension EditorModel {
         let songEnd = project.audio?.end ?? 0
         let end = songEnd > time + 5 ? songEnd : time + Double(parsed.count) * 3
         let lines = LyricImport.roughlyTimed(parsed, start: time, end: end, fps: project.fps)
+        let existing = project.lyricLineCounts
         let apply = { [self] in
-            edit("Place Lyrics") { p in
-                guard p.lyricTracks.indices.contains(track) else { return }
-                p.lyricTracks[track].lines = lines
-            }
+            edit(existing.lines > 0 ? "Replace Lyrics" : "Place Lyrics") { p in p.replaceAllLyrics(with: lines, onTrack: track) }
             // With a song on the timeline, time the words to it right away (R21).
             if project.audio != nil, audioAnalysis.state != .unavailable { alignLyrics(window: window) }
         }
-        if project.lyricTracks.indices.contains(track), !project.lyricTracks[track].lines.isEmpty, let window {
-            let alert = NSAlert()
-            alert.messageText = "Replace the lyrics on Lyrics \(track + 1)?"
-            alert.informativeText = "The track already has \(project.lyricTracks[track].lines.count) lines. You can undo this."
-            alert.addButton(withTitle: "Replace")
-            alert.addButton(withTitle: "Cancel")
-            alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { apply() } }
-        } else {
-            apply()
-        }
+        guard existing.lines > 0, let window else { apply(); return }
+        let target = project.lyricTracks.indices.contains(track) ? track : 0
+        let alert = NSAlert()
+        alert.messageText = existing.tracks > 1 ? "Replace the lyrics on all lyrics tracks?" : "Replace the lyrics?"
+        let onTracks = existing.tracks > 1 ? " on \(existing.tracks) lyrics tracks" : ""
+        alert.informativeText = "The timeline has \(existing.lines) lyric lines\(onTracks). It holds one lyrics file, so all of them "
+            + "are replaced by the lines of “\(asset.name)” on Lyrics \(target + 1), and their timing and placement are lost. You can undo this."
+        alert.addButton(withTitle: "Replace")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { apply() } }
     }
 }
