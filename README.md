@@ -121,10 +121,10 @@ Run `xcodegen generate` after adding, moving or removing source files; the build
 
 ### GitHub CI and releases
 
-Both workflows run only when started by hand: **Actions → CI** (or **Release**) **→ Run workflow**, then pick the branch.
+Start **CI** by hand: **Actions → CI → Run workflow**, then pick the branch. When it passes, **Release** starts by itself on the commit CI tested. Release can also be started by hand the same way.
 
 - **CI** (`.github/workflows/ci.yml`) runs the helper tests and the app tests on an Apple Silicon runner. To run it on every pull request, add a `pull_request` trigger.
-- **Release** (`.github/workflows/release.yml`) runs `scripts/build_release.sh --clean`, smoke test included, and publishes a GitHub Release.
+- **Release** (`.github/workflows/release.yml`) runs `scripts/build_release.sh --clean`, smoke test included, and publishes a GitHub Release. A CI run that fails or is cancelled starts no release.
   - The release has the app as `Cutline-1.0.<n>.zip`, its `.sha256` file (works with `shasum -a 256 -c`), the zipped dSYM, and install notes.
   - The app isn't notarized. After downloading, run `xattr -dr com.apple.quarantine Cutline.app` once.
   - The models used by the smoke test are cached between runs.

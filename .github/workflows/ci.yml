@@ -1,5 +1,6 @@
 # Tests for the Python helper and the app on an Apple Silicon runner.
 # Runs only when started by hand: Actions -> CI -> Run workflow (pick the branch).
+# When it passes, the Release workflow starts by itself on the same commit.
 # To run it on every pull request, add `pull_request:` under `on:`.
 name: CI
 
