@@ -370,10 +370,11 @@ final class TimelineView: NSView {
                                                     .foregroundColor: NSColor.white]
         let size = text.size(withAttributes: attrs)
         let pill = CGSize(width: ceil(size.width) + 8, height: 14)
-        guard r.width >= pill.width + 16, r.height >= Self.titleBarHeight + pill.height + 4 else { return }
+        let bottomGap: CGFloat = 7   // space between the label and the clip's bottom edge
+        guard r.width >= pill.width + 16, r.height >= Self.titleBarHeight + pill.height + bottomGap + 1 else { return }
         let right = min(r.maxX, bounds.maxX) - 4
         guard right - pill.width >= r.minX + 8 else { return }
-        let box = CGRect(x: right - pill.width, y: r.maxY - pill.height - 3, width: pill.width, height: pill.height)
+        let box = CGRect(x: right - pill.width, y: r.maxY - pill.height - bottomGap, width: pill.width, height: pill.height)
         NSColor.black.withAlphaComponent(0.6).setFill()
         NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4).fill()
         text.draw(at: CGPoint(x: box.minX + 4, y: box.midY - size.height / 2), withAttributes: attrs)
