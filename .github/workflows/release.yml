@@ -2,12 +2,16 @@
 # Release with the zipped app, its SHA-256 and the dSYM.
 #
 # Version: 1.0.<run number>, where the run number counts this workflow's runs. The release and
-# its tag (v1.0.<n>) are created on the chosen branch's commit.
-# Start it by hand: Actions -> Release -> Run workflow.
+# its tag (v1.0.<n>) are created on the commit that was built.
+# It starts by itself when a CI run passes (on the commit CI tested), or by hand:
+# Actions -> Release -> Run workflow (on the chosen branch).
 name: Release
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions:
   contents: write
@@ -24,13 +28,19 @@ defaults:
 
 jobs:
   release:
+    # After CI only when it passed (a failed or cancelled CI run releases nothing).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: macos-26
     timeout-minutes: 90
     env:
       VERSION: 1.0.${{ github.run_number }}
       TAG: v1.0.${{ github.run_number }}
+      # The commit to build: the one CI tested, or the chosen branch's.
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT }}
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -76,5 +86,5 @@ jobs:
 
           SHA-256: \`$(cut -d' ' -f1 "$ZIP.sha256")\`
           NOTES
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "Cutline ${TAG}" --notes-file notes.md \
+          gh release create "$TAG" --target "$COMMIT" --title "Cutline ${TAG}" --notes-file notes.md \
             "$ZIP" "$ZIP.sha256" "$DSYM"
