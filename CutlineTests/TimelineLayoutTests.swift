@@ -30,8 +30,9 @@ final class TimelineLayoutTests: XCTestCase {
     }
 
     func testSnapsWithinRadiusOnly() {
-        XCTAssertEqual(Snapping.snap(10.05, targets: [10, 20], pixelsPerSecond: 100), 10)
-        XCTAssertNil(Snapping.snap(10.2, targets: [10, 20], pixelsPerSecond: 100))
+        let targets = [10.0, 20].map { SnapTarget(time: $0, group: .clips) }
+        XCTAssertEqual(Snapping.snap(10.05, targets: targets, pixelsPerSecond: 100)?.time, 10)
+        XCTAssertNil(Snapping.snap(10.2, targets: targets, pixelsPerSecond: 100))
     }
 
     func testSnapTargetsExcludeDraggedItem() {
@@ -39,8 +40,9 @@ final class TimelineLayoutTests: XCTestCase {
         let a = Asset(kind: .image, name: "i", path: "/i")
         p.assets = [a]
         let id = p.addClip(assetID: a.id, track: 0, at: 3)!
-        XCTAssertFalse(Snapping.targets(in: p, playhead: 0, excluding: [id]).contains(3))
-        XCTAssertTrue(Snapping.targets(in: p, playhead: 0, excluding: []).contains(3))
+        let all = Set(SnapGroup.allCases)
+        XCTAssertFalse(Snapping.targets(in: p, playhead: 0, excluding: [id], beats: nil, groups: all).map(\.time).contains(3))
+        XCTAssertTrue(Snapping.targets(in: p, playhead: 0, excluding: [], beats: nil, groups: all).map(\.time).contains(3))
     }
 
     func testFilmstripGridCoarsensWithZoomAndNeverGoesBelowAFrame() {

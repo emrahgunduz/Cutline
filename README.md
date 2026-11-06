@@ -25,7 +25,7 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
 - Assets panel with thumbnails: videos, images (PNG with transparency), the song and lyrics TXT files.
 - Live preview with frame stepping, zoom and pan; drag clips in the preview to move and scale them.
 - One audio track and any number of video and lyrics tracks; mute the song, hide any track.
-- Trim, split, move and group-drag clips, with snapping to sections, downbeats, beats, edges and the playhead.
+- Trim, split, move and group-drag clips, with snapping you can switch on and off for each kind of target: clips and the song (and the playhead), lyrics and words, beats, downbeats and sections.
 - Per-clip size and position (Fill or Fit), horizontal flip, and filters: Color (hue, saturation, contrast, brightness) and Fade, each with an on/off switch.
 - Proxies (½, ¼, ⅛ size) for smooth preview of heavy footage; export always uses the originals.
 - Cinemascope bars for music videos: animated from 16:9 to 2.35:1 between two markers on the timeline.
