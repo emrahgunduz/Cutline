@@ -47,7 +47,10 @@ struct AssetsPanelView: View {
                 .onAppear { panelWidth = geo.size.width }
                 .onChange(of: geo.size.width) { _, w in panelWidth = w }
         }
-        .onAppear { tileSize = editor.document?.layout.assetTileSize ?? Self.defaultTileSize }
+        .onAppear {
+            let saved = editor.document?.layout.assetTileSize ?? Self.defaultTileSize
+            tileSize = min(max(saved, Self.tileSizeRange.lowerBound), Self.tileSizeRange.upperBound)
+        }
     }
 
     private var panel: some View {
