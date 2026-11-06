@@ -74,6 +74,19 @@ final class TimelineDropTests: XCTestCase {
         XCTAssertEqual(e.project.assets.count, 2)
     }
 
+    /// Regression: importing from a background task crashed the app (the edit ran off the main thread).
+    func testImportingFromABackgroundTaskEditsOnTheMainThread() async throws {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        let e = doc.editor
+        let pngs = [try TestMedia.halfTransparentPNG(), try TestMedia.halfTransparentPNG()]
+        let result = await Task.detached { await e.importAssets(pngs, reuseExisting: true) }.value
+        XCTAssertEqual(result.assets.count, 2)
+        XCTAssertEqual(e.project.assets.filter { $0.kind == .image }.count, 2)
+        let viaPanel = await Task.detached { await e.importFiles([try! TestMedia.halfTransparentPNG()]) }.value
+        XCTAssertTrue(viaPanel.isEmpty)
+        XCTAssertEqual(e.project.assets.count, 3)
+    }
+
     func testASongReplacesTheSong() {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         let a = Asset(kind: .audio, name: "a", path: "/a.wav", duration: 60)
