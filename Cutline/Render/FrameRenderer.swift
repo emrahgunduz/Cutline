@@ -6,7 +6,7 @@ import Foundation
 /// Preview and export share this; only the source-frame provider differs.
 struct RenderSnapshot {
     var project: Project
-    /// Images decoded once per snapshot, keyed by asset id.
+    /// The images in use, keyed by asset id (decoded once and shared between snapshots).
     var images: [UUID: CIImage]
     var lyrics: LyricRenderer?
     /// Preview only: keep composited frames in `FrameCache`. Export leaves this off, so it
@@ -61,14 +61,15 @@ enum FrameRenderer {
         return img.transformed(by: CGAffineTransform(translationX: x, y: y))
     }
 
-    static func loadImages(_ project: Project) -> [UUID: CIImage] {
+    /// The images the timeline uses, decoded once (DecodedImageCache) and reused across snapshots.
+    static func loadImages(_ project: Project, cache: DecodedImageCache = .shared) -> [UUID: CIImage] {
         var out: [UUID: CIImage] = [:]
         let used = Set(project.videoTracks.flatMap(\.clips).map(\.assetID))
         for a in project.assets where a.kind == .image && used.contains(a.id) {
             if let card = a.dummy {
                 // Drawn by Cutline at the project's size (no file).
                 if let cg = DummyRenderer.image(card, size: project.canvas.cgSize, barFraction: DummyRenderer.barFraction(for: project)) { out[a.id] = CIImage(cgImage: cg) }
-            } else if let img = CIImage(contentsOf: a.url, options: [.applyOrientationProperty: true]) { out[a.id] = img }
+            } else if let img = cache.image(at: a.url) { out[a.id] = img }
         }
         return out
     }

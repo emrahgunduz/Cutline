@@ -77,6 +77,7 @@ extension EditorModel {
             mediaCacheFiles(.thumbnails).forEach { try? fm.removeItem(at: $0) }
             thumbnails.removeAll()
             waveforms.removeAll()
+            DecodedImageCache.shared.removeAll()   // the decoded image files too
             for a in project.assets {
                 if Task.isCancelled { return }
                 switch a.kind {
