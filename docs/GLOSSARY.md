@@ -23,7 +23,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 |---|---|
 | **Asset** | One imported file (video, image, audio or lyrics TXT). |
 | **Tile** | One asset's thumbnail card. |
-| **Group / section** | Videos, Images, Dummies, Audio and Lyrics, each collapsible. |
+| **Group / section** | Videos, Images, Dummies, Audio and Lyrics, each collapsible. Which ones are collapsed is saved with the project. |
 | **Used mark** | Green check on an asset that is on the timeline. |
 | **Proxy badge** | Orange "PROXY 1/4" label. |
 | **Footer** | The "3 of 9 selected" line at the bottom. |
