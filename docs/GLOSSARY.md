@@ -63,7 +63,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Clip length** | The MM:SS (FF) label at the bottom right of each clip: how long the clip is on the timeline (not its source file), with frames at the project's rate (00 to fps − 1). Hidden when the clip is too small for it. |
 | **Edit point** | Any clip, line, audio or cinemascope edge; ↑/↓ jump between them. |
 | **Multi-selection** | Several items selected with ⌘-click or a **selection box** (⇧-drag on empty space). |
-| **Cinemascope markers** | Two orange flags on the ruler: bars start closing at the first, frame is fully 2.35:1 from the second. |
+| **Cinemascope markers** | Two orange flags on the ruler: bars start closing at the first and are fully closed from the second. |
 
 ## Project concepts
 
@@ -80,7 +80,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Proxy** | A smaller copy of a video used only for preview. Export always uses the original. |
 | **Timeline drop** | Drag assets from the panel, or files from the Finder, onto the timeline. Videos and images go where you drop them, on the video track under the pointer (else the bottom one), one after another. A song replaces the song (the timeline always has one). A lyrics file replaces the lyrics on every lyrics track; when there are some, Cutline asks first. Finder files are imported into the assets first; a file the project already has is reused. |
 | **Alignment** | Matching each lyric word to when it's sung, from the TXT and the vocal stem. Runs after you drop the TXT on a lyrics track (when the song is on the timeline), or from Lyrics > Align Words to Song (⌥⌘L). |
-| **Cinemascope / letterbox** | Animated black bars from 16:9 to 2.35:1, music videos only. Toggle in the timeline button bar. |
+| **Cinemascope / letterbox** | Animated black bars closing over the top and bottom of the frame, music videos only. Toggle in the timeline button bar; while it's on, **Bars** next to the button sets each bar's height in pixels (the default leaves a 2.35:1 picture; the arrow resets it). |
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
 | **Analysis helper** | The bundled, offline Python process (inside `Cutline.app/Contents/Resources/ml`) that runs the music and lyric models. Built by `scripts/build_python_runtime.sh`. It has no network access; the models it uses are not in the app (see **Analysis models**). |
 | **Analysis models** | HTDemucs, Beat This!, the MMS aligner and Whisper medium (about 3 GB), pinned in `helper/cutline_helper/models.json` (URL, size, SHA-256). Downloaded once, from the New Project window or Settings > Models, into `~/Library/Application Support/Cutline/models` or a "Cutline Models" folder you choose (a folder that already has them is used without downloading). Downloads resume after Cancel, are checked against their checksums, and `.complete` is written last. Until the models are ready, no project can be created or opened: opening one (for example by double-clicking it) shows New Project with the download and adds the project to Recent Projects. |

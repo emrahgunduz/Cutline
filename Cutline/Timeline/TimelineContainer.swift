@@ -14,6 +14,13 @@ final class TimelineContainer: NSView {
     private var analyzeButton: NSButton!
     private var alignButton: NSButton!
     private var trimButton: NSButton!
+    /// Cinemascope bar height: "Bars", a number field in px and a reset arrow, shown after the
+    /// cinemascope button while the bars are on (music videos).
+    let barsGroup = NSStackView()
+    let barsField = NSTextField()
+    private var barsReset: NSButton!
+    private(set) var barsShown = false
+    private weak var editor: EditorModel?
     private var cancellables: Set<AnyCancellable> = []
     static let barHeight: CGFloat = 30
 
@@ -21,6 +28,7 @@ final class TimelineContainer: NSView {
 
     init(editor: EditorModel) {
         timeline = TimelineView(editor: editor)
+        self.editor = editor
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = NSColor(calibratedWhite: 0.16, alpha: 1).cgColor
@@ -105,18 +113,44 @@ final class TimelineContainer: NSView {
         trimButton.contentTintColor = .systemRed
         trimButton.isHidden = editor.project.lengthLimit == nil
         let zoomOut = button("minus.magnifyingglass", "Zoom out (−)") { [weak self] in self?.timeline.zoomAroundPlayhead(1 / 1.5) }
+        let barsLabel = NSTextField(labelWithString: "Bars")
+        barsLabel.font = .systemFont(ofSize: 11)
+        barsLabel.textColor = .secondaryLabelColor
+        let pxLabel = NSTextField(labelWithString: "px")
+        pxLabel.font = .systemFont(ofSize: 11)
+        pxLabel.textColor = .secondaryLabelColor
+        let digits = NumberFormatter()
+        digits.allowsFloats = false
+        digits.minimum = 0
+        barsField.formatter = digits
+        barsField.controlSize = .small
+        barsField.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        barsField.alignment = .right
+        barsField.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        barsField.target = self
+        barsField.action = #selector(barsCommitted)
+        barsField.toolTip = "Height of each cinemascope bar (top and bottom) in pixels of the frame. The default leaves a 2.35:1 picture."
+        barsReset = button("arrow.counterclockwise", "Reset the bars to the 2.35:1 height") { [weak self] in self?.resetBars() }
+        barsReset.controlSize = .small
+        barsGroup.orientation = .horizontal
+        barsGroup.spacing = 4
+        for v in [barsLabel, barsField, pxLabel, barsReset] as [NSView] { barsGroup.addArrangedSubview(v) }
+        barsGroup.isHidden = true
+        barsGroup.alphaValue = 0
         let zoomIn = button("plus.magnifyingglass", "Zoom in (=)") { [weak self] in self?.timeline.zoomAroundPlayhead(1.5) }
         let fit = button("arrow.left.and.right.square", "Zoom to fit (⌘0)") { [weak self] in self?.timeline.zoomToFit() }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let groupViews: [NSView] = SnapGroup.allCases.map { groupButtons[$0]! }
         let items: [NSView] = [dummy, separator(), addVideo, addLyrics, separator(), split, delete, separator(), snapButton] + groupViews
-            + [separator(), cinemaButton, separator(), analyzeButton, alignButton, trimButton, spacer, zoomOut, zoomIn, fit]
+            + [separator(), cinemaButton, barsGroup, separator(), analyzeButton, alignButton, trimButton, spacer, zoomOut, zoomIn, fit]
         for v in items { bar.addArrangedSubview(v) }
         cinemaButton.isHidden = editor.project.type != .musicVideo
+        refreshBars(animated: false)
         editor.$revision.receive(on: RunLoop.main).sink { [weak self, weak editor] _ in
             guard let self, let editor else { return }
             self.cinemaButton.state = editor.project.cinemascope.enabled ? .on : .off
+            self.refreshBars(animated: true)
             self.updateAnalysisButtons(editor)
             self.trimButton.isHidden = !editor.project.isOverLimit
         }.store(in: &cancellables)
@@ -146,6 +180,70 @@ final class TimelineContainer: NSView {
         let available = editor.audioAnalysis.state != .unavailable
         analyzeButton.isEnabled = p.audio != nil && available && !busy
         alignButton.isEnabled = p.audio != nil && available && !busy && p.lyricTracks.contains { !$0.lines.isEmpty }
+    }
+
+    // MARK: Cinemascope bar height
+
+    /// Shows the bar height while the bars are on, and its value (unless it's being typed).
+    func refreshBars(animated: Bool) {
+        guard let editor else { return }
+        let p = editor.project
+        setBarsShown(p.type == .musicVideo && p.cinemascope.enabled, animated: animated)
+        if barsField.currentEditor() == nil {
+            barsField.integerValue = Int(Letterbox.fullBarHeight(p).rounded())
+        }
+        barsReset.isHidden = p.cinemascope.barHeight == nil
+    }
+
+    /// Typed height (Return or leaving the field): one undo step. Typing the height already
+    /// shown changes nothing (the default stays the default).
+    @objc private func barsCommitted() {
+        guard let editor else { return }
+        let p = editor.project
+        let v = min(max(0, Double(barsField.integerValue)), Letterbox.maxBarHeight(p.canvas))
+        guard Int(v) != Int(Letterbox.fullBarHeight(p).rounded()) else { refreshBars(animated: false); return }
+        editor.edit("Cinemascope Bar Height") { $0.cinemascope.barHeight = v }
+        refreshBars(animated: false)
+    }
+
+    private func resetBars() {
+        guard let editor, editor.project.cinemascope.barHeight != nil else { return }
+        editor.edit("Reset Cinemascope Bar Height") { $0.cinemascope.barHeight = nil }
+        window?.makeFirstResponder(nil)
+        refreshBars(animated: false)
+    }
+
+    /// Showing: the buttons to the right move over to open the space, then the height fades
+    /// in. Hiding: it fades out, then the buttons move back.
+    private func setBarsShown(_ show: Bool, animated: Bool) {
+        guard show != barsShown else { return }
+        barsShown = show
+        guard animated, window != nil else {
+            barsGroup.isHidden = !show
+            barsGroup.alphaValue = show ? 1 : 0
+            return
+        }
+        let slide = { (hidden: Bool, done: (() -> Void)?) in
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.22
+                ctx.allowsImplicitAnimation = true
+                self.barsGroup.isHidden = hidden
+                self.bar.layoutSubtreeIfNeeded()
+            }, completionHandler: done)
+        }
+        let fade = { (alpha: CGFloat, done: (() -> Void)?) in
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.18
+                self.barsGroup.animator().alphaValue = alpha
+            }, completionHandler: done)
+        }
+        if show {
+            barsGroup.alphaValue = 0
+            slide(false) { [weak self] in if self?.barsShown == true { fade(1, nil) } }
+        } else {
+            if barsField.currentEditor() != nil { window?.makeFirstResponder(nil) }
+            fade(0) { [weak self] in if self?.barsShown == false { slide(true, nil) } }
+        }
     }
 
     /// Group toggles keep their own state but grey out while snapping is off.
