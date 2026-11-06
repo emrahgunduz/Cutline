@@ -16,6 +16,23 @@ struct LayoutState: Codable, Equatable {
     var windowFrame: [Double]?
 }
 
+extension LayoutState {
+    /// Decodes every field leniently; snap groups saved before the split into five are mapped
+    /// to the new groups (an unknown name must not lose the rest of the layout).
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        assetsWidth = try c.decodeIfPresent(Double.self, forKey: .assetsWidth) ?? assetsWidth
+        inspectorWidth = try c.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? inspectorWidth
+        timelineHeight = try c.decodeIfPresent(Double.self, forKey: .timelineHeight) ?? timelineHeight
+        collapsedAssetGroups = try? c.decodeIfPresent([AssetGroup].self, forKey: .collapsedAssetGroups)
+        trackHeights = try? c.decodeIfPresent([String: Double].self, forKey: .trackHeights)
+        snapping = try? c.decodeIfPresent(Bool.self, forKey: .snapping)
+        snapGroups = (try? c.decodeIfPresent([String].self, forKey: .snapGroups)).flatMap { $0.map(SnapGroup.decode) }
+        windowFrame = try? c.decodeIfPresent([Double].self, forKey: .windowFrame)
+    }
+}
+
 enum ProjectFileError: LocalizedError {
     case missingProjectJSON
     case unsupportedSchema(Int)

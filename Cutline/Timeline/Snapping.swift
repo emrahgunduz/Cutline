@@ -1,17 +1,32 @@
 import Foundation
 
-/// Groups of snap targets, in priority order: when several are within the radius, the
-/// earlier group wins (a section edge beats a downbeat beats a beat beats an edge).
+/// Groups of snap targets, from the most to the least important: when targets of several
+/// groups are within reach, the more important group wins (inside a group, the nearest).
+/// Each toggle means what it says: a downbeat is also a beat, so with Beats on it attracts
+/// as a beat even when Downbeats is off.
 enum SnapGroup: String, CaseIterable, Codable {
-    case sections, downbeats, beats, edges
+    /// Edges of the other clips and of the song, the playhead and the project start.
+    case clips
+    /// Edges of lyric lines and words.
+    case lyrics
+    case beats, downbeats, sections
 
     var title: String {
         switch self {
-        case .sections: "Sections"
-        case .downbeats: "Downbeats"
+        case .clips: "Clips & Audio"
+        case .lyrics: "Lyrics & Words"
         case .beats: "Beats"
-        case .edges: "Edges & Playhead"
+        case .downbeats: "Downbeats"
+        case .sections: "Sections"
         }
+    }
+
+    /// Saved names to groups. Projects saved before the split had one "edges" group for
+    /// clips, lyrics, the song and the playhead; it becomes both of its parts. Unknown names
+    /// are skipped.
+    static func decode(_ names: [String]) -> [SnapGroup] {
+        let groups = names.flatMap { $0 == "edges" ? [SnapGroup.clips, .lyrics] : SnapGroup(rawValue: $0).map { [$0] } ?? [] }
+        return allCases.filter(groups.contains)
     }
 }
 
@@ -25,31 +40,31 @@ enum Snapping {
     /// Radius in pixels, so it covers less time as you zoom in.
     static let radiusPixels = 8.0
 
-    /// Edges of clips, lyric lines and words, the audio, the playhead and project start.
-    static func targets(in project: Project, playhead: Double, excluding ids: Set<UUID>, includeAudio: Bool = true) -> [Double] {
-        var out: [Double] = [0, playhead]
-        for c in project.videoTracks.flatMap(\.clips) where !ids.contains(c.id) { out += [c.start, c.end] }
-        for l in project.lyricTracks.flatMap(\.lines) where !ids.contains(l.id) {
-            out += [l.start, l.end]
-            for w in l.words where !ids.contains(w.id) { out += [w.start, w.end] }
-        }
-        if includeAudio, let a = project.audio { out += [a.start, a.end] }
-        return out
-    }
-
     /// Every target in the enabled groups. Beat-based targets are mapped onto the timeline
-    /// through the audio's start; they are left out while the audio itself is dragged.
+    /// through the audio's start; they and the song's edges are left out while the song itself
+    /// is dragged (`includeAudio` false).
     static func targets(in project: Project, playhead: Double, excluding ids: Set<UUID>, includeAudio: Bool = true,
                         beats: ResolvedBeats?, groups: Set<SnapGroup>) -> [SnapTarget] {
         var out: [SnapTarget] = []
-        if groups.contains(.edges) {
-            out += targets(in: project, playhead: playhead, excluding: ids, includeAudio: includeAudio).map { SnapTarget(time: $0, group: .edges) }
+        if groups.contains(.clips) {
+            var t: [Double] = [0, playhead]
+            for c in project.videoTracks.flatMap(\.clips) where !ids.contains(c.id) { t += [c.start, c.end] }
+            if includeAudio, let a = project.audio { t += [a.start, a.end] }
+            out += t.map { SnapTarget(time: $0, group: .clips) }
+        }
+        if groups.contains(.lyrics) {
+            var t: [Double] = []
+            for l in project.lyricTracks.flatMap(\.lines) where !ids.contains(l.id) {
+                t += [l.start, l.end]
+                for w in l.words where !ids.contains(w.id) { t += [w.start, w.end] }
+            }
+            out += t.map { SnapTarget(time: $0, group: .lyrics) }
         }
         if includeAudio, let beats, let audio = project.audio {
             let s = audio.start
-            if groups.contains(.sections) { out += beats.sections.dropFirst().map { SnapTarget(time: s + $0.start, group: .sections) } }
-            if groups.contains(.downbeats) { out += beats.downbeats.map { SnapTarget(time: s + $0, group: .downbeats) } }
             if groups.contains(.beats) { out += beats.beats.map { SnapTarget(time: s + $0, group: .beats) } }
+            if groups.contains(.downbeats) { out += beats.downbeats.map { SnapTarget(time: s + $0, group: .downbeats) } }
+            if groups.contains(.sections) { out += beats.sections.dropFirst().map { SnapTarget(time: s + $0.start, group: .sections) } }
         }
         return out
     }
@@ -62,12 +77,7 @@ enum Snapping {
         return (hit.time, hit)
     }
 
-    /// The target nearest to `time` within the pixel radius, if any.
-    static func snap(_ time: Double, targets: [Double], pixelsPerSecond: Double) -> Double? {
-        snap(time, targets: targets.map { SnapTarget(time: $0, group: .edges) }, pixelsPerSecond: pixelsPerSecond)?.time
-    }
-
-    /// Within the radius, the highest-priority group wins; inside a group, the nearest.
+    /// Within the radius, the most important group wins; inside a group, the nearest.
     static func snap(_ time: Double, targets: [SnapTarget], pixelsPerSecond: Double) -> SnapTarget? {
         let radius = radiusPixels / pixelsPerSecond
         let near = targets.filter { abs($0.time - time) <= radius }

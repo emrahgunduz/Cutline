@@ -46,11 +46,13 @@ final class TimelineContainer: NSView {
             self?.timeline.snappingEnabled.toggle()
         }
         snapButton.setButtonType(.pushOnPushOff)
+        // Most to least important (left to right): when several are in reach, the left one wins.
         let groupSymbols: [SnapGroup: (String, String)] = [
-            .sections: ("square.split.2x1", "Snap to section edges (strongest)"),
-            .downbeats: ("metronome.fill", "Snap to downbeats (first beat of each bar)"),
+            .clips: ("film", "Snap to other clips and the song (and the playhead)"),
+            .lyrics: ("text.quote", "Snap to lyric lines and words"),
             .beats: ("metronome", "Snap to beats"),
-            .edges: ("arrow.left.and.right.righttriangle.left.righttriangle.right", "Snap to clip, lyric and audio edges and the playhead"),
+            .downbeats: ("metronome.fill", "Snap to downbeats (first beat of each bar)"),
+            .sections: ("square.split.2x1", "Snap to section edges"),
         ]
         for g in SnapGroup.allCases {
             let (symbol, tip) = groupSymbols[g]!

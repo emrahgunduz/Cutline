@@ -17,6 +17,7 @@
 		164CFEAF152D42FE8EAE40BC /* LyricTextOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41877B803A10A372704C0931 /* LyricTextOrder.swift */; };
 		168D6316929563EEA6FCE971 /* platform_overlays.json in Resources */ = {isa = PBXBuildFile; fileRef = BA99BD00E299F508282C24C8 /* platform_overlays.json */; };
 		1999844DB0006D0D5FDA307C /* ClipInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81AC03D61FA4DFDB21042B81 /* ClipInspectorView.swift */; };
+		19C48252B44E1A0E1E6E855B /* SnapGroupDragTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CD4C914D20354C69124377 /* SnapGroupDragTests.swift */; };
 		1FA14EE5AE32A994D96C9D10 /* RecentProjectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C73BEF69DCE277E7788A94 /* RecentProjectsTests.swift */; };
 		207794CEC071FE9095BF2660 /* WaveformBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3809159D9792EF49DD8FFA5B /* WaveformBuilderTests.swift */; };
 		24F7198642C60775585EC2E6 /* SampleMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC982F65D966A1E5A0FE8F8 /* SampleMedia.swift */; };
@@ -248,6 +249,7 @@
 		9EB71F1E5EFB9D8BC6E0A8F9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9FE74C377AEEB471B081E7E1 /* SafeArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeArea.swift; sourceTree = "<group>"; };
 		A0F0FDA74FA133DB8CF85250 /* ProjectImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectImport.swift; sourceTree = "<group>"; };
+		A2CD4C914D20354C69124377 /* SnapGroupDragTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapGroupDragTests.swift; sourceTree = "<group>"; };
 		A37AF0904F7CC22263BB9C2E /* ControlClientLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlClientLinkTests.swift; sourceTree = "<group>"; };
 		A63A912439F2E6FBC37779D4 /* ModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelStore.swift; sourceTree = "<group>"; };
 		A8B9F6AE38DC41DC924985AC /* AssetLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLibrary.swift; sourceTree = "<group>"; };
@@ -390,6 +392,7 @@
 				5986D783A144C13227A543EF /* SampleMediaImportTests.swift */,
 				468CC9282E6D6B661CF974D2 /* SegmentExporterTests.swift */,
 				7FB7F57BFA369CC44C2F25E2 /* SizeSolverTests.swift */,
+				A2CD4C914D20354C69124377 /* SnapGroupDragTests.swift */,
 				D42B84D2C503ED810A13AA50 /* SnappingTests.swift */,
 				CECA242B50C1CD9AD30485E4 /* TestMedia.swift */,
 				F4239F96F0A77BCD51FC7335 /* TimelineDropTests.swift */,
@@ -937,6 +940,7 @@
 				C2B91A0740ECEE4E2003275E /* SampleMediaImportTests.swift in Sources */,
 				9EA66948C17455860579AD1E /* SegmentExporterTests.swift in Sources */,
 				40D834D3FEEAB845A9C5BD98 /* SizeSolverTests.swift in Sources */,
+				19C48252B44E1A0E1E6E855B /* SnapGroupDragTests.swift in Sources */,
 				E665C190EE64E8AEEC62FF40 /* SnappingTests.swift in Sources */,
 				52C123D1DB240FE32B977F1C /* TestMedia.swift in Sources */,
 				81A864E5ECF9AA79B45D0D65 /* TimelineDropTests.swift in Sources */,
