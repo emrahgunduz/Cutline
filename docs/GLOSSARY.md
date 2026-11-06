@@ -51,7 +51,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Clip** | A video or image placed on a video track. |
 | **Edge / trim** | A clip's left or right end. Dragging an edge changes its start or end. |
 | **Split** | Cutting a clip in two at the playhead (⌘B). |
-| **Filmstrip** | Frame thumbnails inside a clip. |
+| **Clip picture** | The one picture at the left of each clip box: a video's first frame (where its trim starts), or the image or dummy card. |
 | **Waveform** | The audio drawing on the Audio track. |
 | **Line** | One lyric line, the darker purple box. |
 | **Word** | One word inside a line, the light purple box on the word rows. |

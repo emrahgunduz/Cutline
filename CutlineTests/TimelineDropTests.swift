@@ -149,3 +149,59 @@ private final class FakeDrop: NSObject, NSDraggingInfo {
     var springLoadingHighlight: NSSpringLoadingHighlight { .none }
     func resetSpringLoading() {}
 }
+
+/// A drag on the timeline updates only the timeline while it lasts; the project (and everything
+/// that follows it: preview, inspector, caches) changes once, on mouse up.
+@MainActor
+final class TimelineDragPublishTests: XCTestCase {
+    private func mouse(_ type: NSEvent.EventType, _ p: NSPoint) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                           context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    func testADragPublishesOnceOnMouseUp() throws {
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        let e = doc.editor
+        e.autoAnalyze = false
+        let um = try XCTUnwrap(doc.undoManager)
+        um.groupsByEvent = false  // one undo group per step, as separate user actions would be
+        let img = Asset(kind: .image, name: "i", path: "/i.png")
+        um.beginUndoGrouping()
+        e.edit("Setup") { p in p.assets = [img]; p.addClip(assetID: img.id, track: 0, at: 2) }
+        um.endUndoGrouping()
+        let view = TimelineView(editor: e)
+        view.frame = CGRect(x: 0, y: 0, width: 1200, height: 400)
+        view.pixelsPerSecond = 50
+        view.scrollTime = 0
+        let l = view.layout
+        // Event locations are in window coordinates; pick one the view maps onto Video 1's row,
+        // 25 px below the row's top (in the clip's picture, below its name bar).
+        func viewY(_ wy: CGFloat) -> CGFloat { view.convert(NSPoint(x: 0, y: wy), from: nil).y }
+        let rowTop = try XCTUnwrap(stride(from: CGFloat(0), to: 400, by: 1).map(viewY).filter { if case .video(0)? = l.row(atY: $0) { return true }; return false }.min())
+        let y = try XCTUnwrap(stride(from: CGFloat(0), to: 400, by: 1).first { abs(viewY($0) - (rowTop + 25)) < 0.5 })
+        let start = l.x(for: 3)   // inside the clip (2 s to 7 s), away from its edges
+        let before = e.project, revision = e.revision
+        var published = 0
+        let watch = e.$project.dropFirst().sink { _ in published += 1 }
+        defer { watch.cancel() }
+
+        um.beginUndoGrouping()
+        view.mouseDown(with: mouse(.leftMouseDown, NSPoint(x: start, y: y)))
+        for dx in stride(from: CGFloat(10), through: 100, by: 10) {
+            view.mouseDragged(with: mouse(.leftMouseDragged, NSPoint(x: start + dx, y: y)))
+        }
+        XCTAssertEqual(e.project, before, "the project doesn't change during the drag")
+        XCTAssertEqual(e.revision, revision)
+        XCTAssertEqual(published, 0)
+        let live = try XCTUnwrap(e.timelineProject.videoTracks[0].clips.first)
+        XCTAssertEqual(live.start, 4, accuracy: 0.05, "the timeline shows the clip 100 px (2 s) later")
+
+        view.mouseUp(with: mouse(.leftMouseUp, NSPoint(x: start + 100, y: y)))
+        um.endUndoGrouping()
+        XCTAssertNil(e.timelineDraft)
+        XCTAssertEqual(published, 1, "published once")
+        XCTAssertEqual(try XCTUnwrap(e.project.videoTracks[0].clips.first).start, 4, accuracy: 0.05)
+        um.undo()
+        XCTAssertEqual(try XCTUnwrap(e.project.videoTracks[0].clips.first).start, 2, accuracy: 0.001, "one undo step")
+    }
+}
