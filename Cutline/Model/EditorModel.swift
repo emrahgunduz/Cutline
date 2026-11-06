@@ -192,6 +192,8 @@ final class EditorModel: ObservableObject {
     }
 
     private func apply(_ next: Project, actionName: String) {
+        // Edits update the document and its window: only on the main thread (debug builds stop here).
+        assert(Thread.isMainThread, "project edits must happen on the main thread")
         let previous = project
         var next = next
         // Export and New Dummy choices aren't part of undo: undoing an edit keeps the current ones.

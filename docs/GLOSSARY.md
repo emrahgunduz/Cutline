@@ -77,6 +77,7 @@ Shared names for the parts of Cutline. Update this file when a feature adds or r
 | **Shadow strength** | How dense the lyric drop shadow is (100% = the color's own opacity). |
 | **Lyric style** | The one font, size, color, position and drop shadow used for all lyrics. |
 | **Proxy** | A smaller copy of a video used only for preview. Export always uses the original. |
+| **Timeline drop** | Drag assets from the panel, or files from the Finder, onto the timeline. Videos and images go where you drop them, on the video track under the pointer (else the bottom one), one after another. A song replaces the song (the timeline always has one). A lyrics file replaces the lyrics on every lyrics track; when there are some, Cutline asks first. Finder files are imported into the assets first; a file the project already has is reused. |
 | **Alignment** | Matching each lyric word to when it's sung, from the TXT and the vocal stem. Runs after you drop the TXT on a lyrics track (when the song is on the timeline), or from Lyrics > Align Words to Song (⌥⌘L). |
 | **Cinemascope / letterbox** | Animated black bars from 16:9 to 2.35:1, music videos only. Toggle in the timeline button bar. |
 | **Constant quality vs target bitrate** | The two export rate modes: fixed look with variable size, or fixed size with variable look. |
