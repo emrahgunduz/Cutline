@@ -612,7 +612,7 @@ final class TimelineView: NSView {
     static let cinemaColor = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.22, alpha: 1)
 
     /// Cinemascope transition: a band on the ruler between the markers, a solid strip after
-    /// the end marker (full 2.35:1), and a draggable flag on each marker.
+    /// the end marker (bars fully closed), and a draggable flag on each marker.
     private func drawCinemascopeMarkers(_ l: TimelineLayout, ruler r: CGRect) {
         let c = project.cinemascope
         guard project.type == .musicVideo, c.enabled else { return }

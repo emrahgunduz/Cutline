@@ -43,7 +43,7 @@ final class LyricPlacementTests: XCTestCase {
         let r = LyricRenderer(project: e.project)
         let placed = r.placedLines(at: 2)
         XCTAssertEqual(placed.count, 2)
-        let bar = CGFloat(Letterbox.fullBarHeight(p.canvas))
+        let bar = CGFloat(Letterbox.defaultBarHeight(p.canvas))
         for pl in placed {
             let ink = pl.raster.ink.applying(CGAffineTransform(scaleX: pl.fit, y: pl.fit)).offsetBy(dx: pl.rect.minX, dy: pl.rect.minY)
             XCTAssertEqual(ink.minX, 80, accuracy: 1, "each line's letters start 80 px from the left")

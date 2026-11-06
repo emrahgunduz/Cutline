@@ -56,7 +56,7 @@ enum DummyRenderer {
     /// them (0 = none): the card's text stays inside the picture the bars leave.
     static func barFraction(for p: Project) -> CGFloat {
         guard p.type == .musicVideo, p.cinemascope.enabled, p.canvas.height > 0 else { return 0 }
-        return CGFloat(Letterbox.fullBarHeight(p.canvas) / Double(p.canvas.height))
+        return CGFloat(Letterbox.fullBarHeight(p) / Double(p.canvas.height))
     }
 
     /// - Parameter barFraction: bar height / frame height; the paddings start at the bars.
