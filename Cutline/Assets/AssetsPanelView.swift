@@ -216,7 +216,8 @@ struct AssetsPanelView: View {
 
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
         AssetTile(asset: asset, thumbnails: editor.thumbnails, progress: editor.proxyProgress[asset.id],
-                  selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id), width: tileWidth)
+                  selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id), width: tileWidth,
+                  info: AssetInfo.text(for: asset, canvas: editor.project.canvas), tint: Self.groupColor(AssetGroup(asset)))
             .id(asset.id)
             .contentShape(Rectangle())
             .gesture(TapGesture().modifiers(.command).onEnded { toggle(asset.id) })
@@ -291,6 +292,8 @@ enum AssetTileMetrics {
     static func pictureHeight(_ width: CGFloat) -> CGFloat { max(36, (width - 6) * 0.63) }
     /// Names show from 100 pt; smaller tiles show only the picture.
     static func showsName(_ width: CGFloat) -> Bool { width >= 100 }
+    /// The details bar under the name (size, length, frame rate) needs 130 pt.
+    static func showsInfo(_ width: CGFloat) -> Bool { width >= 130 }
 }
 
 private struct AssetTile: View {
@@ -301,6 +304,11 @@ private struct AssetTile: View {
     let uses: Int
     /// The tile's width in the grid: the picture scales with it, and the name shows from 100 pt.
     var width: CGFloat = AssetsPanelView.defaultTileSize
+    /// Size, length and frame rate as they apply (AssetInfo), shown when the tile is wide enough.
+    var info: String? = nil
+    var tint: Color = .gray
+
+    private var showsInfo: Bool { info != nil && AssetTileMetrics.showsInfo(width) }
 
 
     var body: some View {
@@ -334,7 +342,7 @@ private struct AssetTile: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                if let d = asset.duration, asset.kind != .lyrics {
+                if let d = asset.duration, asset.kind != .lyrics, !(showsInfo && AssetInfo.includesLength(asset)) {
                     Text(Self.duration(d)).font(.system(size: 9, weight: .medium).monospacedDigit()).foregroundStyle(.white)
                         .padding(.horizontal, 3).background(.black.opacity(0.6)).padding(3)
                 }
@@ -344,6 +352,15 @@ private struct AssetTile: View {
             if AssetTileMetrics.showsName(width) {
                 Text(asset.name).font(.caption).lineLimit(1).truncationMode(.middle)
                     .foregroundStyle(selected ? Color.accentColor : .primary)
+            }
+            if showsInfo, let info {
+                Text(info)
+                    .font(.system(size: 9, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1).minimumScaleFactor(0.8).truncationMode(.tail)
+                    .padding(.horizontal, 5).padding(.vertical, 1.5)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.9)))
             }
         }
         .padding(3)

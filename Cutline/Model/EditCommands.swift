@@ -6,6 +6,13 @@ extension Project {
     /// editor's frame grid and the compositor's frame times are the same numbers.
     static let standardRates: [Double] = [24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60000.0 / 1001, 60]
 
+    /// 24, 25, 30… and the NTSC rates as 23.976, 29.97, 59.94; other rates with two decimals.
+    static func rateLabel(_ r: Double) -> String {
+        let near = standardRate(near: r)
+        let v = abs(near - r) < 0.01 ? near : r
+        return v.rounded() == v ? String(Int(v)) : String(format: v < 25 ? "%.3f" : "%.2f", v)
+    }
+
     static func standardRate(near rate: Double) -> Double {
         standardRates.min { abs($0 - rate) < abs($1 - rate) } ?? 30
     }
