@@ -348,7 +348,7 @@ final class TimelineView: NSView {
                 NSColor.systemOrange.setFill()
                 CGRect(x: r.minX, y: r.maxY - 3, width: r.width, height: 3).fill()
             }
-            drawClipLength(clip.duration, in: r)
+            drawClipLength(Self.clipLength(clip.duration, fps: project.fps), in: r)
             NSColor.white.withAlphaComponent(selected ? 1 : 0.25).setStroke()
             path.lineWidth = selected ? 2 : 1
             path.stroke()
@@ -361,11 +361,11 @@ final class TimelineView: NSView {
         }
     }
 
-    /// The clip's length on the timeline (not its source file's), as m:ss in a small dark pill at
-    /// the bottom right. A clip running past the right edge keeps it in view; it's left out
-    /// when the clip is too small to fit it.
-    private func drawClipLength(_ seconds: Double, in r: CGRect) {
-        let text = Self.clipLength(seconds) as NSString
+    /// The clip's length on the timeline (not its source file's), as MM:SS:FF in a small dark
+    /// pill at the bottom right. A clip running past the right edge keeps it in view; it's left
+    /// out when the clip is too small to fit it.
+    private func drawClipLength(_ label: String, in r: CGRect) {
+        let text = label as NSString
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
                                                     .foregroundColor: NSColor.white]
         let size = text.size(withAttributes: attrs)
@@ -379,11 +379,8 @@ final class TimelineView: NSView {
         text.draw(at: CGPoint(x: box.minX + 4, y: box.midY - size.height / 2), withAttributes: attrs)
     }
 
-    /// m:ss (h:mm:ss from an hour), rounded to the nearest second.
-    static func clipLength(_ seconds: Double) -> String {
-        let s = max(0, Int(seconds.rounded()))
-        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
-    }
+    /// MM:SS:FF at the project's frame rate (frames run 00 to fps − 1), like the preview's timecode.
+    static func clipLength(_ seconds: Double, fps: Double) -> String { Timecode.string(seconds, fps: fps) }
 
     /// Tiles across the clip, each showing the source frame at its own time.
     private func drawFilmstrip(clip: Clip, asset: Asset, in r: CGRect, _ l: TimelineLayout) {

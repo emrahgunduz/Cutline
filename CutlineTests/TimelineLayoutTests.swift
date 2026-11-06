@@ -118,12 +118,12 @@ final class WheelZoomTests: XCTestCase {
 }
 
 final class ClipLengthLabelTests: XCTestCase {
-    func testLengthIsMinutesAndSecondsRoundedToTheNearestSecond() {
-        XCTAssertEqual(TimelineView.clipLength(4.96), "0:05")
-        XCTAssertEqual(TimelineView.clipLength(5.4), "0:05")
-        XCTAssertEqual(TimelineView.clipLength(0.3), "0:00")
-        XCTAssertEqual(TimelineView.clipLength(65), "1:05")
-        XCTAssertEqual(TimelineView.clipLength(3725), "1:02:05")
-        XCTAssertEqual(TimelineView.clipLength(-1), "0:00")
+    func testLengthIsMinutesSecondsAndFramesAtTheProjectRate() {
+        XCTAssertEqual(TimelineView.clipLength(6, fps: 30), "00:06:00")
+        XCTAssertEqual(TimelineView.clipLength(6.792, fps: 24), "00:06:19")   // 163 frames
+        XCTAssertEqual(TimelineView.clipLength(5 + 29.0 / 30, fps: 30), "00:05:29", "the last frame before a second")
+        XCTAssertEqual(TimelineView.clipLength(6, fps: 30 - 0.000001), "00:06:00", "30 frames make a second, not :30")
+        XCTAssertEqual(TimelineView.clipLength(65.48, fps: 25), "01:05:12")   // 1637 frames
+        XCTAssertEqual(TimelineView.clipLength(-1, fps: 30), "00:00:00")
     }
 }
