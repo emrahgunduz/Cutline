@@ -50,9 +50,9 @@ final class TimelineContainer: NSView {
         let groupSymbols: [SnapGroup: (String, String)] = [
             .clips: ("film", "Snap to other clips and the song (and the playhead)"),
             .lyrics: ("text.quote", "Snap to lyric lines and words"),
-            .beats: ("metronome", "Snap to beats"),
+            .beats: ("metronome", "Snap to beats (the ones between downbeats)"),
             .downbeats: ("metronome.fill", "Snap to downbeats (first beat of each bar)"),
-            .sections: ("square.split.2x1", "Snap to section edges"),
+            .sections: ("square.split.2x1", "Snap to section starts"),
         ]
         for g in SnapGroup.allCases {
             let (symbol, tip) = groupSymbols[g]!
