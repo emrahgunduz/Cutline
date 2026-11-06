@@ -247,7 +247,7 @@ final class DummyRendererTests: XCTestCase {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         XCTAssertEqual(DummyRenderer.barFraction(for: p), 0, "cinemascope off")
         p.cinemascope.enabled = true
-        XCTAssertEqual(DummyRenderer.barFraction(for: p) * 1080, CGFloat(Letterbox.fullBarHeight(p.canvas)), accuracy: 0.01)
+        XCTAssertEqual(DummyRenderer.barFraction(for: p) * 1080, CGFloat(Letterbox.defaultBarHeight(p.canvas)), accuracy: 0.01)
         var social = Project(type: .social, canvas: .init(width: 1080, height: 1920))
         social.cinemascope.enabled = true
         XCTAssertEqual(DummyRenderer.barFraction(for: social), 0, "no bars outside music videos")
@@ -255,7 +255,7 @@ final class DummyRendererTests: XCTestCase {
 
     func testWithBarsTheTextStaysInsideThePicture() {
         let size = CGSize(width: 1920, height: 1080)
-        let bar = CGFloat(Letterbox.fullBarHeight(CanvasSize(width: 1920, height: 1080)))     // ≈ 131 px
+        let bar = CGFloat(Letterbox.defaultBarHeight(CanvasSize(width: 1920, height: 1080)))     // ≈ 131 px
         let l = DummyRenderer.layout(described, size: size, barFraction: bar / 1080)
         let titleTop = l.titleOrigin.y + CTFontGetAscent(DummyRenderer.font(card.fontName, size: l.titleSize, bold: true))
         XCTAssertEqual(titleTop, 1080 - bar - 100, accuracy: 0.5, "100 px under the top bar")
@@ -271,7 +271,7 @@ final class DummyRendererTests: XCTestCase {
         p.cinemascope = Cinemascope(enabled: true, startMarker: 0, endMarker: 0.5)
         let img = try XCTUnwrap(DummyRenderer.image(described, size: CGSize(width: 1920, height: 1080), barFraction: DummyRenderer.barFraction(for: p)))
         let ci = CIImage(cgImage: img)
-        let bar = CGFloat(Letterbox.fullBarHeight(p.canvas))
+        let bar = CGFloat(Letterbox.defaultBarHeight(p.canvas))
         let plain = FilterChainTests.meanLuma(ci, CGRect(x: 1700, y: 540, width: 150, height: 60))
         // The top and bottom bands the bars will cover hold only the background.
         XCTAssertEqual(FilterChainTests.meanLuma(ci, CGRect(x: 0, y: 1080 - bar, width: 1920, height: bar)), plain, accuracy: 0.005)

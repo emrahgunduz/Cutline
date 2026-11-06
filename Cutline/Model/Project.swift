@@ -318,4 +318,7 @@ struct Cinemascope: Codable, Equatable {
     /// Set when a marker is tied to the song's beats (it then follows beat corrections).
     var startAnchor: BeatAnchor?
     var endAnchor: BeatAnchor?
+    /// Each bar's full height (top and bottom) in pixels, once closed; nil = the height that
+    /// makes the picture between them 2.35:1 (Letterbox.defaultBarHeight).
+    var barHeight: Double?
 }
