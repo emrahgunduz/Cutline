@@ -76,3 +76,41 @@ final class CinemascopeBarHeightTests: XCTestCase {
         XCTAssertNil(e.project.cinemascope.barHeight)
     }
 }
+
+/// Changing the bar height re-renders from the start marker to the end; before it the bars
+/// are open and the cache stays (dummy cards, whose text sits inside the bars, re-render too).
+final class BarHeightRenderKeyTests: XCTestCase {
+    private func project() -> Project {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.cinemascope.enabled = true
+        p.cinemascope.startMarker = 10
+        p.cinemascope.endMarker = 14
+        return p
+    }
+
+    func testOnlyRangesFromTheStartMarkerOnChange() {
+        let a = project()
+        var b = project()
+        b.cinemascope.barHeight = 200
+        XCTAssertEqual(RenderKey.key(project: a, start: 0, end: 2), RenderKey.key(project: b, start: 0, end: 2), "before the bars: kept")
+        XCTAssertEqual(RenderKey.key(project: a, start: 8, end: 10), RenderKey.key(project: b, start: 8, end: 10), "ends at the start marker: kept")
+        XCTAssertNotEqual(RenderKey.key(project: a, start: 10, end: 12), RenderKey.key(project: b, start: 10, end: 12), "closing: re-rendered")
+        XCTAssertNotEqual(RenderKey.key(project: a, start: 20, end: 22), RenderKey.key(project: b, start: 20, end: 22), "closed: re-rendered")
+    }
+
+    func testTheDefaultHeightKeepsItsKeyWhenSetExplicitlyToTheSameValue() {
+        let a = project()
+        var b = project()
+        b.cinemascope.barHeight = Letterbox.defaultBarHeight(b.canvas)
+        XCTAssertEqual(RenderKey.key(project: a, start: 20, end: 22), RenderKey.key(project: b, start: 20, end: 22))
+    }
+
+    func testDummiesBeforeTheBarsReRenderToo() {
+        var a = project()
+        let dummy = a.addDummy(title: "Scene", fontName: "Helvetica", length: 4, color: RGBA(r: 0.2, g: 0.2, b: 0.3, a: 1))
+        a.addClip(assetID: dummy.id, track: 0, at: 0)
+        var b = a
+        b.cinemascope.barHeight = 200
+        XCTAssertNotEqual(RenderKey.key(project: a, start: 0, end: 2), RenderKey.key(project: b, start: 0, end: 2))
+    }
+}
