@@ -136,6 +136,28 @@ final class EditorModel: ObservableObject {
         audioAnalysis.analysis.map { ResolvedBeats($0, project.beatCorrections) }
     }
 
+    /// A timeline drag in progress: its live state, which only the timeline shows. The preview,
+    /// the inspector, the caches and everything else keep the state from before the drag, and
+    /// update once when the drag ends (instead of on every mouse move).
+    private(set) var timelineDraft: Project?
+    let timelineDraftChanged = PassthroughSubject<Void, Never>()
+    /// What the timeline draws: the drag's live state while one is in progress.
+    var timelineProject: Project { timelineDraft ?? project }
+
+    func setTimelineDraft(_ p: Project) {
+        var p = p
+        p.keepLinesAroundWords()
+        timelineDraft = p
+        timelineDraftChanged.send()
+    }
+
+    /// Ends the drag's live state; commit the result with `edit` afterwards.
+    func clearTimelineDraft() {
+        guard timelineDraft != nil else { return }
+        timelineDraft = nil
+        timelineDraftChanged.send()
+    }
+
     func replaceWithoutUndo(_ p: Project) {
         var p = p
         p.keepLinesAroundWords()
