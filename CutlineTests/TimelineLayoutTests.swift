@@ -116,3 +116,14 @@ final class WheelZoomTests: XCTestCase {
         XCTAssertEqual(TimelineView.wheelAction(dx: 0, dy: 10, precise: true, flags: [.option], overHeader: false), .zoom(1.1))
     }
 }
+
+final class ClipLengthLabelTests: XCTestCase {
+    func testLengthIsMinutesAndSecondsRoundedToTheNearestSecond() {
+        XCTAssertEqual(TimelineView.clipLength(4.96), "0:05")
+        XCTAssertEqual(TimelineView.clipLength(5.4), "0:05")
+        XCTAssertEqual(TimelineView.clipLength(0.3), "0:00")
+        XCTAssertEqual(TimelineView.clipLength(65), "1:05")
+        XCTAssertEqual(TimelineView.clipLength(3725), "1:02:05")
+        XCTAssertEqual(TimelineView.clipLength(-1), "0:00")
+    }
+}
