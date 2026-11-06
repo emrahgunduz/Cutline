@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A titled group of inspector controls, optionally with an on/off switch in its header.
@@ -55,6 +56,13 @@ struct ValueRow: View {
                 if editing { focused = false } else { onCommit() }
             }
             .controlSize(.small)
+            // The scroll wheel over the slider moves it one step a click (see ScrollWheelSteps).
+            .background(ScrollWheelSteps(onStep: { direction in
+                if focused { focused = false }
+                let v = Self.stepped(value, direction: direction, step: wheelStep, range: range)
+                onChange(v)
+                text = String(format: format, v)
+            }, onEnd: onCommit))
             TextField("", text: $text)
                 .font(.system(size: 11).monospacedDigit())
                 .multilineTextAlignment(.trailing)
@@ -77,6 +85,22 @@ struct ValueRow: View {
     }
 
     private var isDefault: Bool { defaultValue.map { abs($0 - value) < 1e-9 } ?? true }
+
+    /// One wheel click: the row's step, else the smallest change its field shows (1 for
+    /// "%.0f px", 0.1 for "%.1f%%", 0.01 for "%.2fs").
+    private var wheelStep: Double { step ?? Self.displayStep(format) }
+
+    static func displayStep(_ format: String) -> Double {
+        guard let r = format.range(of: #"%\.(\d)f"#, options: .regularExpression),
+              let digits = Int(format[r].dropFirst(2).dropLast()) else { return 1 }
+        return pow(10, -Double(digits))
+    }
+
+    /// `value` moved one `step` up or down, on the step's grid and inside `range`.
+    static func stepped(_ value: Double, direction: Int, step: Double, range: ClosedRange<Double>) -> Double {
+        let v = ((value / step).rounded() + Double(direction.signum())) * step
+        return min(max(v, range.lowerBound), range.upperBound)
+    }
 
     private func quantized(_ v: Double) -> Double {
         guard let step else { return v }
@@ -109,3 +133,64 @@ struct NudgeSection: View {
         }
     }
 }
+
+/// Scroll wheel steps over a control: each mouse wheel click is one step up (wheel up) or down,
+/// whatever the scroll speed; a trackpad swipe steps once per 12 points it travels (momentum
+/// is ignored). The control keeps its clicks and drags: this view only watches scroll events
+/// over its own area. `onEnd` runs once the scrolling stops (one undo step).
+struct ScrollWheelSteps: NSViewRepresentable {
+    let onStep: (Int) -> Void
+    let onEnd: () -> Void
+
+    func makeNSView(context: Context) -> WheelView { WheelView() }
+
+    func updateNSView(_ view: WheelView, context: Context) {
+        view.onStep = onStep
+        view.onEnd = onEnd
+    }
+
+    final class WheelView: NSView {
+        var onStep: ((Int) -> Void)?
+        var onEnd: (() -> Void)?
+        private var monitor: Any?
+        private var travel: CGFloat = 0
+        private var endWork: DispatchWorkItem?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }   // clicks go to the control
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self, event.window === self.window, !self.isHiddenOrHasHiddenAncestor,
+                      self.bounds.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
+                self.handle(event)
+                return nil
+            }
+        }
+
+        deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
+
+        /// Wheel up (or a swipe up) is +1, with natural scrolling too.
+        func handle(_ event: NSEvent) {
+            guard event.momentumPhase.isEmpty else { return }
+            let dy = event.isDirectionInvertedFromDevice ? -event.scrollingDeltaY : event.scrollingDeltaY
+            guard dy != 0 else { return }
+            if event.hasPreciseScrollingDeltas {
+                travel += dy
+                while abs(travel) >= 12 {
+                    onStep?(travel > 0 ? 1 : -1)
+                    travel -= travel > 0 ? 12 : -12
+                }
+            } else {
+                onStep?(dy > 0 ? 1 : -1)
+            }
+            endWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.travel = 0; self?.onEnd?() }
+            endWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+        }
+    }
+}
+
