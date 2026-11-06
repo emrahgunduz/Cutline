@@ -36,12 +36,12 @@ final class AssetsGridColumnTests: XCTestCase {
         return (columns.count, w)
     }
 
-    func testTheGridKeepsRoomForAScrollBarThatTakesSpace() {
+    private let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+
+    func testTheUsualPanelShowsThreeTilesWithRoomForTheScrollBar() {
         let legacy = shape(AssetsPanelView.columns(panelWidth: 371, scrollerStyle: .legacy))
         XCTAssertEqual(legacy.count, 3)
-        XCTAssertGreaterThanOrEqual(legacy.width, 96)
-        let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
-        // Every tile and gap plus the room for the scroll bar fits in the panel.
+        XCTAssertGreaterThanOrEqual(legacy.width, CGFloat(AssetsPanelView.defaultTileSize))
         XCTAssertLessThanOrEqual(CGFloat(legacy.count) * legacy.width + CGFloat(legacy.count - 1) * 8 + 28 + scroller, 371)
     }
 
@@ -52,9 +52,32 @@ final class AssetsGridColumnTests: XCTestCase {
         XCTAssertGreaterThan(overlay.width, legacy.width)
     }
 
-    func testNarrowPanelsKeepOneColumnAtTheMinimumSize() {
-        let narrow = shape(AssetsPanelView.columns(panelWidth: 120, scrollerStyle: .legacy))
-        XCTAssertEqual(narrow.count, 1)
-        XCTAssertEqual(narrow.width, 96)
+    /// A narrow panel drops to two tiles a row, then one (narrower than the chosen size).
+    func testNarrowPanelsDropColumns() {
+        XCTAssertEqual(shape(AssetsPanelView.columns(panelWidth: 280, scrollerStyle: .legacy)).count, 2)
+        let one = shape(AssetsPanelView.columns(panelWidth: 150, scrollerStyle: .legacy))
+        XCTAssertEqual(one.count, 1)
+        XCTAssertEqual(one.width, 150 - 28 - scroller, accuracy: 1, "fills the panel")
+    }
+
+    /// The size slider: bigger tiles, fewer a row; every row filled.
+    func testTheTileSizeSetsHowManyFit() {
+        let small = shape(AssetsPanelView.columns(panelWidth: 600, tileSize: 80, scrollerStyle: .overlay))
+        let large = shape(AssetsPanelView.columns(panelWidth: 600, tileSize: 192, scrollerStyle: .overlay))
+        XCTAssertGreaterThan(small.count, large.count)
+        XCTAssertGreaterThanOrEqual(large.width, 192)
+        for s in [small, large] { XCTAssertEqual(CGFloat(s.count) * s.width + CGFloat(s.count - 1) * 8, 600 - 28, accuracy: CGFloat(s.count)) }
+    }
+
+    func testPicturesScaleAndNamesHideOnSmallTiles() {
+        XCTAssertGreaterThan(AssetTileMetrics.pictureHeight(190), AssetTileMetrics.pictureHeight(100))
+        XCTAssertFalse(AssetTileMetrics.showsName(90))
+        XCTAssertTrue(AssetTileMetrics.showsName(104))
+    }
+
+    func testTheTileSizeIsSavedWithTheLayout() throws {
+        var l = LayoutState()
+        l.assetTileSize = 150
+        XCTAssertEqual(try JSONDecoder().decode(LayoutState.self, from: JSONEncoder().encode(l)).assetTileSize, 150)
     }
 }

@@ -20,10 +20,10 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
 - A frame rate for each project, chosen when you create it (24 fps by default).
 - Length limits, codecs and export defaults are editable in Settings > Presets.
 - Import from Project: start a new format with another project's song, lyric timing, clips and tracks (a one-time copy).
-- Panel sizes, track heights, the window's size and which asset sections are open are saved with each project.
+- Panel sizes, track heights, the window's size, the asset tile size and which asset sections are open are saved with each project.
 
 **Editing**
-- Assets panel with thumbnails: videos, images (PNG with transparency, JPEG and others), the song and lyrics TXT files.
+- Assets panel with thumbnails: videos, images (PNG with transparency, JPEG and others), the song and lyrics TXT files. A slider in its header sets the tile size.
 - Drag files from the Finder or the assets panel onto the timeline: clips land where you drop them, and a song or lyrics file replaces the current one.
 - Live preview with frame stepping, zoom and pan; drag clips in the preview to move and scale them.
 - One audio track and any number of video and lyrics tracks; mute the song, hide any track.

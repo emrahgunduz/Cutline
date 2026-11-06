@@ -7,6 +7,8 @@ struct LayoutState: Codable, Equatable {
     var timelineHeight: Double = 320
     /// Assets panel sections that are collapsed (nil = all open).
     var collapsedAssetGroups: [AssetGroup]?
+    /// Assets panel tile size from its slider (nil = the default).
+    var assetTileSize: Double?
     /// Timeline row heights keyed by track id ("audio" for the audio row).
     var trackHeights: [String: Double]?
     var snapping: Bool?
@@ -26,6 +28,7 @@ extension LayoutState {
         inspectorWidth = try c.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? inspectorWidth
         timelineHeight = try c.decodeIfPresent(Double.self, forKey: .timelineHeight) ?? timelineHeight
         collapsedAssetGroups = try? c.decodeIfPresent([AssetGroup].self, forKey: .collapsedAssetGroups)
+        assetTileSize = try? c.decodeIfPresent(Double.self, forKey: .assetTileSize)
         trackHeights = try? c.decodeIfPresent([String: Double].self, forKey: .trackHeights)
         snapping = try? c.decodeIfPresent(Bool.self, forKey: .snapping)
         snapGroups = (try? c.decodeIfPresent([String].self, forKey: .snapGroups)).flatMap { $0.map(SnapGroup.decode) }
