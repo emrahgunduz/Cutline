@@ -7,6 +7,8 @@ final class TimelineView: NSView {
     let editor: EditorModel
     private var cancellables: Set<AnyCancellable> = []
     private let filmstrip = Filmstrip()
+    /// The first frame each video clip showed last, kept while a trimmed clip's new one loads.
+    private var firstFrames: [UUID: NSImage] = [:]
 
     var pixelsPerSecond: CGFloat = 40 { didSet { scrollChanged() } }
     var scrollTime: Double = 0 { didSet { scrollChanged() } }
@@ -71,6 +73,7 @@ final class TimelineView: NSView {
         filmstrip.onUpdate = redraw
         editor.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in self?.needsDisplay = true; self?.onScroll?() }.store(in: &cancellables)
         editor.$revision.receive(on: RunLoop.main).sink { [weak self] _ in self?.clampToContent() }.store(in: &cancellables)
+        editor.timelineDraftChanged.sink { [weak self] in self?.needsDisplay = true }.store(in: &cancellables)
         editor.thumbnails.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.waveforms.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
         editor.audioAnalysis.objectWillChange.receive(on: RunLoop.main).sink { _ in redraw() }.store(in: &cancellables)
@@ -96,7 +99,8 @@ final class TimelineView: NSView {
 
     // MARK: Layout
 
-    private var project: Project { editor.project }
+    /// The drag's live state while one is in progress (see EditorModel.timelineDraft).
+    private var project: Project { editor.timelineProject }
 
     func rowKey(_ row: TimelineRow) -> String {
         switch row {
@@ -327,7 +331,7 @@ final class TimelineView: NSView {
             if r.height > labelH + 8 {
                 NSGraphicsContext.saveGraphicsState()
                 NSBezierPath(rect: r.insetBy(dx: 1, dy: 1)).addClip()
-                drawFilmstrip(clip: clip, asset: asset, in: CGRect(x: r.minX, y: r.minY + labelH, width: r.width, height: r.height - labelH), l)
+                drawFirstFrame(clip: clip, asset: asset, in: CGRect(x: r.minX, y: r.minY + labelH, width: r.width, height: r.height - labelH))
                 NSGraphicsContext.restoreGraphicsState()
             }
             var labelX = r.minX + 5
@@ -389,31 +393,21 @@ final class TimelineView: NSView {
         return String(format: "%02d:%02d (%02d)", s / 60, s % 60, f)
     }
 
-    /// Tiles across the clip, each showing the source frame at its own time.
-    private func drawFilmstrip(clip: Clip, asset: Asset, in r: CGRect, _ l: TimelineLayout) {
-        if asset.kind == .image {
-            guard let img = editor.thumbnails.images[asset.id] else { return }
-            let w = max(16, r.height * img.size.width / max(1, img.size.height))
-            var x = r.minX
-            while x < r.maxX { if x + w > TimelineLayout.headerWidth && x < bounds.width { img.draw(in: CGRect(x: x, y: r.minY, width: w, height: r.height)) }; x += w }
-            return
+    /// One picture per clip box, at its left edge: a video's first frame (where its trim starts),
+    /// or the image or dummy card itself. While a video's frame is fetched (after a trim), the
+    /// clip keeps the picture it had, or the file's thumbnail.
+    private func drawFirstFrame(clip: Clip, asset: Asset, in r: CGRect) {
+        var img: NSImage?
+        if asset.kind == .video {
+            img = filmstrip.image(url: editor.mediaURL(for: asset, useProxies: true), sourceTime: clip.sourceIn, step: 1 / max(1, project.fps))
+            if let img { firstFrames[clip.id] = img } else { img = firstFrames[clip.id] ?? editor.thumbnails.images[asset.id] }
+        } else {
+            img = editor.thumbnails.images[asset.id]
         }
-        let aspect = asset.pixelSize.map { CGFloat($0.width) / CGFloat(max(1, $0.height)) } ?? 16 / 9
-        let tileW = max(24, r.height * aspect)
-        let tileSeconds = Double(tileW / l.pixelsPerSecond)
-        let step = Filmstrip.gridStep(tileSeconds: tileSeconds, fps: project.fps)
-        let url = editor.mediaURL(for: asset, useProxies: true)
-        var x = r.minX
-        while x < r.maxX {
-            if x + tileW > TimelineLayout.headerWidth && x < bounds.width {
-                let localT = Double((x - r.minX) / l.pixelsPerSecond)
-                let src = clip.sourceIn + localT
-                if let img = filmstrip.image(url: url, sourceTime: src, step: step) ?? (localT == 0 ? editor.thumbnails.images[asset.id] : nil) {
-                    img.draw(in: CGRect(x: x, y: r.minY, width: tileW, height: r.height))
-                }
-            }
-            x += tileW
-        }
+        guard let img, img.size.height > 0 else { return }
+        let w = r.height * img.size.width / img.size.height
+        guard r.minX + w > TimelineLayout.headerWidth, r.minX < bounds.width else { return }
+        img.draw(in: CGRect(x: r.minX, y: r.minY, width: w, height: r.height))
     }
 
     private func drawAudio(_ rect: CGRect, _ l: TimelineLayout) {
@@ -876,7 +870,7 @@ final class TimelineView: NSView {
             let t = max(0, snapped(l.time(for: p.x), excluding: [], event: event))
             if isStart { next.cinemascope.startMarker = next.quantize(min(t, original.cinemascope.endMarker)) }
             else { next.cinemascope.endMarker = next.quantize(max(t, original.cinemascope.startMarker)) }
-            editor.replaceWithoutUndo(next)
+            editor.setTimelineDraft(next)
             d.didEdit = true
             drag = d
             return
@@ -889,7 +883,7 @@ final class TimelineView: NSView {
             case .downbeat(let i): next.moveDownbeat(i, to: t, analysis: analysis)
             default: return
             }
-            editor.replaceWithoutUndo(next)
+            editor.setTimelineDraft(next)
             d.didEdit = true
             drag = d
             return
@@ -916,7 +910,7 @@ final class TimelineView: NSView {
             var next = original
             for id in clips { if let loc = original.clipLocation(id), let c = original.videoTracks[loc.track].clips.first(where: { $0.id == id }) { next.moveClip(id, toTrack: loc.track, start: c.start + dt) } }
             for id in lines { if let loc = original.lineLocation(id), let ln = original.lyricTracks[loc.track].lines.first(where: { $0.id == id }) { next.moveLine(id, toTrack: loc.track, start: ln.start + dt) } }
-            editor.replaceWithoutUndo(next)
+            editor.setTimelineDraft(next)
             d.didEdit = true
             drag = d
             return
@@ -977,44 +971,44 @@ final class TimelineView: NSView {
                 next.moveAudio(start: snappedMove(start: a.start + dt, duration: a.duration, excluding: moving, event: event), alone: alone)
             default: return
             }
-            // Live preview of the drag; committed as one undo step on mouse up.
-            editor.replaceWithoutUndo(next)
+            // Live state of the drag, shown by the timeline only; committed as one undo step on mouse up.
+            editor.setTimelineDraft(next)
             d.didEdit = true
             drag = d
         }
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { drag = nil; snapGuide = nil; reorderTarget = nil; marqueeRect = nil; needsDisplay = true; updateCursor(at: convert(event.locationInWindow, from: nil)) }
+        defer { editor.clearTimelineDraft(); drag = nil; snapGuide = nil; reorderTarget = nil; marqueeRect = nil; needsDisplay = true; updateCursor(at: convert(event.locationInWindow, from: nil)) }
         guard let d = drag else { return }
         switch d.kind {
         case .resize: editor.document?.persistLayout()
         case .reorder(let row):
             if let target = reorderTarget { performReorder(row, to: target) }
         case .marker(_, let original) where d.didEdit:
-            var final = editor.project
+            var final = editor.timelineProject
             final.anchorMarkers(editor.resolvedBeats, hash: editor.audioAnalysis.analysis?.audioHash)
-            editor.replaceWithoutUndo(original)
+            editor.clearTimelineDraft()   // the published project is still the one from before the drag
             editor.edit("Move Cinemascope Marker") { $0 = final }
         case .beat(let hit, let original, _) where d.didEdit:
-            let final = editor.project
-            editor.replaceWithoutUndo(original)
+            let final = editor.timelineProject
+            editor.clearTimelineDraft()   // the published project is still the one from before the drag
             editor.edit(actionName(for: hit)) { $0 = final }
         case .group(let original, _, _) where d.didEdit:
-            var final = editor.project
+            var final = editor.timelineProject
             final.markHandEditedWords(comparedTo: original)
-            editor.replaceWithoutUndo(original)
+            editor.clearTimelineDraft()   // the published project is still the one from before the drag
             editor.edit("Move Items") { $0 = final }
         case .edit(let hit, let original) where d.didEdit:
             // Only the dragged item changes: an edited word is confirmed, but the words around
             // it keep their times (tap mode is what re-times the words between taps).
-            var final = editor.project
+            var final = editor.timelineProject
             // Moved or re-timed lyrics are your timing now: re-aligning asks before replacing it.
             switch hit {
             case .line, .word: final.markHandEditedWords(comparedTo: original)
             default: break
             }
-            editor.replaceWithoutUndo(original)
+            editor.clearTimelineDraft()   // the published project is still the one from before the drag
             editor.edit(actionName(for: hit)) { $0 = final }
         default: break
         }
