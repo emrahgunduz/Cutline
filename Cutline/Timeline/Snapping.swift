@@ -2,8 +2,9 @@ import Foundation
 
 /// Groups of snap targets, from the most to the least important: when targets of several
 /// groups are within reach, the more important group wins (inside a group, the nearest).
-/// Each toggle means what it says: a downbeat is also a beat, so with Beats on it attracts
-/// as a beat even when Downbeats is off.
+/// The song's points are in one group each: a section start is a section, a downbeat (that
+/// isn't a section start) a downbeat, and Beats are only the beats in between. So each toggle
+/// turns exactly its own points on and off.
 enum SnapGroup: String, CaseIterable, Codable {
     /// Edges of the other clips and of the song, the playhead and the project start.
     case clips
@@ -62,11 +63,21 @@ enum Snapping {
         }
         if includeAudio, let beats, let audio = project.audio {
             let s = audio.start
-            if groups.contains(.beats) { out += beats.beats.map { SnapTarget(time: s + $0, group: .beats) } }
-            if groups.contains(.downbeats) { out += beats.downbeats.map { SnapTarget(time: s + $0, group: .downbeats) } }
-            if groups.contains(.sections) { out += beats.sections.dropFirst().map { SnapTarget(time: s + $0.start, group: .sections) } }
+            let sections = beats.sections.dropFirst().map(\.start)
+            let downbeats = beats.downbeats.filter { !contains(sections, $0) }
+            if groups.contains(.beats) {
+                out += beats.beats.filter { !contains(downbeats, $0) && !contains(sections, $0) }.map { SnapTarget(time: s + $0, group: .beats) }
+            }
+            if groups.contains(.downbeats) { out += downbeats.map { SnapTarget(time: s + $0, group: .downbeats) } }
+            if groups.contains(.sections) { out += sections.map { SnapTarget(time: s + $0, group: .sections) } }
         }
         return out
+    }
+
+    /// Whether `times` has one within 2 ms of `t` (a downbeat sits on a beat, a section start
+    /// on a downbeat; the analysis gives them separately).
+    private static func contains(_ times: [Double], _ t: Double) -> Bool {
+        times.contains { abs($0 - t) < 0.002 }
     }
 
     /// Where a dragged time lands: on the best target in reach, unless snapping is off or
