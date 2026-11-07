@@ -81,7 +81,7 @@ struct LyricStyleView: View {
                 ValueRow(label: "Padding ↕", value: paddingY, range: 0...600, step: 1, format: "%.0f px", defaultValue: 60,
                          onChange: { paddingY = $0.rounded() }, onCommit: {})
                     .help("Distance of the letters from the top or bottom edge of the frame")
-                if ids.count > 1 || (applyToAll && editor.project.lyricTracks.count > 1) {
+                if ids.count > 1 {
                     ValueRow(label: "Line gap", value: gap, range: -20...200, step: 1, format: "%.0f px", defaultValue: 0,
                              onChange: { gap = $0 }, onCommit: {})
                 }
@@ -89,7 +89,7 @@ struct LyricStyleView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 4) { spotButtons }
                     HStack(spacing: 4) {
-                        iconButton("rectangle.stack", "Apply to all: Auto Position moves every lyric line, with no padding", on: applyToAll) { applyToAll.toggle() }
+                        iconButton("rectangle.stack", "Apply to all: Auto Position moves every lyric line", on: applyToAll) { applyToAll.toggle() }
                         Spacer(minLength: 4)
                         autoPositionButton
                     }
@@ -115,7 +115,7 @@ struct LyricStyleView: View {
     private var autoPositionButton: some View {
         let spot = editor.project.lyricAutoSpot
         return Button {
-            editor.autoPosition(spot, allLines: applyToAll, paddingX: paddingX, paddingY: paddingY, gap: gap)
+            editor.autoPosition(spot, allLines: applyToAll, paddingX: paddingX, paddingY: paddingY)
         } label: {
             Text("Auto Position").font(.system(size: 11))
                 .padding(.horizontal, 10)
@@ -125,8 +125,8 @@ struct LyricStyleView: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .help(applyToAll ? "Move every lyric line to \(Self.title(spot).lowercased()), right at the frame edges; lines shown together stack in track order"
-                         : "Move the selected lines to \(Self.title(spot).lowercased()), with the paddings")
+        .help(applyToAll ? "Move every lyric line to \(Self.title(spot).lowercased()) with the paddings, on top of each other"
+                         : "Move the selected lines to \(Self.title(spot).lowercased()) with the paddings, on top of each other")
     }
 
     private static func title(_ spot: LyricSpot) -> String {
