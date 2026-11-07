@@ -13,6 +13,14 @@ extension Project {
         return v.rounded() == v ? String(Int(v)) : String(format: v < 25 ? "%.3f" : "%.2f", v)
     }
 
+    /// A length as MM:SS (FF): minutes, seconds and the frames left over at `fps`.
+    static func lengthLabel(_ seconds: Double, fps: Double) -> String {
+        let rate = max(1, Int(fps.rounded()))
+        let frames = Int((max(0, seconds) * fps).rounded())
+        let s = frames / rate, f = frames % rate
+        return String(format: "%02d:%02d (%02d)", s / 60, s % 60, f)
+    }
+
     static func standardRate(near rate: Double) -> Double {
         standardRates.min { abs($0 - rate) < abs($1 - rate) } ?? 30
     }
