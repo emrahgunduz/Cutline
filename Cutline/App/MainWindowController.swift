@@ -190,16 +190,14 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         if first { restoreWindowFrame() }
         super.showWindow(sender)
         guard first else { return }
+        // The panels go where the project's layout says; nothing that happens while they're put
+        // there is saved. Only a divider drag saves panel sizes, and only a move or resize of
+        // the open window saves its frame, so nothing needs to wait for later layout passes.
         restoring = true
         applyPanelSizes()
+        restoring = false
         observeWindow()
-        // Layout passes right after opening can still move the dividers; ignore them. (On the
-        // run loop, not the main queue: a run loop turn also comes inside a main-queue block,
-        // and in every mode, live resizes included.)
-        perform(#selector(endRestoring), with: nil, afterDelay: 0, inModes: [.common])
     }
-
-    @objc private func endRestoring() { restoring = false }
 
     @objc private func reapplyPanelSizes() { applyPanelSizes() }
 
