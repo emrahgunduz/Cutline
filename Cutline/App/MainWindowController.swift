@@ -193,9 +193,15 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
         restoring = true
         applyPanelSizes()
         observeWindow()
-        // Layout passes right after opening can still move the dividers; ignore them.
-        DispatchQueue.main.async { self.restoring = false }
+        // Layout passes right after opening can still move the dividers; ignore them. (On the
+        // run loop, not the main queue: a run loop turn also comes inside a main-queue block,
+        // and in every mode, live resizes included.)
+        perform(#selector(endRestoring), with: nil, afterDelay: 0, inModes: [.common])
     }
+
+    @objc private func endRestoring() { restoring = false }
+
+    @objc private func reapplyPanelSizes() { applyPanelSizes() }
 
     private var windowObservers: [NSObjectProtocol] = []
 
@@ -228,7 +234,7 @@ final class MainWindowController: NSWindowController, NSSplitViewDelegate {
                 self?.windowFrameChanged()
                 // The split views lay out again after this notification (and during animated
                 // resizes such as Fill or full screen); put the panels back once that's done.
-                DispatchQueue.main.async { self?.applyPanelSizes() }
+                self.map { $0.perform(#selector(MainWindowController.reapplyPanelSizes), with: nil, afterDelay: 0, inModes: [.common]) }
             },
             nc.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
                 self?.applyPanelSizes()
