@@ -138,6 +138,31 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(docB.layout.windowFrame, saved(frameB))
     }
 
+    /// Changes made right after the window opens, before its first drawing is done (a slow
+    /// machine is always there; CI was), are saved too.
+    func testChangesRightAfterOpeningAreSaved() throws {
+        let (v, m) = try screen()
+        var layout = LayoutState()
+        layout.windowFrame = saved(NSRect(x: v.minX, y: v.minY, width: min(1500, v.width), height: min(950, v.height)))
+        let doc = ProjectDocument(project: Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080)))
+        doc.layout = layout
+        NSDocumentController.shared.addDocument(doc)
+        defer { doc.close() }
+        doc.makeWindowControllers()
+        doc.showWindows()   // no run loop turn after this
+        let window = try XCTUnwrap(doc.windowControllers.first?.window)
+        let moved = NSRect(x: v.minX + 2, y: v.minY, width: m.width, height: m.height)
+        window.setFrame(moved, display: true)
+        XCTAssertEqual(doc.layout.windowFrame, saved(moved))
+        let vertical = try XCTUnwrap(window.contentView?.subviews.compactMap { $0 as? NSSplitView }.first)
+        let split = try XCTUnwrap(vertical.arrangedSubviews.first as? DividerTrackingSplitView)
+        split.isDraggingDivider = true
+        split.setPosition(333, ofDividerAt: 0)
+        split.window?.contentView?.layoutSubtreeIfNeeded()
+        split.isDraggingDivider = false
+        XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
+    }
+
     func testOlderLayoutsWithoutAWindowFrameStillLoad() throws {
         let old = #"{"assetsWidth":300,"inspectorWidth":310,"timelineHeight":320}"#
         let l = try JSONDecoder().decode(LayoutState.self, from: Data(old.utf8))
