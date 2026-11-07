@@ -23,7 +23,7 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
 - Panel sizes, track heights, the window's size, the asset tile size and which asset sections are open are saved with each project.
 
 **Editing**
-- Assets panel with thumbnails: videos, images (PNG with transparency, JPEG and others), the song and lyrics TXT files. A slider in its header sets the tile size; wide enough tiles show each asset's size, length and frame rate under its name.
+- Assets panel with thumbnails: videos, images (PNG with transparency, JPEG and others), the song and lyrics TXT files. A slider in its header sets the tile size. Under each tile, colored boxes show the asset's size, and its length as MM:SS (FF) with the frame rate.
 - Drag files from the Finder or the assets panel onto the timeline: clips land where you drop them, and a song or lyrics file replaces the current one.
 - Live preview with frame stepping, zoom and pan; drag clips in the preview to move and scale them.
 - One audio track and any number of video and lyrics tracks; mute the song, hide any track.

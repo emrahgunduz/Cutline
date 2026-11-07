@@ -217,7 +217,7 @@ struct AssetsPanelView: View {
     private func tile(_ asset: Asset, _ group: [Asset]) -> some View {
         AssetTile(asset: asset, thumbnails: editor.thumbnails, progress: editor.proxyProgress[asset.id],
                   selected: selection.contains(asset.id), uses: editor.project.usageCount(of: asset.id), width: tileWidth,
-                  info: AssetInfo.text(for: asset, canvas: editor.project.canvas), tint: Self.groupColor(AssetGroup(asset)))
+                  info: AssetInfo.details(for: asset, canvas: editor.project.canvas, fps: editor.project.fps), tint: Self.groupColor(AssetGroup(asset)))
             .id(asset.id)
             .contentShape(Rectangle())
             .gesture(TapGesture().modifiers(.command).onEnded { toggle(asset.id) })
@@ -290,10 +290,8 @@ struct AssetsPanelView: View {
 enum AssetTileMetrics {
     /// The picture's height for a tile `width` wide (about 62 pt for a 104 pt tile).
     static func pictureHeight(_ width: CGFloat) -> CGFloat { max(36, (width - 6) * 0.63) }
-    /// Names show from 100 pt; smaller tiles show only the picture.
+    /// Names show from 100 pt; the detail boxes show at every size.
     static func showsName(_ width: CGFloat) -> Bool { width >= 100 }
-    /// The details bar under the name (size, length, frame rate) needs 130 pt.
-    static func showsInfo(_ width: CGFloat) -> Bool { width >= 130 }
 }
 
 private struct AssetTile: View {
@@ -304,11 +302,9 @@ private struct AssetTile: View {
     let uses: Int
     /// The tile's width in the grid: the picture scales with it, and the name shows from 100 pt.
     var width: CGFloat = AssetsPanelView.defaultTileSize
-    /// Size, length and frame rate as they apply (AssetInfo), shown when the tile is wide enough.
-    var info: String? = nil
+    /// Size, length and frame rate as they apply (AssetInfo), in boxes under the name.
+    var info = AssetInfo.Details()
     var tint: Color = .gray
-
-    private var showsInfo: Bool { info != nil && AssetTileMetrics.showsInfo(width) }
 
 
     var body: some View {
@@ -341,33 +337,50 @@ private struct AssetTile: View {
                         .padding(3).help("Used in the timeline\(uses > 1 ? " (\(uses)×)" : "")")
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if let d = asset.duration, asset.kind != .lyrics, !(showsInfo && AssetInfo.includesLength(asset)) {
-                    Text(Self.duration(d)).font(.system(size: 9, weight: .medium).monospacedDigit()).foregroundStyle(.white)
-                        .padding(.horizontal, 3).background(.black.opacity(0.6)).padding(3)
-                }
-            }
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2.5))
             if AssetTileMetrics.showsName(width) {
                 Text(asset.name).font(.caption).lineLimit(1).truncationMode(.middle)
                     .foregroundStyle(selected ? Color.accentColor : .primary)
             }
-            if showsInfo, let info {
-                Text(info)
-                    .font(.system(size: 9, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1).minimumScaleFactor(0.8).truncationMode(.tail)
-                    .padding(.horizontal, 5).padding(.vertical, 1.5)
-                    .frame(maxWidth: .infinity)
-                    .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.9)))
+            if let size = info.size {
+                infoBox { Text(size).frame(maxWidth: .infinity) }
+            }
+            if let length = info.length {
+                infoBox {
+                    // Small tiles drop the "fps" unit, then use a smaller size.
+                    let compact = info.rate?.replacingOccurrences(of: " fps", with: "")
+                    ViewThatFits(in: .horizontal) {
+                        lengthRow(length, info.rate)
+                        lengthRow(length, compact)
+                        lengthRow(length, compact).font(.system(size: 8, weight: .medium).monospacedDigit())
+                        lengthRow(length, compact).font(.system(size: 7, weight: .medium).monospacedDigit())
+                    }
+                }
             }
         }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.18) : .clear))
     }
 
-    static func duration(_ s: Double) -> String { String(format: "%d:%02d", Int(s) / 60, Int(s) % 60) }
+    private func lengthRow(_ length: String, _ rate: String?) -> some View {
+        HStack(spacing: 4) {
+            Text(length).layoutPriority(1)   // the length stays whole; the rate gives way first
+            Spacer(minLength: 0)
+            if let rate { Text(rate) }
+        }
+    }
+
+    /// A detail box under the name, in the group's color.
+    private func infoBox(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .font(.system(size: 9, weight: .medium).monospacedDigit())
+            .foregroundStyle(.white.opacity(0.85))
+            .lineLimit(1).minimumScaleFactor(0.6).truncationMode(.tail)
+            .padding(.horizontal, 5).padding(.vertical, 1.5)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.9)))
+    }
 
     private var icon: String {
         switch asset.kind {
