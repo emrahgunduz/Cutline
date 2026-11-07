@@ -45,7 +45,7 @@ Everything runs on your Mac. The analysis is offline; the only download is a one
 - Fix the unsure ones fast: N jumps to the next unsure word and loops the song around it, T taps words in time to the music, and confirmed words act as anchors for the words between them.
 - Multi-line lyrics: lines on different tracks show at the same time.
 - One font, size and color, a drop shadow (blur, offset, color, strength), quick fades or letter-by-letter animation, and lead-in / lead-out times.
-- Placement with alignment, padding, line width and wrapping. Auto Position moves the selected lines to a top or bottom corner or edge middle as one block; with Apply to all, every line goes there, and lines shown together stack in track order. In portrait projects lyrics keep clear of where TikTok, Reels and Shorts draw their buttons.
+- Placement with alignment, padding, line width and wrapping. Auto Position moves the selected lines to the chosen spot (a top or bottom corner or edge middle, saved with the project) as one block with the paddings. With Apply to all it moves every lyric line there right at the frame edges, with no padding; lines shown together stack in track order. In portrait projects lyrics keep clear of where TikTok, Reels and Shorts draw their buttons.
 
 **Export**
 - H.265 or H.264, with constant quality, a target bitrate, or a target file size (Cutline picks the bitrate and re-encodes if the file comes out too big).

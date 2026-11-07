@@ -85,27 +85,33 @@ final class AutoPositionTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(ink[a]).minY, try XCTUnwrap(ink[b]).maxY, "the first track is above the second")
     }
 
-    func testApplyToAllPutsEveryLineInTheSameSpotAndStacksLinesShownTogether() throws {
+    func testApplyToAllPutsEveryLineInTheSameSpotWithNoPaddingAndStacksLinesShownTogether() throws {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         p.addLyricTrack()
         p.lyricTracks[0].lines = [line("gece", 0, 2), line("Kör", 4, 6), line("yalnız", 8, 10)]
         p.lyricTracks[1].lines = [line("gece", 4, 6)]
         let e = ProjectDocument(project: p).editor
         let lines0 = p.lyricTracks[0].lines, shared = p.lyricTracks[1].lines[0]
-        e.selection = .lyricLine(lines0[0].id)   // one selected line; every line moves
-        e.autoPosition(.bottomLeft, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
+        e.setSelection(Set(lines0.map { Selection.lyricLine($0.id) }))   // selected or not, every line moves
+        e.autoPosition(.bottomRight, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
         XCTAssertTrue(e.project.lyricTracks.flatMap(\.lines).allSatisfy(\.hasPosition))
         let alone = try XCTUnwrap(inks(e.project, at: 1)[lines0[0].id])
-        XCTAssertEqual(alone.minX, 60, accuracy: 1)
-        XCTAssertEqual(alone.minY, 40, accuracy: 1, "a line shown alone sits at the bottom padding")
-        XCTAssertEqual(try XCTUnwrap(inks(e.project, at: 9)[lines0[2].id]).minX, 60, accuracy: 1)
+        XCTAssertEqual(alone.maxX, 1920, accuracy: 1, "no padding: the letters end at the right edge")
+        XCTAssertEqual(alone.minY, 0, accuracy: 1, "no padding: the letters sit on the bottom edge")
+        XCTAssertEqual(try XCTUnwrap(inks(e.project, at: 9)[lines0[2].id]).maxX, 1920, accuracy: 1)
         let together = inks(e.project, at: 5)
         let lower = try XCTUnwrap(together[shared.id]), upper = try XCTUnwrap(together[lines0[1].id])
         XCTAssertEqual(lower.minY, alone.minY, accuracy: 1, "the bottom track's line takes the same spot")
         XCTAssertGreaterThan(upper.minY, lower.maxY, "the line shown with it stacks above, in track order")
-        XCTAssertEqual(upper.minX, 60, accuracy: 1)
-        e.autoPosition(nil, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
-        XCTAssertFalse(e.project.lyricTracks.flatMap(\.lines).contains(where: \.hasPosition), "no spot: back to the automatic stack")
+        XCTAssertEqual(upper.maxX, 1920, accuracy: 1)
+    }
+
+    func testTheSpotIsSavedWithTheProject() throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        XCTAssertEqual(p.lyricAutoSpot, .bottomCenter, "one spot is always chosen")
+        p.lyricAutoSpot = .topLeft
+        let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(p))
+        XCTAssertEqual(back.lyricAutoSpot, .topLeft)
     }
 
     func testAutoPositionIsOneUndoStep() throws {

@@ -33,6 +33,9 @@ struct Project: Codable, Equatable {
     var exportSettings: ExportSettings?
     /// The New Dummy sheet's last choices (font, title, length, color), for this project.
     var dummyDefaults: DummyDefaults?
+    /// Lyric inspector > Placement: where Auto Position puts lines. nil = bottom center.
+    var lyricAutoSpotValue: LyricSpot?
+    var lyricAutoSpot: LyricSpot { get { lyricAutoSpotValue ?? .bottomCenter } set { lyricAutoSpotValue = newValue } }
 
     init(type: ProjectType, canvas: CanvasSize) {
         self.type = type
