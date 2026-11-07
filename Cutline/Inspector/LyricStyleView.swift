@@ -7,8 +7,6 @@ struct LyricStyleView: View {
     @AppStorage("lyricAlignPaddingX") private var paddingX = 60.0
     @AppStorage("lyricAlignPaddingY") private var paddingY = 60.0
     @AppStorage("lyricLineGap") private var gap = 0.0
-    /// Auto Position's target ("" = none: back to the automatic stack).
-    @AppStorage("lyricAutoSpot") private var spotValue = LyricSpot.bottomCenter.rawValue
     @State private var applyToAll = false
     private static let families = NSFontManager.shared.availableFontFamilies
 
@@ -87,34 +85,48 @@ struct LyricStyleView: View {
                     ValueRow(label: "Line gap", value: gap, range: -20...200, step: 1, format: "%.0f px", defaultValue: 0,
                              onChange: { gap = $0 }, onCommit: {})
                 }
-                HStack(spacing: 4) {
-                    ForEach(LyricSpot.allCases) { spot in
-                        choiceButton(Self.symbol(spot), Self.title(spot), on: spot.rawValue == spotValue) {
-                            spotValue = spot.rawValue == spotValue ? "" : spot.rawValue
-                        }
+                // The spot row has the align row's columns; Auto Position ends where both rows end.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) { spotButtons }
+                    HStack(spacing: 4) {
+                        iconButton("rectangle.stack", "Apply to all: Auto Position moves every lyric line, with no padding", on: applyToAll) { applyToAll.toggle() }
+                        Spacer(minLength: 4)
+                        autoPositionButton
                     }
-                    Divider().frame(height: 18)
-                    choiceButton("rectangle.stack", "Apply to all: Auto Position moves every lyric line", on: applyToAll) { applyToAll.toggle() }
+                    .frame(maxWidth: .infinity)
                 }
-                HStack {
-                    Spacer()
-                    let spot = LyricSpot(rawValue: spotValue)
-                    Button("Auto Position") {
-                        editor.autoPosition(spot, allLines: applyToAll, paddingX: paddingX, paddingY: paddingY, gap: gap)
-                    }
-                    .controlSize(.small)
-                    .disabled(spot == nil && !(applyToAll ? editor.project.lyricTracks.flatMap(\.lines) : ids.compactMap(editor.line))
-                        .contains { $0.hasPosition })
-                    .help(autoPositionHelp(spot))
-                }
+                .fixedSize()
             }
         }
     }
 
-    private func autoPositionHelp(_ spot: LyricSpot?) -> String {
-        guard let spot else { return applyToAll ? "Return every lyric line to the automatic stack" : "Return the selected lines to the automatic stack" }
-        return applyToAll ? "Move every lyric line to \(Self.title(spot).lowercased()); lines shown together stack in track order"
-                          : "Move the selected lines to \(Self.title(spot).lowercased())"
+    /// The six spots, top row then bottom row, like the align buttons above them. One is always
+    /// chosen, saved with the project.
+    @ViewBuilder private var spotButtons: some View {
+        let chosen = editor.project.lyricAutoSpot
+        ForEach(LyricSpot.allCases) { spot in
+            if spot == .bottomLeft { Divider().frame(height: 18) }
+            iconButton(Self.symbol(spot), Self.title(spot), on: spot == chosen) {
+                if spot != chosen { editor.edit("Lyric Spot") { $0.lyricAutoSpot = spot } }
+            }
+        }
+    }
+
+    private var autoPositionButton: some View {
+        let spot = editor.project.lyricAutoSpot
+        return Button {
+            editor.autoPosition(spot, allLines: applyToAll, paddingX: paddingX, paddingY: paddingY, gap: gap)
+        } label: {
+            Text("Auto Position").font(.system(size: 11))
+                .padding(.horizontal, 10)
+                .frame(height: 20)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.1)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help(applyToAll ? "Move every lyric line to \(Self.title(spot).lowercased()), right at the frame edges; lines shown together stack in track order"
+                         : "Move the selected lines to \(Self.title(spot).lowercased()), with the paddings")
     }
 
     private static func title(_ spot: LyricSpot) -> String {
@@ -139,9 +151,9 @@ struct LyricStyleView: View {
         }
     }
 
-    /// An icon button that shows whether it's chosen (in the accent color, also while the
-    /// window is inactive).
-    private func choiceButton(_ symbol: String, _ tip: String, on: Bool, action: @escaping () -> Void) -> some View {
+    /// An icon button; a chosen one is drawn in the accent color (also while the window is
+    /// inactive). Every Placement icon button has the same size, so the rows line up.
+    private func iconButton(_ symbol: String, _ tip: String, on: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .foregroundStyle(on ? Color.white : Color.primary)
@@ -153,8 +165,7 @@ struct LyricStyleView: View {
     }
 
     private func alignButton(_ symbol: String, _ tip: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol).frame(width: 22, height: 18) }
-            .buttonStyle(.bordered).controlSize(.small).help(tip)
+        iconButton(symbol, tip, action: action)
     }
 
     private var selectedText: String? {

@@ -51,8 +51,8 @@ enum LyricPlacement {
 }
 
 /// Where Auto Position puts lyric lines: a top or bottom corner, or the middle of the top or
-/// bottom edge, with the placement paddings.
-enum LyricSpot: String, CaseIterable, Identifiable {
+/// bottom edge.
+enum LyricSpot: String, Codable, CaseIterable, Identifiable {
     case topLeft, topCenter, topRight, bottomLeft, bottomCenter, bottomRight
     var id: Self { self }
     var horizontal: LyricPlacement.Horizontal {
@@ -120,12 +120,11 @@ extension EditorModel {
         }
     }
 
-    /// Auto Position. The selected lines go to `spot` as one block, the same as the align
-    /// buttons. With `allLines`, every lyric line goes there on its own, so lines shown at
-    /// different times sit in the same place; lines shown together on other tracks stack with
-    /// it in track order. No spot: the lines go back to the automatic stack.
-    func autoPosition(_ spot: LyricSpot?, allLines: Bool, paddingX: Double, paddingY: Double, gap: Double) {
-        guard let spot else { resetLinePositions(all: allLines); return }
+    /// Auto Position. The selected lines go to `spot` as one block with the paddings, the same
+    /// as the align buttons. With `allLines`, every lyric line goes there on its own with no
+    /// padding (right at the frame edges), so lines shown at different times sit in the same
+    /// place; lines shown together on other tracks stack with it in track order.
+    func autoPosition(_ spot: LyricSpot, allLines: Bool, paddingX: Double, paddingY: Double, gap: Double) {
         guard allLines else {
             alignLines(horizontal: spot.horizontal, vertical: spot.vertical, paddingX: paddingX, paddingY: paddingY, gap: gap, actionName: "Auto Position")
             return
@@ -149,9 +148,8 @@ extension EditorModel {
                 rows[o.track] = b
             }
             let tracks = rows.keys.sorted()
-            let ys = LyricPlacement.stackedY(spot.vertical, boxes: tracks.map { rows[$0]! }, frame: 0...canvas.height,
-                                             padding: CGFloat(paddingY), gap: CGFloat(gap))
-            let x = LyricPlacement.x(for: spot.horizontal, box: own, canvasWidth: canvas.width, padding: CGFloat(paddingX))
+            let ys = LyricPlacement.stackedY(spot.vertical, boxes: tracks.map { rows[$0]! }, frame: 0...canvas.height, padding: 0, gap: CGFloat(gap))
+            let x = LyricPlacement.x(for: spot.horizontal, box: own, canvasWidth: canvas.width, padding: 0)
             spots[item.id] = (x, ys[tracks.firstIndex(of: item.track)!], own.size.width)
         }
         edit("Auto Position") { p in
@@ -167,15 +165,13 @@ extension EditorModel {
         }
     }
 
-    /// Back to the automatic stack: the placement lines, or every lyric line.
-    func resetLinePositions(all: Bool = false) {
-        let ids = all ? Set(project.lyricTracks.flatMap { $0.lines.map(\.id) }) : Set(placementLineIDs)
+    func resetLinePositions() {
+        let ids = placementLineIDs
         edit("Auto Position") { p in
-            for t in p.lyricTracks.indices {
-                for i in p.lyricTracks[t].lines.indices where ids.contains(p.lyricTracks[t].lines[i].id) {
-                    p.lyricTracks[t].lines[i].centerX = nil
-                    p.lyricTracks[t].lines[i].centerY = nil
-                }
+            for id in ids {
+                guard let loc = p.lineLocation(id) else { continue }
+                p.lyricTracks[loc.track].lines[loc.index].centerX = nil
+                p.lyricTracks[loc.track].lines[loc.index].centerY = nil
             }
         }
     }
