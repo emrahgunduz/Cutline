@@ -33,39 +33,58 @@ final class MainWindowTests: XCTestCase {
         return (doc, window, vertical, horizontal)
     }
 
+    /// The main screen's visible area. AppKit keeps windows inside it, and CI machines have
+    /// small displays, so every frame in these tests is made to fit.
+    private func screen() throws -> NSRect {
+        let v = try XCTUnwrap(NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame, "no screen")
+        let min = NSSize(width: 1000, height: 640)   // the editor window's minimum size
+        guard v.width >= min.width + 10, v.height >= min.height + 10 else {
+            throw XCTSkip("the screen (\(v.size)) is smaller than the editor window's minimum size")
+        }
+        return v
+    }
+
+    private func saved(_ r: NSRect) -> [Double] { [r.minX, r.minY, r.width, r.height].map(Double.init) }
+
     private func widths(_ h: NSSplitView) -> (assets: CGFloat, inspector: CGFloat) {
         (h.arrangedSubviews[0].frame.width, h.arrangedSubviews[2].frame.width)
     }
 
     func testWindowResizesDontOverwriteThePanelSizes() throws {
+        let v = try screen()
+        let big = NSRect(x: v.minX + 5, y: v.minY + 5, width: min(1800, v.width - 10), height: min(1100, v.height - 10)).integral
+        // Panel sizes that fit the window (and the panels' limits) on any screen.
+        let assets = (big.width * 0.22).rounded(), inspector = (big.width * 0.26).rounded(), timeline = (big.height * 0.35).rounded()
         var layout = LayoutState()
-        layout.assetsWidth = 420
-        layout.inspectorWidth = 460
-        layout.timelineHeight = 400
-        layout.windowFrame = [100, 100, 1800, 1100]
+        layout.assetsWidth = assets
+        layout.inspectorWidth = inspector
+        layout.timelineHeight = timeline
+        layout.windowFrame = saved(big)
         let (doc, window, vertical, horizontal) = try open(layout)
         defer { doc.close() }
-        XCTAssertEqual(widths(horizontal).assets, 420, accuracy: 1)
-        XCTAssertEqual(widths(horizontal).inspector, 460, accuracy: 1)
-        XCTAssertEqual(vertical.arrangedSubviews[1].frame.height, 400, accuracy: 1)
+        XCTAssertEqual(window.frame, big)
+        XCTAssertEqual(widths(horizontal).assets, assets, accuracy: 1)
+        XCTAssertEqual(widths(horizontal).inspector, inspector, accuracy: 1)
+        XCTAssertEqual(vertical.arrangedSubviews[1].frame.height, timeline, accuracy: 1)
 
         // Shrink to the minimum: the panels may be squeezed, but the saved sizes stay.
-        window.setFrame(NSRect(x: 100, y: 100, width: window.minSize.width, height: window.minSize.height), display: true)
-        XCTAssertEqual(doc.layout.assetsWidth, 420)
-        XCTAssertEqual(doc.layout.inspectorWidth, 460)
-        XCTAssertEqual(doc.layout.timelineHeight, 400)
+        window.setFrame(NSRect(x: big.minX, y: big.minY, width: window.minSize.width, height: window.minSize.height), display: true)
+        XCTAssertEqual(doc.layout.assetsWidth, assets)
+        XCTAssertEqual(doc.layout.inspectorWidth, inspector)
+        XCTAssertEqual(doc.layout.timelineHeight, timeline)
 
         // Back to a big window: the project's sizes return.
-        window.setFrame(NSRect(x: 100, y: 100, width: 1800, height: 1100), display: true)
-        XCTAssertEqual(widths(horizontal).assets, 420, accuracy: 1)
-        XCTAssertEqual(widths(horizontal).inspector, 460, accuracy: 1)
-        XCTAssertEqual(vertical.arrangedSubviews[1].frame.height, 400, accuracy: 1)
-        XCTAssertEqual(doc.layout.windowFrame, [100, 100, 1800, 1100])
+        window.setFrame(big, display: true)
+        XCTAssertEqual(widths(horizontal).assets, assets, accuracy: 1)
+        XCTAssertEqual(widths(horizontal).inspector, inspector, accuracy: 1)
+        XCTAssertEqual(vertical.arrangedSubviews[1].frame.height, timeline, accuracy: 1)
+        XCTAssertEqual(doc.layout.windowFrame, saved(big))
     }
 
     func testDraggingADividerSavesThePanelSize() throws {
+        let v = try screen()
         var layout = LayoutState()
-        layout.windowFrame = [100, 100, 1800, 1100]
+        layout.windowFrame = saved(NSRect(x: v.minX + 5, y: v.minY + 5, width: min(1800, v.width - 10), height: min(1100, v.height - 10)).integral)
         let (doc, _, _, horizontal) = try open(layout)
         defer { doc.close() }
         // What a drag does: the split view tracks the mouse while the divider moves.
@@ -77,23 +96,27 @@ final class MainWindowTests: XCTestCase {
         horizontal.window?.contentView?.layoutSubtreeIfNeeded()
         split.isDraggingDivider = false
         XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
-        horizontal.setPosition(500, ofDividerAt: 0)  // not a drag: not saved
+        horizontal.setPosition(380, ofDividerAt: 0)  // not a drag: not saved
         XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
     }
 
     func testEachProjectOpensInItsOwnWindowFrame() throws {
+        let v = try screen()
+        let frameA = NSRect(x: v.minX, y: v.minY, width: min(1500, v.width - 10), height: min(950, v.height - 10)).integral
+        let frameB = NSRect(x: v.minX + 10, y: v.minY + 10, width: min(1700, v.width - 10), height: min(1050, v.height - 10)).integral
+        let moved = NSRect(x: v.minX + 5, y: v.minY + 5, width: 1000, height: 640).integral
         var a = LayoutState(), b = LayoutState()
-        a.windowFrame = [80, 90, 1500, 950]
-        b.windowFrame = [140, 120, 1700, 1050]
+        a.windowFrame = saved(frameA)
+        b.windowFrame = saved(frameB)
         let (docA, windowA, _, _) = try open(a)
         defer { docA.close() }
         let (docB, windowB, _, _) = try open(b)
         defer { docB.close() }
-        XCTAssertEqual(windowA.frame, NSRect(x: 80, y: 90, width: 1500, height: 950))
-        XCTAssertEqual(windowB.frame, NSRect(x: 140, y: 120, width: 1700, height: 1050))
-        windowA.setFrame(NSRect(x: 60, y: 70, width: 1400, height: 900), display: true)
-        XCTAssertEqual(docA.layout.windowFrame, [60, 70, 1400, 900])
-        XCTAssertEqual(docB.layout.windowFrame, [140, 120, 1700, 1050])
+        XCTAssertEqual(windowA.frame, frameA)
+        XCTAssertEqual(windowB.frame, frameB)
+        windowA.setFrame(moved, display: true)
+        XCTAssertEqual(docA.layout.windowFrame, saved(moved))
+        XCTAssertEqual(docB.layout.windowFrame, saved(frameB))
     }
 
     func testOlderLayoutsWithoutAWindowFrameStillLoad() throws {
