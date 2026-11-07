@@ -33,15 +33,24 @@ final class MainWindowTests: XCTestCase {
         return (doc, window, vertical, horizontal)
     }
 
-    /// The main screen's visible area. AppKit keeps windows inside it, and CI machines have
-    /// small displays, so every frame in these tests is made to fit.
-    private func screen() throws -> NSRect {
+    /// The editor window's real minimum size. It's set to 1000×640, and AppKit adds the
+    /// toolbar's height once the toolbar is in (674 pt tall on macOS 26).
+    private func minimumWindowSize() throws -> NSSize {
+        let (doc, window, _, _) = try open(LayoutState())
+        defer { doc.close() }
+        return window.minSize
+    }
+
+    /// The main screen's visible area and the editor window's minimum size. AppKit keeps
+    /// windows inside the visible area and at least the minimum size, and CI machines have
+    /// small displays (1024×677 pt usable), so every frame in these tests is made to fit.
+    private func screen() throws -> (visible: NSRect, minimum: NSSize) {
         let v = try XCTUnwrap(NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame, "no screen")
-        let min = NSSize(width: 1000, height: 640)   // the editor window's minimum size
-        guard v.width >= min.width + 10, v.height >= min.height + 10 else {
-            throw XCTSkip("the screen (\(v.size)) is smaller than the editor window's minimum size")
+        let min = try minimumWindowSize()
+        guard v.width >= min.width + 2, v.height >= min.height + 2 else {
+            throw XCTSkip("the screen (\(v.size)) is smaller than the editor window's minimum size (\(min))")
         }
-        return v
+        return (v, min)
     }
 
     private func saved(_ r: NSRect) -> [Double] { [r.minX, r.minY, r.width, r.height].map(Double.init) }
@@ -51,8 +60,8 @@ final class MainWindowTests: XCTestCase {
     }
 
     func testWindowResizesDontOverwriteThePanelSizes() throws {
-        let v = try screen()
-        let big = NSRect(x: v.minX + 5, y: v.minY + 5, width: min(1800, v.width - 10), height: min(1100, v.height - 10)).integral
+        let (v, _) = try screen()
+        let big = NSRect(x: v.minX, y: v.minY, width: min(1800, v.width), height: min(1100, v.height))
         // Panel sizes that fit the window (and the panels' limits) on any screen.
         let assets = (big.width * 0.22).rounded(), inspector = (big.width * 0.26).rounded(), timeline = (big.height * 0.35).rounded()
         var layout = LayoutState()
@@ -82,29 +91,39 @@ final class MainWindowTests: XCTestCase {
     }
 
     func testDraggingADividerSavesThePanelSize() throws {
-        let v = try screen()
+        let (v, _) = try screen()
         var layout = LayoutState()
-        layout.windowFrame = saved(NSRect(x: v.minX + 5, y: v.minY + 5, width: min(1800, v.width - 10), height: min(1100, v.height - 10)).integral)
+        layout.windowFrame = saved(NSRect(x: v.minX, y: v.minY, width: min(1800, v.width), height: min(1100, v.height)))
         let (doc, _, _, horizontal) = try open(layout)
         defer { doc.close() }
         // What a drag does: the split view tracks the mouse while the divider moves.
         let split = try XCTUnwrap(horizontal as? DividerTrackingSplitView)
         split.isDraggingDivider = true
         horizontal.setPosition(333, ofDividerAt: 0)
-        // The split view may apply the position in the next layout pass (it does when the
-        // window isn't on screen); the drag lasts until then, as a real one would.
-        horizontal.window?.contentView?.layoutSubtreeIfNeeded()
+        // The split view may apply the position in a later layout pass (it does when the
+        // window isn't on screen, and later still on a slow machine); the drag lasts until
+        // then, as a real one would.
+        let deadline = Date().addingTimeInterval(2)
+        while abs(doc.layout.assetsWidth - 333) > 1, Date() < deadline {
+            horizontal.window?.contentView?.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
         split.isDraggingDivider = false
         XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
         horizontal.setPosition(380, ofDividerAt: 0)  // not a drag: not saved
+        horizontal.window?.contentView?.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         XCTAssertEqual(doc.layout.assetsWidth, 333, accuracy: 1)
     }
 
     func testEachProjectOpensInItsOwnWindowFrame() throws {
-        let v = try screen()
-        let frameA = NSRect(x: v.minX, y: v.minY, width: min(1500, v.width - 10), height: min(950, v.height - 10)).integral
-        let frameB = NSRect(x: v.minX + 10, y: v.minY + 10, width: min(1700, v.width - 10), height: min(1050, v.height - 10)).integral
-        let moved = NSRect(x: v.minX + 5, y: v.minY + 5, width: 1000, height: 640).integral
+        let (v, m) = try screen()
+        // Two frames and a third to move to, all different, each at least the minimum size and
+        // inside the visible area (the CI screen leaves only a few points to spare).
+        let spareW = ((v.width - m.width) / 2).rounded(.down), spareH = ((v.height - m.height) / 2).rounded(.down)
+        let frameA = NSRect(x: v.minX, y: v.minY, width: min(1500, v.width - spareW), height: min(950, v.height - spareH))
+        let frameB = NSRect(x: v.minX + spareW, y: v.minY + spareH, width: min(1700, v.width - spareW), height: min(1050, v.height - spareH))
+        let moved = NSRect(x: v.minX + (spareW / 2).rounded(.down), y: v.minY + (spareH / 2).rounded(.down), width: m.width, height: m.height)
         var a = LayoutState(), b = LayoutState()
         a.windowFrame = saved(frameA)
         b.windowFrame = saved(frameB)
