@@ -386,12 +386,7 @@ final class TimelineView: NSView {
 
     /// MM:SS (FF): minutes and seconds, then the frames past the last whole second at the
     /// project's frame rate (00 to fps − 1; a full second's worth rolls over into SS).
-    static func clipLength(_ seconds: Double, fps: Double) -> String {
-        let rate = max(1, Int(fps.rounded()))
-        let frames = Int((max(0, seconds) * fps).rounded())
-        let s = frames / rate, f = frames % rate
-        return String(format: "%02d:%02d (%02d)", s / 60, s % 60, f)
-    }
+    static func clipLength(_ seconds: Double, fps: Double) -> String { Project.lengthLabel(seconds, fps: fps) }
 
     /// One picture per clip box, at its left edge: a video's first frame (where its trim starts),
     /// or the image or dummy card itself. While a video's frame is fetched (after a trim), the
