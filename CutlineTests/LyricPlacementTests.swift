@@ -70,40 +70,41 @@ final class AutoPositionTests: XCTestCase {
         })
     }
 
-    func testSelectedLinesGoToTheSpotAsOneBlock() throws {
+    func testSelectedLinesGoToTheSpotOnTopOfEachOther() throws {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
-        p.addLyricTrack()
-        p.lyricTracks[0].lines = [line("Kör", 1, 3)]
-        p.lyricTracks[1].lines = [line("aynalarda", 1, 3)]
+        p.addLyricTrack(); p.addLyricTrack()
+        p.lyricTracks[0].lines = [line("Aynı kıyıdan", 1, 3)]
+        p.lyricTracks[1].lines = [line("Kumlar, kaldırımlara", 1, 3)]
+        p.lyricTracks[2].lines = [line("Topladığımız", 1, 3)]
         let e = ProjectDocument(project: p).editor
-        let (a, b) = (p.lyricTracks[0].lines[0].id, p.lyricTracks[1].lines[0].id)
-        e.setSelection([.lyricLine(a), .lyricLine(b)])
-        e.autoPosition(.topRight, allLines: false, paddingX: 80, paddingY: 30, gap: 10)
+        let ids = p.lyricTracks.map { $0.lines[0].id }
+        e.setSelection([.lyricLine(ids[0]), .lyricLine(ids[1])])
+        e.autoPosition(.topLeft, allLines: false, paddingX: 80, paddingY: 30)
         let ink = inks(e.project, at: 2)
-        for id in [a, b] { XCTAssertEqual(try XCTUnwrap(ink[id]).maxX, 1920 - 80, accuracy: 1, "letters end 80 px from the right") }
-        XCTAssertEqual(try XCTUnwrap(ink[a]).maxY, 1080 - 30, accuracy: 1, "the block's top letters are 30 px under the top")
-        XCTAssertGreaterThan(try XCTUnwrap(ink[a]).minY, try XCTUnwrap(ink[b]).maxY, "the first track is above the second")
+        for id in ids.prefix(2) {
+            let r = try XCTUnwrap(ink[id])
+            XCTAssertEqual(r.minX, 80, accuracy: 1, "letters start 80 px from the left")
+            XCTAssertEqual(r.maxY, 1080 - 30, accuracy: 1, "each line's letters are 30 px under the top: on top of each other, no line gap")
+        }
+        XCTAssertFalse(e.project.lyricTracks[2].lines[0].hasPosition, "unselected lines stay")
     }
 
-    func testApplyToAllPutsEveryLineInTheSameSpotWithNoPaddingAndStacksLinesShownTogether() throws {
+    func testApplyToAllMovesEveryLineOnTopOfEachOtherWithThePaddings() throws {
         var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
         p.addLyricTrack()
         p.lyricTracks[0].lines = [line("gece", 0, 2), line("Kör", 4, 6), line("yalnız", 8, 10)]
-        p.lyricTracks[1].lines = [line("gece", 4, 6)]
+        p.lyricTracks[1].lines = [line("aynalarda", 4, 6)]
         let e = ProjectDocument(project: p).editor
-        let lines0 = p.lyricTracks[0].lines, shared = p.lyricTracks[1].lines[0]
-        e.setSelection(Set(lines0.map { Selection.lyricLine($0.id) }))   // selected or not, every line moves
-        e.autoPosition(.bottomRight, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
+        e.selection = .lyricLine(p.lyricTracks[0].lines[0].id)   // selected or not, every line moves
+        e.autoPosition(.bottomRight, allLines: true, paddingX: 60, paddingY: 40)
         XCTAssertTrue(e.project.lyricTracks.flatMap(\.lines).allSatisfy(\.hasPosition))
-        let alone = try XCTUnwrap(inks(e.project, at: 1)[lines0[0].id])
-        XCTAssertEqual(alone.maxX, 1920, accuracy: 1, "no padding: the letters end at the right edge")
-        XCTAssertEqual(alone.minY, 0, accuracy: 1, "no padding: the letters sit on the bottom edge")
-        XCTAssertEqual(try XCTUnwrap(inks(e.project, at: 9)[lines0[2].id]).maxX, 1920, accuracy: 1)
-        let together = inks(e.project, at: 5)
-        let lower = try XCTUnwrap(together[shared.id]), upper = try XCTUnwrap(together[lines0[1].id])
-        XCTAssertEqual(lower.minY, alone.minY, accuracy: 1, "the bottom track's line takes the same spot")
-        XCTAssertGreaterThan(upper.minY, lower.maxY, "the line shown with it stacks above, in track order")
-        XCTAssertEqual(upper.maxX, 1920, accuracy: 1)
+        for t in [1.0, 5, 9] {
+            for r in inks(e.project, at: t).values {
+                XCTAssertEqual(r.maxX, 1920 - 60, accuracy: 1)
+                XCTAssertEqual(r.minY, 40, accuracy: 1, "every line sits on the bottom padding, also lines shown together")
+            }
+        }
+        XCTAssertEqual(inks(e.project, at: 5).count, 2)
     }
 
     func testTheSpotIsSavedWithTheProject() throws {
@@ -123,7 +124,7 @@ final class AutoPositionTests: XCTestCase {
         um.groupsByEvent = false
         e.selection = .lyricLine(p.lyricTracks[0].lines[0].id)
         um.beginUndoGrouping()
-        e.autoPosition(.topCenter, allLines: true, paddingX: 60, paddingY: 60, gap: 0)
+        e.autoPosition(.topCenter, allLines: true, paddingX: 60, paddingY: 60)
         um.endUndoGrouping()
         XCTAssertTrue(e.project.lyricTracks[0].lines.allSatisfy(\.hasPosition))
         um.undo()
