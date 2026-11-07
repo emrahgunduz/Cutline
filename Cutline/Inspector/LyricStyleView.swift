@@ -7,6 +7,9 @@ struct LyricStyleView: View {
     @AppStorage("lyricAlignPaddingX") private var paddingX = 60.0
     @AppStorage("lyricAlignPaddingY") private var paddingY = 60.0
     @AppStorage("lyricLineGap") private var gap = 0.0
+    /// Auto Position's target ("" = none: back to the automatic stack).
+    @AppStorage("lyricAutoSpot") private var spotValue = LyricSpot.bottomCenter.rawValue
+    @State private var applyToAll = false
     private static let families = NSFontManager.shared.availableFontFamilies
 
     var body: some View {
@@ -80,20 +83,73 @@ struct LyricStyleView: View {
                 ValueRow(label: "Padding ↕", value: paddingY, range: 0...600, step: 1, format: "%.0f px", defaultValue: 60,
                          onChange: { paddingY = $0.rounded() }, onCommit: {})
                     .help("Distance of the letters from the top or bottom edge of the frame")
-                if ids.count > 1 {
+                if ids.count > 1 || (applyToAll && editor.project.lyricTracks.count > 1) {
                     ValueRow(label: "Line gap", value: gap, range: -20...200, step: 1, format: "%.0f px", defaultValue: 0,
                              onChange: { gap = $0 }, onCommit: {})
                 }
+                HStack(spacing: 4) {
+                    ForEach(LyricSpot.allCases) { spot in
+                        choiceButton(Self.symbol(spot), Self.title(spot), on: spot.rawValue == spotValue) {
+                            spotValue = spot.rawValue == spotValue ? "" : spot.rawValue
+                        }
+                    }
+                    Divider().frame(height: 18)
+                    choiceButton("rectangle.stack", "Apply to all: Auto Position moves every lyric line", on: applyToAll) { applyToAll.toggle() }
+                }
                 HStack {
-                    Text(ids.count > 1 ? "Selected lines stack under each other." : "Drag the line in the preview to move it.")
-                        .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button("Auto Position") { editor.resetLinePositions() }
-                        .controlSize(.small)
-                        .disabled(!ids.contains { editor.line($0)?.hasPosition == true })
+                    let spot = LyricSpot(rawValue: spotValue)
+                    Button("Auto Position") {
+                        editor.autoPosition(spot, allLines: applyToAll, paddingX: paddingX, paddingY: paddingY, gap: gap)
+                    }
+                    .controlSize(.small)
+                    .disabled(spot == nil && !(applyToAll ? editor.project.lyricTracks.flatMap(\.lines) : ids.compactMap(editor.line))
+                        .contains { $0.hasPosition })
+                    .help(autoPositionHelp(spot))
                 }
             }
         }
+    }
+
+    private func autoPositionHelp(_ spot: LyricSpot?) -> String {
+        guard let spot else { return applyToAll ? "Return every lyric line to the automatic stack" : "Return the selected lines to the automatic stack" }
+        return applyToAll ? "Move every lyric line to \(Self.title(spot).lowercased()); lines shown together stack in track order"
+                          : "Move the selected lines to \(Self.title(spot).lowercased())"
+    }
+
+    private static func title(_ spot: LyricSpot) -> String {
+        switch spot {
+        case .topLeft: "Top left"
+        case .topCenter: "Top center"
+        case .topRight: "Top right"
+        case .bottomLeft: "Bottom left"
+        case .bottomCenter: "Bottom center"
+        case .bottomRight: "Bottom right"
+        }
+    }
+
+    private static func symbol(_ spot: LyricSpot) -> String {
+        switch spot {
+        case .topLeft: "rectangle.inset.topleft.filled"
+        case .topCenter: "rectangle.topthird.inset.filled"
+        case .topRight: "rectangle.inset.topright.filled"
+        case .bottomLeft: "rectangle.inset.bottomleft.filled"
+        case .bottomCenter: "rectangle.bottomthird.inset.filled"
+        case .bottomRight: "rectangle.inset.bottomright.filled"
+        }
+    }
+
+    /// An icon button that shows whether it's chosen (in the accent color, also while the
+    /// window is inactive).
+    private func choiceButton(_ symbol: String, _ tip: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .frame(width: 30, height: 20)
+                .background(RoundedRectangle(cornerRadius: 5).fill(on ? Color.accentColor : Color.primary.opacity(0.1)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(tip)
     }
 
     private func alignButton(_ symbol: String, _ tip: String, action: @escaping () -> Void) -> some View {

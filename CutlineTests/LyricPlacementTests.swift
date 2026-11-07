@@ -57,6 +57,74 @@ final class LyricPlacementTests: XCTestCase {
     }
 }
 
+@MainActor
+final class AutoPositionTests: XCTestCase {
+    private func line(_ text: String, _ start: Double, _ end: Double) -> LyricLine {
+        LyricLine(start: start, end: end, words: [LyricWord(text: text, start: start, end: end)])
+    }
+
+    /// Letters of every line on screen at `t`, in canvas pixels.
+    private func inks(_ p: Project, at t: Double) -> [UUID: CGRect] {
+        Dictionary(uniqueKeysWithValues: LyricRenderer(project: p).placedLines(at: t).map { pl in
+            (pl.line.id, pl.raster.ink.applying(CGAffineTransform(scaleX: pl.fit, y: pl.fit)).offsetBy(dx: pl.rect.minX, dy: pl.rect.minY))
+        })
+    }
+
+    func testSelectedLinesGoToTheSpotAsOneBlock() throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.addLyricTrack()
+        p.lyricTracks[0].lines = [line("Kör", 1, 3)]
+        p.lyricTracks[1].lines = [line("aynalarda", 1, 3)]
+        let e = ProjectDocument(project: p).editor
+        let (a, b) = (p.lyricTracks[0].lines[0].id, p.lyricTracks[1].lines[0].id)
+        e.setSelection([.lyricLine(a), .lyricLine(b)])
+        e.autoPosition(.topRight, allLines: false, paddingX: 80, paddingY: 30, gap: 10)
+        let ink = inks(e.project, at: 2)
+        for id in [a, b] { XCTAssertEqual(try XCTUnwrap(ink[id]).maxX, 1920 - 80, accuracy: 1, "letters end 80 px from the right") }
+        XCTAssertEqual(try XCTUnwrap(ink[a]).maxY, 1080 - 30, accuracy: 1, "the block's top letters are 30 px under the top")
+        XCTAssertGreaterThan(try XCTUnwrap(ink[a]).minY, try XCTUnwrap(ink[b]).maxY, "the first track is above the second")
+    }
+
+    func testApplyToAllPutsEveryLineInTheSameSpotAndStacksLinesShownTogether() throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.addLyricTrack()
+        p.lyricTracks[0].lines = [line("gece", 0, 2), line("Kör", 4, 6), line("yalnız", 8, 10)]
+        p.lyricTracks[1].lines = [line("gece", 4, 6)]
+        let e = ProjectDocument(project: p).editor
+        let lines0 = p.lyricTracks[0].lines, shared = p.lyricTracks[1].lines[0]
+        e.selection = .lyricLine(lines0[0].id)   // one selected line; every line moves
+        e.autoPosition(.bottomLeft, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
+        XCTAssertTrue(e.project.lyricTracks.flatMap(\.lines).allSatisfy(\.hasPosition))
+        let alone = try XCTUnwrap(inks(e.project, at: 1)[lines0[0].id])
+        XCTAssertEqual(alone.minX, 60, accuracy: 1)
+        XCTAssertEqual(alone.minY, 40, accuracy: 1, "a line shown alone sits at the bottom padding")
+        XCTAssertEqual(try XCTUnwrap(inks(e.project, at: 9)[lines0[2].id]).minX, 60, accuracy: 1)
+        let together = inks(e.project, at: 5)
+        let lower = try XCTUnwrap(together[shared.id]), upper = try XCTUnwrap(together[lines0[1].id])
+        XCTAssertEqual(lower.minY, alone.minY, accuracy: 1, "the bottom track's line takes the same spot")
+        XCTAssertGreaterThan(upper.minY, lower.maxY, "the line shown with it stacks above, in track order")
+        XCTAssertEqual(upper.minX, 60, accuracy: 1)
+        e.autoPosition(nil, allLines: true, paddingX: 60, paddingY: 40, gap: 10)
+        XCTAssertFalse(e.project.lyricTracks.flatMap(\.lines).contains(where: \.hasPosition), "no spot: back to the automatic stack")
+    }
+
+    func testAutoPositionIsOneUndoStep() throws {
+        var p = Project(type: .musicVideo, canvas: .init(width: 1920, height: 1080))
+        p.lyricTracks[0].lines = [line("a", 0, 2), line("b", 3, 5)]
+        let doc = ProjectDocument(project: p)
+        let e = doc.editor
+        let um = try XCTUnwrap(doc.undoManager)
+        um.groupsByEvent = false
+        e.selection = .lyricLine(p.lyricTracks[0].lines[0].id)
+        um.beginUndoGrouping()
+        e.autoPosition(.topCenter, allLines: true, paddingX: 60, paddingY: 60, gap: 0)
+        um.endUndoGrouping()
+        XCTAssertTrue(e.project.lyricTracks[0].lines.allSatisfy(\.hasPosition))
+        um.undo()
+        XCTAssertFalse(e.project.lyricTracks[0].lines.contains(where: \.hasPosition))
+    }
+}
+
 final class NegativeGapTests: XCTestCase {
     func testNegativeGapOverlapsLines() {
         let plain = LyricPlacement.Box(size: CGSize(width: 300, height: 80))
