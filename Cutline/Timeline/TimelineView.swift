@@ -63,6 +63,8 @@ final class TimelineView: NSView {
     private let playheadLayer = CAShapeLayer()
     /// Cache strip states, recomputed only when the project or the segment files change.
     private var stripMemo: (revision: Int, files: Set<String>, states: [(segment: SegmentExporter.Segment, state: CacheStrip.State)])?
+    /// The revision and files whose states are being worked out in the background.
+    private var stripPending: (revision: Int, files: Set<String>)?
 
     init(editor: EditorModel) {
         self.editor = editor
@@ -183,7 +185,7 @@ final class TimelineView: NSView {
             CGRect(x: 0, y: f.minY - 1, width: bounds.width, height: 3).fill()
         }
         NSGraphicsContext.restoreGraphicsState()
-        drawRuler(l)
+        drawRuler(l, dirty: dirtyRect)
         if let limit = project.lengthLimit {
             HardOutLine.draw(limit: limit, duration: project.duration, layout: l, bounds: bounds, rulerHeight: TimelineLayout.rulerHeight)
         }
@@ -260,6 +262,23 @@ final class TimelineView: NSView {
         }
     }
 
+    /// Text attributes, made once: creating the fonts for every label on every redraw was a
+    /// good part of the timeline's drawing time.
+    private enum Attrs {
+        static let headerTitle: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.labelColor]
+        static let headerCount: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.tertiaryLabelColor]
+        static let proxyBadge: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.black]
+        static let clipName: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white]
+        static let clipLength: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold), .foregroundColor: NSColor.white]
+        static let dropHint: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.tertiaryLabelColor]
+        static let analysisNote: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.75)]
+        static let lineText: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.9)]
+        static let wordText: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.black.withAlphaComponent(0.8)]
+        static let rulerTick: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]
+        static let playheadTime: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.systemRed]
+        static let cinemaFlag: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: TimelineView.cinemaColor]
+    }
+
     private func drawHeader(_ row: TimelineRow, _ rect: CGRect) {
         let header = CGRect(x: 0, y: rect.minY, width: TimelineLayout.headerWidth, height: rect.height - 1)
         NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
@@ -275,7 +294,7 @@ final class TimelineView: NSView {
             symbol("line.3.horizontal", at: CGRect(x: 8, y: rect.minY + 4, width: 12, height: 12), tint: .tertiaryLabelColor)
         }
         (title(row) as NSString).draw(at: CGPoint(x: 24, y: rect.minY + 3),
-                                      withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.labelColor])
+                                      withAttributes: Attrs.headerTitle)
         let b = headerButtonRects(rect)
         if row != .audio { symbol("plus.circle", at: b.add, tint: .secondaryLabelColor) }
         if canRemove(row) { symbol("minus.circle", at: b.remove, tint: .secondaryLabelColor) }
@@ -283,23 +302,35 @@ final class TimelineView: NSView {
         if case .video(let t) = row, rect.height > 38 {
             let count = project.videoTracks[t].clips.count
             ("\(count) clip\(count == 1 ? "" : "s")" as NSString).draw(at: CGPoint(x: 24, y: rect.minY + 19),
-                                                                       withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.tertiaryLabelColor])
+                                                                       withAttributes: Attrs.headerCount)
         }
         // Resize grip along the bottom edge.
         NSColor(calibratedWhite: 0.28, alpha: 1).setFill()
         CGRect(x: TimelineLayout.headerWidth / 2 - 10, y: rect.maxY - 4, width: 20, height: 2).fill()
     }
 
+    /// Tinted header symbols, made once per symbol, size, tint and appearance. Making them anew
+    /// for every header on every redraw was a quarter of the timeline's drawing time.
+    private var symbolImages: [String: NSImage] = [:]
+
     private func symbol(_ name: String, at rect: CGRect, tint: NSColor) {
-        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: rect.height - 3, weight: .regular)) else { return }
-        let tinted = NSImage(size: img.size, flipped: false) { r in
-            img.draw(in: r)
-            tint.set()
-            r.fill(using: .sourceAtop)
-            return true
+        let key = "\(name)|\(rect.height)|\(tint)|\(effectiveAppearance.name.rawValue)"
+        let tinted: NSImage
+        if let hit = symbolImages[key] {
+            tinted = hit
+        } else {
+            guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: rect.height - 3, weight: .regular)) else { return }
+            tinted = NSImage(size: img.size, flipped: false) { r in
+                img.draw(in: r)
+                tint.set()
+                r.fill(using: .sourceAtop)
+                return true
+            }
+            if symbolImages.count > 100 { symbolImages.removeAll() }
+            symbolImages[key] = tinted
         }
-        tinted.draw(in: Self.aspectFit(img.size, in: rect))
+        tinted.draw(in: Self.aspectFit(tinted.size, in: rect))
     }
 
     /// `size` scaled to fit inside `rect` keeping its proportions, centred (symbols such as the
@@ -338,7 +369,7 @@ final class TimelineView: NSView {
             if let proxy = asset.proxy, r.width > 60 {
                 // Orange "PROXY 1/4" badge: preview is playing the low-res copy of this clip.
                 let text = "PROXY \(proxy.scale.label)" as NSString
-                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.black]
+                let attrs = Attrs.proxyBadge
                 let size = text.size(withAttributes: attrs)
                 let badge = CGRect(x: labelX, y: r.minY + 4, width: size.width + 8, height: 12)
                 NSColor.systemOrange.setFill()
@@ -346,8 +377,10 @@ final class TimelineView: NSView {
                 text.draw(at: CGPoint(x: badge.minX + 4, y: badge.minY), withAttributes: attrs)
                 labelX = badge.maxX + 5
             }
-            (asset.name as NSString).draw(in: CGRect(x: labelX, y: r.minY + 3, width: max(0, r.maxX - labelX - 5), height: 15),
-                                          withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white])
+            let nameWidth = r.maxX - labelX - 5
+            if nameWidth > 8 {   // no room for even a letter: don't lay the name out
+                (asset.name as NSString).draw(in: CGRect(x: labelX, y: r.minY + 3, width: nameWidth, height: 15), withAttributes: Attrs.clipName)
+            }
             if asset.proxy != nil {
                 NSColor.systemOrange.setFill()
                 CGRect(x: r.minX, y: r.maxY - 3, width: r.width, height: 3).fill()
@@ -369,13 +402,14 @@ final class TimelineView: NSView {
     /// pill at the bottom right. A clip running past the right edge keeps it in view; it's left
     /// out when the clip is too small to fit it.
     private func drawClipLength(_ label: String, in r: CGRect) {
-        let text = label as NSString
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
-                                                    .foregroundColor: NSColor.white]
-        let size = text.size(withAttributes: attrs)
-        let pill = CGSize(width: ceil(size.width) + 8, height: 14)
         let bottomGap: CGFloat = 7   // space between the label and the clip's bottom edge
-        guard r.width >= pill.width + 16, r.height >= Self.titleBarHeight + pill.height + bottomGap + 1 else { return }
+        // Too short for the pill: skip before measuring any text.
+        guard r.height >= Self.titleBarHeight + 14 + bottomGap + 1, r.width >= 40 else { return }
+        let text = label as NSString
+        let attrs = Attrs.clipLength
+        let size = Self.labelSize(label)
+        let pill = CGSize(width: ceil(size.width) + 8, height: 14)
+        guard r.width >= pill.width + 16 else { return }
         let right = min(r.maxX, bounds.maxX) - 4
         guard right - pill.width >= r.minX + 8 else { return }
         let box = CGRect(x: right - pill.width, y: r.maxY - pill.height - bottomGap, width: pill.width, height: pill.height)
@@ -387,6 +421,16 @@ final class TimelineView: NSView {
     /// MM:SS (FF): minutes and seconds, then the frames past the last whole second at the
     /// project's frame rate (00 to fps − 1; a full second's worth rolls over into SS).
     static func clipLength(_ seconds: Double, fps: Double) -> String { Project.lengthLabel(seconds, fps: fps) }
+
+    /// Measured clip length labels (the same few lengths repeat across clips and redraws).
+    private static var labelSizes: [String: CGSize] = [:]
+    private static func labelSize(_ label: String) -> CGSize {
+        if let s = labelSizes[label] { return s }
+        if labelSizes.count > 2000 { labelSizes.removeAll() }
+        let s = (label as NSString).size(withAttributes: Attrs.clipLength)
+        labelSizes[label] = s
+        return s
+    }
 
     /// One picture per clip box, at its left edge: a video's first frame (where its trim starts),
     /// or the image or dummy card itself. While a video's frame is fetched (after a trim), the
@@ -408,7 +452,7 @@ final class TimelineView: NSView {
     private func drawAudio(_ rect: CGRect, _ l: TimelineLayout) {
         guard let audio = project.audio else {
             ("Drop the song here" as NSString).draw(at: CGPoint(x: TimelineLayout.headerWidth + 10, y: rect.minY + 4),
-                                                    withAttributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.tertiaryLabelColor])
+                                                    withAttributes: Attrs.dropHint)
             return
         }
         let r = CGRect(x: l.x(for: audio.start), y: rect.minY + 2, width: CGFloat(audio.duration) * l.pixelsPerSecond, height: rect.height - 5)
@@ -435,7 +479,7 @@ final class TimelineView: NSView {
                 case .idle: nil
                 }
                 if let note {
-                    (note as NSString).draw(at: CGPoint(x: x0 + 6, y: r.minY), withAttributes: [.font: NSFont.systemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.75)])
+                    (note as NSString).draw(at: CGPoint(x: x0 + 6, y: r.minY), withAttributes: Attrs.analysisNote)
                 }
             }
         }
@@ -524,7 +568,7 @@ final class TimelineView: NSView {
             }
             if bar.width > 30 {
                 (line.text as NSString).draw(in: CGRect(x: bar.minX + 5, y: bar.minY + 3, width: bar.width - 10, height: 15),
-                                             withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.9)])
+                                             withAttributes: Attrs.lineText)
             }
             guard parts.words.count == line.words.count else { continue }
             for (i, wd) in line.words.enumerated() {
@@ -551,7 +595,7 @@ final class TimelineView: NSView {
                 }
                 if wr.width > 14 && wr.height >= 10 {
                     (wd.text as NSString).draw(in: wr.insetBy(dx: 3, dy: 0),
-                                               withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.black.withAlphaComponent(0.8)])
+                                               withAttributes: Attrs.wordText)
                 }
             }
         }
@@ -564,13 +608,16 @@ final class TimelineView: NSView {
         CGRect(x: x, y: TimelineLayout.rulerHeight, width: bounds.width - x, height: bounds.height).fill()
     }
 
-    private func drawRuler(_ l: TimelineLayout) {
+    private func drawRuler(_ l: TimelineLayout, dirty: CGRect) {
         let r = CGRect(x: 0, y: 0, width: bounds.width, height: TimelineLayout.rulerHeight)
         NSColor(calibratedWhite: 0.17, alpha: 1).setFill(); r.fill()
         NSColor(calibratedWhite: 0.05, alpha: 1).setFill(); CGRect(x: 0, y: r.maxY - 1, width: r.width, height: 1).fill()
+        // Playback repaints only the timecode box at the left (the playhead itself is a layer):
+        // the ticks, markers and cache strip right of it don't need laying out again.
+        guard dirty.maxX > TimelineLayout.headerWidth else { return drawPlayheadTimecode(ruler: r) }
         let step = l.tickInterval(fps: project.fps)
         var t = (l.scrollTime / step).rounded(.down) * step
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor]
+        let attrs = Attrs.rulerTick
         while l.x(for: t) < bounds.width {
             let x = l.x(for: t)
             if x >= TimelineLayout.headerWidth {
@@ -590,16 +637,41 @@ final class TimelineView: NSView {
         }
         drawCinemascopeMarkers(l, ruler: r)
         drawCacheStrip(l, ruler: r)
+        drawPlayheadTimecode(ruler: r)
+    }
+
+    /// The playhead's timecode in the box above the track headers.
+    private func drawPlayheadTimecode(ruler r: CGRect) {
         NSColor(calibratedWhite: 0.19, alpha: 1).setFill()
         CGRect(x: 0, y: 0, width: TimelineLayout.headerWidth, height: r.height - 1).fill()
         (Timecode.string(editor.playhead, fps: project.fps) as NSString).draw(at: CGPoint(x: 10, y: 6),
-            withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.systemRed])
+            withAttributes: Attrs.playheadTime)
     }
 
     private func drawCacheStrip(_ l: TimelineLayout, ruler r: CGRect) {
-        if stripMemo?.revision != editor.revision || stripMemo?.files != editor.segmentFiles {
-            let states = CacheStrip.states(project: project, settings: .defaults(for: project), files: editor.segmentFiles)
-            stripMemo = (editor.revision, editor.segmentFiles, states)
+        let revision = editor.revision, files = editor.segmentFiles
+        if stripMemo?.revision != revision || stripMemo?.files != files {
+            if files.isEmpty {
+                // Nothing exported: every segment is uncached and nothing is drawn.
+                stripMemo = (revision, files, [])
+                stripPending = nil
+            } else if stripPending?.revision != revision || stripPending?.files != files {
+                // A key per segment of the whole song takes a while (about 10 ms for a 3.5 minute
+                // song): work it out off the main thread and show it when it's ready. Until
+                // then the strip shows the states before this edit.
+                stripPending = (revision, files)
+                let project = editor.project
+                let settings = ExportSettings.defaults(for: project)   // presets are read here, on the main thread
+                DispatchQueue.global(qos: .utility).async { [weak self] in
+                    let states = CacheStrip.states(project: project, settings: settings, files: files)
+                    DispatchQueue.main.async {
+                        guard let self, self.stripPending?.revision == revision, self.stripPending?.files == files else { return }
+                        self.stripPending = nil
+                        self.stripMemo = (revision, files, states)
+                        self.setNeedsDisplay(CGRect(x: 0, y: 0, width: self.bounds.width, height: TimelineLayout.rulerHeight))
+                    }
+                }
+            }
         }
         CacheStrip.draw(stripMemo?.states ?? [], layout: l, width: bounds.width, y: r.maxY - CacheStrip.height - 1)
     }
@@ -622,7 +694,7 @@ final class TimelineView: NSView {
             let flag = NSBezierPath()
             flag.move(to: CGPoint(x: x - 6, y: 0)); flag.line(to: CGPoint(x: x + 6, y: 0)); flag.line(to: CGPoint(x: x, y: 8)); flag.close()
             flag.fill()
-            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: Self.cinemaColor]
+            let attrs = Attrs.cinemaFlag
             let str = label as NSString
             let w = str.size(withAttributes: attrs).width
             str.draw(at: CGPoint(x: x == xs ? x + 4 : x - w - 4, y: 12), withAttributes: attrs)

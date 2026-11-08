@@ -42,6 +42,22 @@ final class DecodedImageCacheTests: XCTestCase {
         XCTAssertEqual(cache.decodeCount, 2)
     }
 
+    /// The app's cache trusts a file's size and date for a moment (the preview asks for every
+    /// image after each edit); a change on disk shows once that has passed.
+    func testFileChecksAreTrustedForTheRecheckInterval() throws {
+        let cache = DecodedImageCache(recheckInterval: 0.3)
+        let png = try TestMedia.halfTransparentPNG(size: 64)
+        XCTAssertEqual(try XCTUnwrap(cache.image(at: png)).extent.width, 64)
+        let other = try TestMedia.halfTransparentPNG(size: 96)
+        try FileManager.default.removeItem(at: png)
+        try FileManager.default.copyItem(at: other, to: png)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: png.path)
+        XCTAssertEqual(try XCTUnwrap(cache.image(at: png)).extent.width, 64, "within the interval: no file system check")
+        Thread.sleep(forTimeInterval: 0.35)
+        XCTAssertEqual(try XCTUnwrap(cache.image(at: png)).extent.width, 96, "after it: checked again and decoded")
+        XCTAssertEqual(cache.decodeCount, 2)
+    }
+
     func testAMissingFileGivesNoImage() {
         XCTAssertNil(DecodedImageCache().image(at: URL(fileURLWithPath: "/nonexistent-\(UUID()).png")))
     }
